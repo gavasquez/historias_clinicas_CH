@@ -1,0 +1,594 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model acompanantes {
+  id_acompanante        Int       @id @default(autoincrement())
+  id_paciente           Int
+  nombre                String    @db.VarChar(150)
+  direccion             String?   @db.VarChar(200)
+  telefono              String?   @db.VarChar(50)
+  relacion_con_paciente String?   @db.VarChar(100)
+  pacientes             pacientes @relation(fields: [id_paciente], references: [id_paciente], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model archivos_adjuntos {
+  id_archivo       Int       @id @default(autoincrement())
+  entidad          String    @db.VarChar(50)
+  id_entidad       Int
+  nombre_archivo   String    @db.VarChar(255)
+  ruta             String    @db.VarChar(500)
+  tipo_mime        String?   @db.VarChar(100)
+  tamano_bytes     BigInt?
+  id_usuario_subio Int?
+  fecha_subida     DateTime  @default(now()) @db.Timestamp(6)
+  usuarios         usuarios? @relation(fields: [id_usuario_subio], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([entidad, id_entidad], map: "idx_adjuntos_entidad")
+}
+
+model atenciones_salud {
+  id_atencion                 Int                           @id @default(autoincrement())
+  id_historia                 Int
+  id_profesional              Int?
+  id_tipo_atencion            Int?
+  id_modalidad_atencion       Int?
+  id_cita                     Int?
+  fecha_hora                  DateTime                      @default(now()) @db.Timestamp(6)
+  motivo_atencion             String?
+  nota_atencion               String?
+  observacion_analisis        String?
+  plan_manejo                 String?
+  historias_clinicas          historias_clinicas            @relation(fields: [id_historia], references: [id_historia], onDelete: Cascade, onUpdate: NoAction)
+  modalidades_atencion        modalidades_atencion?         @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion], onDelete: NoAction, onUpdate: NoAction)
+  profesionales_salud         profesionales_salud?          @relation(fields: [id_profesional], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
+  tipos_atencion              tipos_atencion?               @relation(fields: [id_tipo_atencion], references: [id_tipo_atencion], onDelete: NoAction, onUpdate: NoAction)
+  citas                       citas?                        @relation(fields: [id_cita], references: [id_cita], onDelete: NoAction, onUpdate: NoAction, map: "fk_atencion_cita")
+  certificados_medicos        certificados_medicos[]
+  consentimientos_paciente    consentimientos_paciente[]
+  desistimientos_programa     desistimientos_programa[]
+  diagnosticos_atencion       diagnosticos_atencion[]
+  eventos_seguimiento_cronico eventos_seguimiento_cronico[]
+  examenes_diagnosticos       examenes_diagnosticos[]
+  formulas_medicas            formulas_medicas[]
+  recomendaciones_medicas     recomendaciones_medicas[]
+  rutas_activadas_atencion    rutas_activadas_atencion[]
+}
+
+model auditoria {
+  id_auditoria Int       @id @default(autoincrement())
+  id_usuario   Int?
+  tabla        String    @db.VarChar(100)
+  id_registro  String    @db.VarChar(100)
+  accion       String    @db.VarChar(20)
+  fecha_hora   DateTime  @default(now()) @db.Timestamp(6)
+  detalle      String?
+  usuarios     usuarios? @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model catalogo_examenes {
+  id_examen_catalogo    Int                     @id @default(autoincrement())
+  nombre                String                  @db.VarChar(150)
+  id_tipo_examen        Int
+  activo                Boolean                 @default(true)
+  tipos_examen          tipos_examen            @relation(fields: [id_tipo_examen], references: [id_tipo_examen], onDelete: NoAction, onUpdate: NoAction)
+  examenes_diagnosticos examenes_diagnosticos[]
+}
+
+model catalogo_medicamentos {
+  id_medicamento   Int             @id @default(autoincrement())
+  nombre_generico  String          @db.VarChar(150)
+  nombre_comercial String?         @db.VarChar(150)
+  presentacion     String?         @db.VarChar(100)
+  registro_invima  String?         @db.VarChar(50)
+  activo           Boolean         @default(true)
+  items_formula    items_formula[]
+}
+
+model certificados_medicos {
+  id_certificado           Int                      @id @default(autoincrement())
+  id_atencion              Int
+  id_tipo_certificado      Int
+  restricciones            String?
+  recomendaciones          String?
+  fecha_emision            DateTime                 @default(now()) @db.Timestamp(6)
+  codigo_verificacion      String?                  @db.VarChar(100)
+  firma_digital            String?
+  id_usuario_emisor        Int?
+  atenciones_salud         atenciones_salud         @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  tipos_certificado_medico tipos_certificado_medico @relation(fields: [id_tipo_certificado], references: [id_tipo_certificado], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                 usuarios?                @relation(fields: [id_usuario_emisor], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model cie10 {
+  codigo                String                  @id @db.VarChar(10)
+  descripcion           String                  @db.VarChar(255)
+  diagnosticos_atencion diagnosticos_atencion[]
+}
+
+model citas {
+  id_cita             Int                 @id @default(autoincrement())
+  id_paciente         Int
+  id_profesional      Int
+  id_sede             Int?
+  id_tipo_cita        Int?
+  id_estado_cita      Int?
+  fecha_hora_inicio   DateTime            @db.Timestamp(6)
+  fecha_hora_fin      DateTime?           @db.Timestamp(6)
+  motivo              String?
+  canal_recordatorio  String?             @db.VarChar(50)
+  atenciones_salud    atenciones_salud[]
+  estados_cita        estados_cita?       @relation(fields: [id_estado_cita], references: [id_estado_cita], onDelete: NoAction, onUpdate: NoAction)
+  pacientes           pacientes           @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
+  profesionales_salud profesionales_salud @relation(fields: [id_profesional], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
+  sedes               sedes?              @relation(fields: [id_sede], references: [id_sede], onDelete: NoAction, onUpdate: NoAction)
+  tipos_cita          tipos_cita?         @relation(fields: [id_tipo_cita], references: [id_tipo_cita], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_paciente], map: "idx_citas_paciente")
+  @@index([id_profesional, fecha_hora_inicio], map: "idx_citas_profesional")
+}
+
+model consentimientos_paciente {
+  id_consentimiento         Int                       @id @default(autoincrement())
+  id_paciente               Int
+  id_plantilla              Int
+  id_atencion               Int?
+  id_estado_consentimiento  Int?
+  fecha_firma               DateTime                  @default(now()) @db.Timestamp(6)
+  firma_paciente            String?
+  firma_testigo             String?
+  observaciones             String?
+  atenciones_salud          atenciones_salud?         @relation(fields: [id_atencion], references: [id_atencion], onDelete: NoAction, onUpdate: NoAction)
+  estados_consentimiento    estados_consentimiento?   @relation(fields: [id_estado_consentimiento], references: [id_estado_consentimiento], onDelete: NoAction, onUpdate: NoAction)
+  pacientes                 pacientes                 @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
+  plantillas_consentimiento plantillas_consentimiento @relation(fields: [id_plantilla], references: [id_plantilla], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_paciente], map: "idx_consent_paciente")
+}
+
+model desistimientos_programa {
+  id_desistimiento       Int                  @id @default(autoincrement())
+  id_programa_paciente   Int
+  id_profesional         Int?
+  id_atencion            Int?
+  fecha                  DateTime             @db.Date
+  id_sede                Int?
+  motivo_desistimiento   String?
+  firma_digital          String?
+  compromiso_otras_rutas String?
+  atenciones_salud       atenciones_salud?    @relation(fields: [id_atencion], references: [id_atencion], onDelete: NoAction, onUpdate: NoAction)
+  profesionales_salud    profesionales_salud? @relation(fields: [id_profesional], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
+  programas_paciente     programas_paciente   @relation(fields: [id_programa_paciente], references: [id_programa_paciente], onDelete: NoAction, onUpdate: NoAction)
+  sedes                  sedes?               @relation(fields: [id_sede], references: [id_sede], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model diagnosticos_atencion {
+  id_diagnostico                 Int                             @id @default(autoincrement())
+  id_atencion                    Int
+  codigo_cie10                   String                          @db.VarChar(10)
+  es_principal                   Boolean                         @default(false)
+  id_tipo_confirmacion           Int?
+  cie10                          cie10                           @relation(fields: [codigo_cie10], references: [codigo], onDelete: NoAction, onUpdate: NoAction)
+  atenciones_salud               atenciones_salud                @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  tipos_confirmacion_diagnostico tipos_confirmacion_diagnostico? @relation(fields: [id_tipo_confirmacion], references: [id_tipo_confirmacion], onDelete: NoAction, onUpdate: NoAction)
+  seguimientos_cronicos          seguimientos_cronicos[]
+
+  @@index([id_atencion], map: "idx_diag_atencion")
+  @@index([codigo_cie10], map: "idx_diag_cie10")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model disponibilidades_profesional {
+  id_disponibilidad     Int                 @id @default(autoincrement())
+  id_profesional        Int
+  dia_semana            Int                 @db.SmallInt
+  hora_inicio           DateTime            @db.Time(6)
+  hora_fin              DateTime            @db.Time(6)
+  capacidad_simultanea  Int                 @default(1)
+  es_excepcion          Boolean             @default(false)
+  fecha_inicio_vigencia DateTime?           @db.Date
+  fecha_fin_vigencia    DateTime?           @db.Date
+  profesionales_salud   profesionales_salud @relation(fields: [id_profesional], references: [id_profesional], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model eps {
+  id_eps    Int         @id @default(autoincrement())
+  nombre    String      @db.VarChar(150)
+  nit       String?     @db.VarChar(50)
+  pacientes pacientes[]
+}
+
+model especialidades {
+  id_especialidad     Int                   @id @default(autoincrement())
+  nombre              String                @db.VarChar(100)
+  descripcion         String?               @db.VarChar(200)
+  profesionales_salud profesionales_salud[]
+}
+
+model estados_cita {
+  id_estado_cita Int     @id @default(autoincrement())
+  codigo         String  @unique @db.VarChar(50)
+  descripcion    String  @db.VarChar(150)
+  citas          citas[]
+}
+
+model estados_civiles {
+  id_estado_civil Int         @id @default(autoincrement())
+  codigo          String      @unique @db.VarChar(20)
+  descripcion     String      @db.VarChar(100)
+  pacientes       pacientes[]
+}
+
+model estados_consentimiento {
+  id_estado_consentimiento Int                        @id @default(autoincrement())
+  codigo                   String                     @unique @db.VarChar(50)
+  descripcion              String                     @db.VarChar(150)
+  consentimientos_paciente consentimientos_paciente[]
+}
+
+model estados_examen {
+  id_estado_examen      Int                     @id @default(autoincrement())
+  codigo                String                  @unique @db.VarChar(50)
+  descripcion           String                  @db.VarChar(150)
+  examenes_diagnosticos examenes_diagnosticos[]
+}
+
+model estados_programa_paciente {
+  id_estado_programa_paciente Int                  @id @default(autoincrement())
+  codigo                      String               @unique @db.VarChar(50)
+  descripcion                 String               @db.VarChar(150)
+  programas_paciente          programas_paciente[]
+}
+
+model estados_seguimiento {
+  id_estado_seguimiento       Int                           @id @default(autoincrement())
+  codigo                      String                        @unique @db.VarChar(50)
+  descripcion                 String                        @db.VarChar(150)
+  eventos_seguimiento_cronico eventos_seguimiento_cronico[]
+  seguimientos_cronicos       seguimientos_cronicos[]
+}
+
+model eventos_seguimiento_cronico {
+  id_evento              Int                   @id @default(autoincrement())
+  id_seguimiento_cronico Int
+  id_atencion            Int?
+  fecha_programada       DateTime?             @db.Date
+  fecha_realizada        DateTime?             @db.Date
+  id_estado_seguimiento  Int?
+  comentarios            String?
+  atenciones_salud       atenciones_salud?     @relation(fields: [id_atencion], references: [id_atencion], onDelete: NoAction, onUpdate: NoAction)
+  estados_seguimiento    estados_seguimiento?  @relation(fields: [id_estado_seguimiento], references: [id_estado_seguimiento], onDelete: NoAction, onUpdate: NoAction)
+  seguimientos_cronicos  seguimientos_cronicos @relation(fields: [id_seguimiento_cronico], references: [id_seguimiento_cronico], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model examenes_diagnosticos {
+  id_examen          Int               @id @default(autoincrement())
+  id_atencion        Int
+  id_examen_catalogo Int
+  id_estado_examen   Int?
+  indicaciones       String?
+  resultado          String?
+  atenciones_salud   atenciones_salud  @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  estados_examen     estados_examen?   @relation(fields: [id_estado_examen], references: [id_estado_examen], onDelete: NoAction, onUpdate: NoAction)
+  catalogo_examenes  catalogo_examenes @relation(fields: [id_examen_catalogo], references: [id_examen_catalogo], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model formulas_medicas {
+  id_formula              Int              @id @default(autoincrement())
+  id_atencion             Int
+  fecha_emision           DateTime         @default(now()) @db.Timestamp(6)
+  vigencia_hasta          DateTime?        @db.Date
+  instrucciones_generales String?
+  firma_digital           String?
+  atenciones_salud        atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  items_formula           items_formula[]
+}
+
+model generos {
+  id_genero   Int         @id @default(autoincrement())
+  codigo      String      @unique @db.VarChar(20)
+  descripcion String      @db.VarChar(100)
+  pacientes   pacientes[]
+}
+
+model historias_clinicas {
+  id_historia                Int                    @id @default(autoincrement())
+  id_paciente                Int
+  id_tipo_historia           Int
+  id_profesional_responsable Int?
+  fecha_apertura             DateTime               @default(now()) @db.Timestamp(6)
+  estado                     String?                @default("activa") @db.VarChar(50)
+  motivo_consulta            String?
+  enfermedad_actual          String?
+  antecedentes_personales    String?
+  antecedentes_familiares    String?
+  atenciones_salud           atenciones_salud[]
+  pacientes                  pacientes              @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
+  profesionales_salud        profesionales_salud?   @relation(fields: [id_profesional_responsable], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
+  tipos_historia_clinica     tipos_historia_clinica @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_paciente], map: "idx_historia_paciente")
+}
+
+model items_formula {
+  id_item               Int                   @id @default(autoincrement())
+  id_formula            Int
+  id_medicamento        Int
+  dosis                 String                @db.VarChar(100)
+  frecuencia            String                @db.VarChar(100)
+  duracion              String?               @db.VarChar(100)
+  via_administracion    String?               @db.VarChar(50)
+  formulas_medicas      formulas_medicas      @relation(fields: [id_formula], references: [id_formula], onDelete: Cascade, onUpdate: NoAction)
+  catalogo_medicamentos catalogo_medicamentos @relation(fields: [id_medicamento], references: [id_medicamento], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model modalidades_atencion {
+  id_modalidad_atencion Int                @id @default(autoincrement())
+  codigo                String             @unique @db.VarChar(50)
+  descripcion           String             @db.VarChar(150)
+  atenciones_salud      atenciones_salud[]
+}
+
+model pacientes {
+  id_paciente              Int                        @id @default(autoincrement())
+  id_tipo_documento        Int
+  numero_documento         String                     @unique @db.VarChar(50)
+  nombres                  String                     @db.VarChar(100)
+  apellidos                String                     @db.VarChar(100)
+  fecha_nacimiento         DateTime                   @db.Date
+  id_genero                Int?
+  id_estado_civil          Int?
+  direccion                String?                    @db.VarChar(200)
+  telefono                 String?                    @db.VarChar(50)
+  email                    String?                    @db.VarChar(150)
+  id_tipo_sangre           Int?
+  id_sede                  Int?
+  id_programa_academico    Int?
+  id_eps                   Int?
+  condicion_particular     String?
+  id_tipo_usuario          Int?
+  activo                   Boolean                    @default(true)
+  fecha_creacion           DateTime                   @default(now()) @db.Timestamp(6)
+  id_usuario_creacion      Int?
+  acompanantes             acompanantes[]
+  citas                    citas[]
+  consentimientos_paciente consentimientos_paciente[]
+  historias_clinicas       historias_clinicas[]
+  eps                      eps?                       @relation(fields: [id_eps], references: [id_eps], onDelete: NoAction, onUpdate: NoAction)
+  estados_civiles          estados_civiles?           @relation(fields: [id_estado_civil], references: [id_estado_civil], onDelete: NoAction, onUpdate: NoAction)
+  generos                  generos?                   @relation(fields: [id_genero], references: [id_genero], onDelete: NoAction, onUpdate: NoAction)
+  programas_academicos     programas_academicos?      @relation(fields: [id_programa_academico], references: [id_programa_academico], onDelete: NoAction, onUpdate: NoAction)
+  sedes                    sedes?                     @relation(fields: [id_sede], references: [id_sede], onDelete: NoAction, onUpdate: NoAction)
+  tipos_documento          tipos_documento            @relation(fields: [id_tipo_documento], references: [id_tipo_documento], onDelete: NoAction, onUpdate: NoAction)
+  tipos_sangre             tipos_sangre?              @relation(fields: [id_tipo_sangre], references: [id_tipo_sangre], onDelete: NoAction, onUpdate: NoAction)
+  tipos_usuario            tipos_usuario?             @relation(fields: [id_tipo_usuario], references: [id_tipo_usuario], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                 usuarios?                  @relation(fields: [id_usuario_creacion], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  programas_paciente       programas_paciente[]
+  seguimientos_cronicos    seguimientos_cronicos[]
+
+  @@index([nombres, apellidos], map: "idx_pacientes_nombre")
+}
+
+model plantillas_consentimiento {
+  id_plantilla             Int                        @id @default(autoincrement())
+  id_tipo_consentimiento   Int
+  version                  Int
+  vigente_desde            DateTime                   @db.Date
+  vigente_hasta            DateTime?                  @db.Date
+  contenido                String
+  id_usuario_creador       Int?
+  fecha_creacion           DateTime                   @default(now()) @db.Timestamp(6)
+  activo                   Boolean                    @default(true)
+  consentimientos_paciente consentimientos_paciente[]
+  tipos_consentimiento     tipos_consentimiento       @relation(fields: [id_tipo_consentimiento], references: [id_tipo_consentimiento], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                 usuarios?                  @relation(fields: [id_usuario_creador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([id_tipo_consentimiento, version])
+}
+
+model profesionales_salud {
+  id_profesional               Int                            @id @default(autoincrement())
+  id_usuario                   Int
+  id_sede                      Int?
+  id_especialidad              Int?
+  registro_medico              String?                        @db.VarChar(100)
+  telefono_contacto            String?                        @db.VarChar(50)
+  activo                       Boolean                        @default(true)
+  atenciones_salud             atenciones_salud[]
+  citas                        citas[]
+  desistimientos_programa      desistimientos_programa[]
+  disponibilidades_profesional disponibilidades_profesional[]
+  historias_clinicas           historias_clinicas[]
+  especialidades               especialidades?                @relation(fields: [id_especialidad], references: [id_especialidad], onDelete: NoAction, onUpdate: NoAction)
+  sedes                        sedes?                         @relation(fields: [id_sede], references: [id_sede], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                     usuarios                       @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model programas_academicos {
+  id_programa_academico Int         @id @default(autoincrement())
+  nombre                String      @db.VarChar(150)
+  codigo                String?     @unique @db.VarChar(50)
+  pacientes             pacientes[]
+}
+
+model programas_paciente {
+  id_programa_paciente        Int                        @id @default(autoincrement())
+  id_paciente                 Int
+  id_programa_salud           Int
+  id_estado_programa_paciente Int?
+  fecha_inicio                DateTime                   @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_fin                   DateTime?                  @db.Date
+  desistimientos_programa     desistimientos_programa[]
+  estados_programa_paciente   estados_programa_paciente? @relation(fields: [id_estado_programa_paciente], references: [id_estado_programa_paciente], onDelete: NoAction, onUpdate: NoAction)
+  pacientes                   pacientes                  @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
+  programas_salud             programas_salud            @relation(fields: [id_programa_salud], references: [id_programa_salud], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model programas_salud {
+  id_programa_salud     Int                     @id @default(autoincrement())
+  nombre                String                  @db.VarChar(150)
+  descripcion           String?                 @db.VarChar(300)
+  activo                Boolean                 @default(true)
+  programas_paciente    programas_paciente[]
+  seguimientos_cronicos seguimientos_cronicos[]
+}
+
+model recomendaciones_medicas {
+  id_recomendacion           Int                         @id @default(autoincrement())
+  id_atencion                Int
+  id_tipo_recomendacion      Int?
+  descripcion                String
+  atenciones_salud           atenciones_salud            @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  tipos_recomendacion_medica tipos_recomendacion_medica? @relation(fields: [id_tipo_recomendacion], references: [id_tipo_recomendacion], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model roles {
+  id_rol      Int        @id @default(autoincrement())
+  nombre      String     @unique @db.VarChar(50)
+  descripcion String?    @db.VarChar(200)
+  usuarios    usuarios[]
+}
+
+model rutas_activadas_atencion {
+  id_ruta_activada Int              @id @default(autoincrement())
+  id_atencion      Int
+  id_ruta_atencion Int
+  fecha_activacion DateTime         @default(now()) @db.Timestamp(6)
+  observaciones    String?
+  atenciones_salud atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  rutas_atencion   rutas_atencion   @relation(fields: [id_ruta_atencion], references: [id_ruta_atencion], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model rutas_atencion {
+  id_ruta_atencion         Int                        @id @default(autoincrement())
+  codigo                   String                     @unique @db.VarChar(50)
+  descripcion              String                     @db.VarChar(150)
+  rutas_activadas_atencion rutas_activadas_atencion[]
+}
+
+model sedes {
+  id_sede                 Int                       @id @default(autoincrement())
+  nombre                  String                    @db.VarChar(100)
+  ciudad                  String?                   @db.VarChar(100)
+  departamento            String?                   @db.VarChar(100)
+  citas                   citas[]
+  desistimientos_programa desistimientos_programa[]
+  pacientes               pacientes[]
+  profesionales_salud     profesionales_salud[]
+}
+
+model seguimientos_cronicos {
+  id_seguimiento_cronico      Int                           @id @default(autoincrement())
+  id_paciente                 Int
+  id_programa_salud           Int?
+  id_diagnostico_principal    Int?
+  fecha_inicio                DateTime                      @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_fin                   DateTime?                     @db.Date
+  id_estado_seguimiento       Int?
+  observaciones_generales     String?
+  eventos_seguimiento_cronico eventos_seguimiento_cronico[]
+  diagnosticos_atencion       diagnosticos_atencion?        @relation(fields: [id_diagnostico_principal], references: [id_diagnostico], onDelete: NoAction, onUpdate: NoAction, map: "fk_seguimiento_diag_principal")
+  estados_seguimiento         estados_seguimiento?          @relation(fields: [id_estado_seguimiento], references: [id_estado_seguimiento], onDelete: NoAction, onUpdate: NoAction)
+  pacientes                   pacientes                     @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
+  programas_salud             programas_salud?              @relation(fields: [id_programa_salud], references: [id_programa_salud], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model tipos_atencion {
+  id_tipo_atencion Int                @id @default(autoincrement())
+  codigo           String             @unique @db.VarChar(50)
+  descripcion      String             @db.VarChar(150)
+  atenciones_salud atenciones_salud[]
+}
+
+model tipos_certificado_medico {
+  id_tipo_certificado  Int                    @id @default(autoincrement())
+  codigo               String                 @unique @db.VarChar(50)
+  descripcion          String                 @db.VarChar(150)
+  certificados_medicos certificados_medicos[]
+}
+
+model tipos_cita {
+  id_tipo_cita Int     @id @default(autoincrement())
+  codigo       String  @unique @db.VarChar(50)
+  descripcion  String  @db.VarChar(150)
+  citas        citas[]
+}
+
+model tipos_confirmacion_diagnostico {
+  id_tipo_confirmacion  Int                     @id @default(autoincrement())
+  codigo                String                  @unique @db.VarChar(50)
+  descripcion           String                  @db.VarChar(150)
+  diagnosticos_atencion diagnosticos_atencion[]
+}
+
+model tipos_consentimiento {
+  id_tipo_consentimiento    Int                         @id @default(autoincrement())
+  codigo                    String                      @unique @db.VarChar(80)
+  descripcion               String                      @db.VarChar(200)
+  plantillas_consentimiento plantillas_consentimiento[]
+}
+
+model tipos_documento {
+  id_tipo_documento Int         @id @default(autoincrement())
+  codigo            String      @unique @db.VarChar(10)
+  descripcion       String      @db.VarChar(100)
+  pacientes         pacientes[]
+}
+
+model tipos_examen {
+  id_tipo_examen    Int                 @id @default(autoincrement())
+  codigo            String              @unique @db.VarChar(50)
+  descripcion       String              @db.VarChar(150)
+  catalogo_examenes catalogo_examenes[]
+}
+
+model tipos_historia_clinica {
+  id_tipo_historia   Int                  @id @default(autoincrement())
+  codigo             String               @unique @db.VarChar(50)
+  descripcion        String               @db.VarChar(150)
+  historias_clinicas historias_clinicas[]
+}
+
+model tipos_recomendacion_medica {
+  id_tipo_recomendacion   Int                       @id @default(autoincrement())
+  codigo                  String                    @unique @db.VarChar(50)
+  descripcion             String                    @db.VarChar(150)
+  recomendaciones_medicas recomendaciones_medicas[]
+}
+
+model tipos_sangre {
+  id_tipo_sangre Int         @id @default(autoincrement())
+  codigo         String      @unique @db.VarChar(5)
+  descripcion    String?     @db.VarChar(50)
+  pacientes      pacientes[]
+}
+
+model tipos_usuario {
+  id_tipo_usuario Int         @id @default(autoincrement())
+  codigo          String      @unique @db.VarChar(30)
+  descripcion     String      @db.VarChar(100)
+  pacientes       pacientes[]
+}
+
+model usuarios {
+  id_usuario                Int                         @id @default(autoincrement())
+  username                  String                      @unique @db.VarChar(50)
+  password_hash             String                      @db.VarChar(255)
+  nombre_completo           String                      @db.VarChar(150)
+  email                     String?                     @unique @db.VarChar(150)
+  activo                    Boolean                     @default(true)
+  id_rol                    Int
+  fecha_creacion            DateTime                    @default(now()) @db.Timestamp(6)
+  archivos_adjuntos         archivos_adjuntos[]
+  auditoria                 auditoria[]
+  certificados_medicos      certificados_medicos[]
+  pacientes                 pacientes[]
+  plantillas_consentimiento plantillas_consentimiento[]
+  profesionales_salud       profesionales_salud[]
+  roles                     roles                       @relation(fields: [id_rol], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
+}
