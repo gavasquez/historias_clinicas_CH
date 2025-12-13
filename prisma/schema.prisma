@@ -413,6 +413,7 @@ model programas_academicos {
   id_programa_academico Int         @id @default(autoincrement())
   nombre                String      @db.VarChar(150)
   codigo                String?     @unique @db.VarChar(50)
+  tipo_poblacion        String      @db.VarChar(30) // ADMIN, ESTUDIANTE, EGRESADO, PROFESOR, EXTERNO
   pacientes             pacientes[]
 }
 
@@ -448,10 +449,11 @@ model recomendaciones_medicas {
 }
 
 model roles {
-  id_rol      Int        @id @default(autoincrement())
-  nombre      String     @unique @db.VarChar(50)
-  descripcion String?    @db.VarChar(200)
-  usuarios    usuarios[]
+  id_rol         Int              @id @default(autoincrement())
+  nombre         String           @unique @db.VarChar(50)
+  descripcion    String?          @db.VarChar(200)
+  roles_permisos roles_permisos[]
+  usuarios       usuarios[]
 }
 
 model rutas_activadas_atencion {
@@ -591,4 +593,24 @@ model usuarios {
   plantillas_consentimiento plantillas_consentimiento[]
   profesionales_salud       profesionales_salud[]
   roles                     roles                       @relation(fields: [id_rol], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model permisos {
+  id_permiso     Int              @id @default(autoincrement())
+  codigo         String           @unique @db.VarChar(100)
+  descripcion    String           @db.VarChar(255)
+  modulo         String           @db.VarChar(50)
+  activo         Boolean          @default(true)
+  roles_permisos roles_permisos[]
+}
+
+model roles_permisos {
+  id_rol_permiso Int      @id @default(autoincrement())
+  id_rol         Int
+  id_permiso     Int
+  concedido      Boolean  @default(true)
+  permisos       permisos @relation(fields: [id_permiso], references: [id_permiso], onDelete: Cascade, onUpdate: NoAction)
+  roles          roles    @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([id_rol, id_permiso], map: "uq_rol_permiso")
 }
