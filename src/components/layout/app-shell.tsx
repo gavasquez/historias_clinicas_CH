@@ -11,12 +11,14 @@ import {
   FileText,
   BarChart3,
   LogOut,
+  Stethoscope,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Resumen", icon: LayoutDashboard },
   { href: "/patients", label: "Pacientes", icon: Users },
   { href: "/appointments", label: "Citas", icon: CalendarDays },
+  { href: '/professionals', label: "Profesionales", icon: Stethoscope },
   { href: "/records", label: "Historias clínicas", icon: FileText },
   { href: "/reports", label: "Reportes", icon: BarChart3 },
 ];

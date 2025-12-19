@@ -186,6 +186,7 @@ model diagnosticos_atencion {
 model disponibilidades_profesional {
   id_disponibilidad     Int                 @id @default(autoincrement())
   id_profesional        Int
+  id_sede               Int?
   dia_semana            Int                 @db.SmallInt
   hora_inicio           DateTime            @db.Time(6)
   hora_fin              DateTime            @db.Time(6)
@@ -194,6 +195,9 @@ model disponibilidades_profesional {
   fecha_inicio_vigencia DateTime?           @db.Date
   fecha_fin_vigencia    DateTime?           @db.Date
   profesionales_salud   profesionales_salud @relation(fields: [id_profesional], references: [id_profesional], onDelete: Cascade, onUpdate: NoAction)
+  sedes                 sedes?              @relation(fields: [id_sede], references: [id_sede], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_profesional, id_sede, dia_semana], map: "idx_disp_prof_sede_dia")
 }
 
 model eps {
@@ -482,6 +486,7 @@ model sedes {
   desistimientos_programa desistimientos_programa[]
   pacientes               pacientes[]
   profesionales_salud     profesionales_salud[]
+  disponibilidades_profesional disponibilidades_profesional[]
 }
 
 model seguimientos_cronicos {

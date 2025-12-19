@@ -29,6 +29,11 @@ export interface Sede {
   nombre: string;
 }
 
+export interface Especialidad {
+  id_especialidad: number;
+  nombre: string;
+}
+
 export interface ProgramaAcademico {
   id_programa_academico: number;
   nombre: string;
@@ -41,6 +46,18 @@ export interface Eps {
 
 export interface TipoUsuario {
   id_tipo_usuario: number;
+  codigo: string;
+  descripcion: string;
+}
+
+export interface TipoCita {
+  id_tipo_cita: number;
+  codigo: string;
+  descripcion: string;
+}
+
+export interface EstadoCita {
+  id_estado_cita: number;
   codigo: string;
   descripcion: string;
 }
@@ -70,6 +87,11 @@ export async function fetchSedes(): Promise<Sede[]> {
   return res.data;
 }
 
+export async function fetchEspecialidades(): Promise<Especialidad[]> {
+  const res = await apiClient.get<Especialidad[]>("/catalogs/specialties");
+  return res.data;
+}
+
 export async function fetchProgramas(): Promise<ProgramaAcademico[]> {
   const res = await apiClient.get<ProgramaAcademico[]>("/catalogs/programs");
   return res.data;
@@ -91,5 +113,15 @@ export async function fetchEps(): Promise<Eps[]> {
 
 export async function fetchTiposUsuario(): Promise<TipoUsuario[]> {
   const res = await apiClient.get<TipoUsuario[]>("/catalogs/user-types");
+  return res.data;
+}
+
+export async function fetchTiposCita(): Promise<TipoCita[]> {
+  const res = await apiClient.get<TipoCita[]>("/catalogs/appointment-types");
+  return res.data;
+}
+
+export async function fetchEstadosCita(): Promise<EstadoCita[]> {
+  const res = await apiClient.get<EstadoCita[]>("/catalogs/appointment-statuses");
   return res.data;
 }

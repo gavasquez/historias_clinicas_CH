@@ -79,6 +79,7 @@ export async function PUT(
       id_eps,
       condicion_particular,
       id_tipo_usuario,
+      activo,
     } = body;
 
     const updateData: any = {};
@@ -133,6 +134,16 @@ export async function PUT(
       updateData.condicion_particular = condicion_particular ?? null;
     if (id_tipo_usuario !== undefined)
       updateData.id_tipo_usuario = toNullableInt(id_tipo_usuario);
+
+    if (activo !== undefined) {
+      if (typeof activo !== "boolean") {
+        return NextResponse.json(
+          { message: "El campo activo debe ser boolean" },
+          { status: 400 },
+        );
+      }
+      updateData.activo = activo;
+    }
 
     const pacienteActualizado = await prisma.pacientes.update({
       where: { id_paciente: id },

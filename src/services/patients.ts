@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api";
 import axios from "axios";
 import type { PatientsResponse, PacienteDetalle } from "@/types/patients";
+import type { PatientAppointmentsResponse } from "@/types/patient-appointments";
 
 export interface PatientFilters {
   documento?: string;
@@ -59,6 +60,11 @@ export async function updatePatient(id: string, input: PatientCreateInput) {
   return res.data;
 }
 
+export async function togglePatientActive(id: string, activo: boolean) {
+  const res = await apiClient.put(`/patients/${id}`, { activo });
+  return res.data;
+}
+
 export async function getPatientDetailById(
   id: string,
 ): Promise<PacienteDetalle | null> {
@@ -71,4 +77,34 @@ export async function getPatientDetailById(
     }
     throw error;
   }
+}
+
+export interface PatientAppointmentsFilters {
+  desde?: string;
+  hasta?: string;
+  id_estado_cita?: number;
+  id_sede?: number;
+  profesional?: string;
+}
+
+export async function fetchPatientAppointments(
+  patientId: string,
+  params: { page: number; filters?: PatientAppointmentsFilters },
+): Promise<PatientAppointmentsResponse> {
+  const res = await apiClient.get<PatientAppointmentsResponse>(`/patients/${patientId}/appointments`, {
+    params: {
+      page: params.page,
+      desde: params.filters?.desde || undefined,
+      hasta: params.filters?.hasta || undefined,
+      id_estado_cita:
+        params.filters?.id_estado_cita && params.filters.id_estado_cita > 0
+          ? params.filters.id_estado_cita
+          : undefined,
+      id_sede:
+        params.filters?.id_sede && params.filters.id_sede > 0 ? params.filters.id_sede : undefined,
+      profesional: params.filters?.profesional?.trim() || undefined,
+    },
+  });
+
+  return res.data;
 }

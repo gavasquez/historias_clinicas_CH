@@ -4,6 +4,7 @@ export interface Paciente {
   nombres: string;
   apellidos: string;
   fecha_nacimiento: string;
+  activo?: boolean;
   tipos_documento: { codigo: string } | null;
   tipos_usuario: { descripcion: string } | null;
   programas_academicos: { nombre: string } | null;
@@ -46,6 +47,7 @@ export interface PacienteDetalle {
   nombres: string;
   apellidos: string;
   fecha_nacimiento: string;
+  activo?: boolean;
   telefono: string | null;
   email: string | null;
   direccion: string | null;

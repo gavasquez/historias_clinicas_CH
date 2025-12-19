@@ -2,18 +2,34 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
 import type { PatientsResponse } from "@/types/patients";
-import { fetchPatients } from "@/services/patients";
+import { fetchPatients, togglePatientActive } from "@/services/patients";
+import Swal from "sweetalert2";
 
 export function PatientsView() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [documento, setDocumento] = useState("");
   const [nombre, setNombre] = useState("");
   const [tipoUsuario, setTipoUsuario] = useState("");
   const [programa, setPrograma] = useState("");
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, activo }: { id: string; activo: boolean }) => togglePatientActive(id, activo),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["patients"] });
+    },
+  });
+
+  const estadoBadgeClasses = (activo?: boolean) => {
+    const base =
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border";
+    if (activo === false) return `${base} border-slate-200 bg-slate-50 text-slate-500`;
+    return `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
+  };
 
   const { data, isLoading, isError } = useQuery<PatientsResponse>({
     queryKey: [
@@ -132,6 +148,7 @@ export function PatientsView() {
                   <th className="px-4 py-3">Tipo usuario</th>
                   <th className="px-4 py-3">Programa</th>
                   <th className="px-4 py-3">Sede</th>
+                  <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -139,7 +156,7 @@ export function PatientsView() {
                 {isLoading && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-6 text-center text-sm text-slate-500"
                     >
                       Cargando pacientes...
@@ -150,7 +167,7 @@ export function PatientsView() {
                 {isError && !isLoading && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-4 py-6 text-center text-sm text-red-600"
                     >
                       Ocurrió un error al cargar los pacientes.
@@ -161,7 +178,7 @@ export function PatientsView() {
                 {!isLoading && !isError && patients.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-4 py-6 text-center text-sm text-slate-500"
                     >
                       No hay pacientes registrados.
@@ -195,14 +212,53 @@ export function PatientsView() {
                       <td className="px-4 py-3 text-xs md:text-sm">
                         {p.sedes?.nombre ?? ""}
                       </td>
+                      <td className="px-4 py-3 text-xs md:text-sm">
+                        <span className={estadoBadgeClasses(p.activo)}>
+                          {p.activo === false ? "Inactivo" : "Activo"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-right text-xs md:text-sm">
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/patients/${p.id_paciente}`)}
-                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-                        >
-                          Ver
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/patients/${p.id_paciente}`)}
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+                          >
+                            Ver
+                          </button>
+                          <button
+                            type="button"
+                            disabled={toggleActiveMutation.isPending}
+                            onClick={async () => {
+                              const nextActive = p.activo === false;
+                              const result = await Swal.fire({
+                                title: nextActive ? "¿Activar paciente?" : "¿Inactivar paciente?",
+                                text: nextActive
+                                  ? "El paciente volverá a estar disponible en el sistema."
+                                  : "El paciente quedará inactivo en el sistema.",
+                                icon: "warning",
+                                showCancelButton: true,
+                                confirmButtonText: nextActive ? "Activar" : "Inactivar",
+                                cancelButtonText: "Cancelar",
+                                confirmButtonColor: nextActive ? "#0ea5e9" : "#ef4444",
+                                cancelButtonColor: "#6b7280",
+                              });
+
+                              if (!result.isConfirmed) return;
+                              toggleActiveMutation.mutate({
+                                id: String(p.id_paciente),
+                                activo: nextActive,
+                              });
+                            }}
+                            className={
+                              p.activo === false
+                                ? "rounded-lg border border-sky-300 px-2 py-1 text-xs font-medium text-sky-700 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                : "rounded-lg border border-red-300 px-2 py-1 text-xs font-medium text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            }
+                          >
+                            {p.activo === false ? "Activar" : "Inactivar"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

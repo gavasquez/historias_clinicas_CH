@@ -50,11 +50,11 @@ Leyenda de estado:
 
 ## Fase 3: Agenda y Citas
 
-- ⬜ Página simple de profesionales (`/professionals`)
-- ⬜ Configuración básica de disponibilidad de profesionales
-- ⬜ Página de agenda / listado de citas por profesional y fecha
-- ⬜ Formulario para crear / editar citas (selección de paciente, profesional, tipo, fecha/hora)
-- ⬜ Historial de citas por paciente
+- ✅ Página simple de profesionales (`/professionals`)
+- ✅ Configuración básica de disponibilidad de profesionales
+- ✅ Página de agenda / listado de citas por profesional y fecha
+- ✅ Formulario para crear / editar citas (selección de paciente, profesional, tipo, fecha/hora)
+- ✅ Historial de citas por paciente
 
 ---
 
@@ -73,6 +73,15 @@ Leyenda de estado:
 - ⬜ Búsqueda de CIE-10 (por código y descripción) integrada a las atenciones
 - ⬜ Registro de diagnósticos principal/secundarios, presuntivo/definitivo
 - ⬜ Generación de fórmulas médicas (medicamentos, dosis, frecuencia)
+
+---
+
+## Fase 6: Administración de Usuarios del Sistema
+
+- ⬜ API `/api/users` para gestión básica de usuarios (GET listado, POST creación, PUT actualización)
+- ⬜ Página `/users` con listado de usuarios del sistema
+- ⬜ Formulario `/users/new` para crear usuarios (nombre, email, rol, estado)
+- ⬜ Acción desde `/users` para "Marcar como profesional" que cree o asocie el registro en `profesionales_salud`
 - ⬜ Registro de exámenes complementarios (laboratorio, imagen, otros)
 
 ---
