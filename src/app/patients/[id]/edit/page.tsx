@@ -18,12 +18,16 @@ import type {
   ProgramaAcademico,
   Eps,
   TipoUsuario,
+  Departamento,
+  Ciudad,
 } from "@/services/catalogs";
 
 export default function EditPatientPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id;
+
+  const [idDepartamento, setIdDepartamento] = useState<number | undefined>(undefined);
 
   const [form, setForm] = useState<PatientCreateInput | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -43,9 +47,14 @@ export default function EditPatientPage() {
     tiposUsuario,
     eps,
     programas,
-  } = usePatientCatalogs(form?.id_tipo_usuario as number | undefined);
+    departamentos,
+    ciudades,
+  } = usePatientCatalogs(
+    form?.id_tipo_usuario as number | undefined,
+    idDepartamento,
+  );
 
-  const { data: pacienteApi, isLoading: loadingPaciente } = useQuery<PacienteDetalleApi>({
+  const { data: pacienteApi, isLoading: loadingPaciente } = useQuery<PacienteDetalleApi & { id_departamento?: number | null }>({
     queryKey: ["patient-edit", id],
     enabled: !!id,
     queryFn: () => getPatientById(String(id)),
@@ -53,6 +62,9 @@ export default function EditPatientPage() {
 
   useEffect(() => {
     if (pacienteApi && !form) {
+      if (pacienteApi.id_departamento) {
+        setIdDepartamento(pacienteApi.id_departamento);
+      }
       setForm({
         id_tipo_documento: pacienteApi.id_tipo_documento,
         numero_documento: pacienteApi.numero_documento,
@@ -61,6 +73,7 @@ export default function EditPatientPage() {
         fecha_nacimiento: pacienteApi.fecha_nacimiento.substring(0, 10),
         telefono: pacienteApi.telefono ?? "",
         email: pacienteApi.email ?? "",
+        id_ciudad: pacienteApi.id_ciudad ?? undefined,
         id_genero: pacienteApi.id_genero ?? undefined,
         id_estado_civil: pacienteApi.id_estado_civil ?? undefined,
         direccion: pacienteApi.direccion ?? "",
@@ -73,6 +86,12 @@ export default function EditPatientPage() {
       });
     }
   }, [pacienteApi, form]);
+
+  useEffect(() => {
+    if (!form?.id_ciudad) return;
+    if (idDepartamento !== undefined) return;
+    setIdDepartamento(undefined);
+  }, [form?.id_ciudad, idDepartamento]);
 
   useEffect(() => {
     if (toast) {
@@ -95,6 +114,7 @@ export default function EditPatientPage() {
       id_tipo_documento: Number(form.id_tipo_documento || 0),
       id_genero: Number(form.id_genero || 0),
       id_estado_civil: Number(form.id_estado_civil || 0),
+      id_ciudad: Number(form.id_ciudad || 0),
       id_sede: Number(form.id_sede || 0),
       id_programa_academico: Number(form.id_programa_academico || 0),
       id_tipo_usuario: Number(form.id_tipo_usuario || 0),
@@ -276,7 +296,9 @@ export default function EditPatientPage() {
 
               {/* Teléfono */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-600">Teléfono</label>
+                <label className="text-xs font-medium text-slate-600">
+                  Teléfono <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={form.telefono ?? ""}
@@ -284,6 +306,64 @@ export default function EditPatientPage() {
                   placeholder="Teléfono de contacto"
                   className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
+                {errors.telefono && (
+                  <span className="text-xs text-red-600">{errors.telefono}</span>
+                )}
+              </div>
+
+              {/* Departamento */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">
+                  Departamento <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={idDepartamento ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value === "" ? undefined : Number(e.target.value);
+                    setIdDepartamento(value);
+                    setForm((prev) => (prev ? { ...prev, id_ciudad: undefined } : prev));
+                  }}
+                  className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Seleccione departamento</option>
+                  {(departamentos ?? []).map((dep: Departamento) => (
+                    <option key={dep.id_departamento} value={dep.id_departamento}>
+                      {dep.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ciudad */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">
+                  Ciudad <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.id_ciudad ?? ""}
+                  onChange={(e) =>
+                    handleChange(
+                      "id_ciudad",
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  disabled={!idDepartamento || !(ciudades ?? []).length}
+                  className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {idDepartamento
+                      ? "Seleccione ciudad"
+                      : "Seleccione primero el departamento"}
+                  </option>
+                  {(ciudades ?? []).map((c: Ciudad) => (
+                    <option key={c.id_ciudad} value={c.id_ciudad}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+                {errors.id_ciudad && (
+                  <span className="text-xs text-red-600">{errors.id_ciudad}</span>
+                )}
               </div>
 
               {/* Correo */}

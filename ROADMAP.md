@@ -39,7 +39,7 @@ Leyenda de estado:
 
 ## Fase 2: Gestión de Pacientes
 
-- 🟡 Página `/patients` con listado paginado de pacientes
+- ✅ Página `/patients` con listado paginado de pacientes
 - ✅ Filtros por documento, nombre, tipo de usuario, programa
 - ✅ Formulario de creación de paciente con validaciones (zod)
 - ✅ Uso de catálogos (tipos doc, géneros, EPS, programas académicos)
@@ -60,28 +60,28 @@ Leyenda de estado:
 
 ## Fase 4: Historias Clínicas y Atenciones
 
-- ⬜ Vista de historias clínicas por paciente (`/patients/[id]/records`)
-- ⬜ Creación de historia clínica (consulta externa, ingreso)
+- ✅ Vista de historias clínicas por paciente (`/patients/[id]/records`)
+- ✅ Creación de historia clínica (consulta externa, ingreso)
 - ⬜ Formulario de historia clínica (secciones principales FO-BI-SA-07 / 08)
-- ⬜ Registro de atenciones / evoluciones (`atenciones_salud`) asociadas a historias
+- ✅ Registro de atenciones / evoluciones (`atenciones_salud`) asociadas a historias
 - ⬜ Timeline de atenciones por historia
 
 ---
 
 ## Fase 5: Diagnósticos CIE-10 e Indicaciones
 
-- ⬜ Búsqueda de CIE-10 (por código y descripción) integrada a las atenciones
-- ⬜ Registro de diagnósticos principal/secundarios, presuntivo/definitivo
+- ✅ Búsqueda de CIE-10 (por código y descripción) integrada a las atenciones
+- ✅ Registro de diagnósticos principal/secundarios, presuntivo/definitivo
 - ⬜ Generación de fórmulas médicas (medicamentos, dosis, frecuencia)
 
 ---
 
 ## Fase 6: Administración de Usuarios del Sistema
 
-- ⬜ API `/api/users` para gestión básica de usuarios (GET listado, POST creación, PUT actualización)
-- ⬜ Página `/users` con listado de usuarios del sistema
-- ⬜ Formulario `/users/new` para crear usuarios (nombre, email, rol, estado)
-- ⬜ Acción desde `/users` para "Marcar como profesional" que cree o asocie el registro en `profesionales_salud`
+- ✅ API `/api/users` para gestión básica de usuarios (GET listado, POST creación, PUT actualización)
+- ✅ Página `/users` con listado de usuarios del sistema
+- ✅ Formulario `/users/new` para crear usuarios (nombre, email, rol, estado)
+- ✅ Acción desde `/users` para "Marcar como profesional" que cree o asocie el registro en `profesionales_salud`
 - ⬜ Registro de exámenes complementarios (laboratorio, imagen, otros)
 
 ---

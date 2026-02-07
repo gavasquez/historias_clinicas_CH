@@ -16,8 +16,11 @@ export interface PatientCreateInput {
   nombres: string;
   apellidos: string;
   fecha_nacimiento: string; // ISO date (yyyy-mm-dd)
-  telefono?: string;
+  telefono: string;
   email?: string;
+  id_ciudad?: number;
+  departamento?: string;
+  ciudad?: string;
   id_genero?: number;
   id_estado_civil?: number;
   direccion?: string;
@@ -27,6 +30,11 @@ export interface PatientCreateInput {
   id_eps?: number;
   condicion_particular?: string;
   id_tipo_usuario?: number;
+
+  contacto_emergencia_nombre?: string;
+  contacto_emergencia_relacion?: string;
+  contacto_emergencia_telefono?: string;
+  contacto_emergencia_direccion?: string;
 }
 
 export async function fetchPatients(

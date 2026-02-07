@@ -61,7 +61,7 @@ function CompanionForm({
             value={values.nombre}
             onChange={(e) => onChange({ nombre: e.target.value })}
             className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            placeholder="Nombre del acompañante"
+            placeholder="Nombre completo"
           />
         </div>
 
@@ -96,7 +96,7 @@ function CompanionForm({
             value={values.direccion}
             onChange={(e) => onChange({ direccion: e.target.value })}
             className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            placeholder="Dirección del acompañante"
+            placeholder="Dirección del contacto"
           />
         </div>
 
@@ -187,11 +187,11 @@ export default function PatientCompanionsPage() {
       setCompanionForm({ nombre: "", relacion_con_paciente: "", telefono: "", direccion: "" });
       setCompanionError(null);
       await queryClient.invalidateQueries({ queryKey: ["companions", id] });
-      setToast({ type: "success", message: "Acompañante registrado correctamente" });
+      setToast({ type: "success", message: "Contacto de emergencia registrado correctamente" });
     },
     onError: () => {
-      setCompanionError("No se pudo registrar el acompañante. Intente de nuevo.");
-      setToast({ type: "error", message: "No se pudo registrar el acompañante" });
+      setCompanionError("No se pudo registrar el contacto de emergencia. Intente de nuevo.");
+      setToast({ type: "error", message: "No se pudo registrar el contacto de emergencia" });
     },
   });
 
@@ -206,11 +206,11 @@ export default function PatientCompanionsPage() {
     onSuccess: async () => {
       setEditingId(null);
       await queryClient.invalidateQueries({ queryKey: ["companions", id] });
-      setToast({ type: "success", message: "Acompañante actualizado correctamente" });
+      setToast({ type: "success", message: "Contacto de emergencia actualizado correctamente" });
     },
     onError: () => {
-      setCompanionError("No se pudo actualizar el acompañante. Intente de nuevo.");
-      setToast({ type: "error", message: "No se pudo actualizar el acompañante" });
+      setCompanionError("No se pudo actualizar el contacto de emergencia. Intente de nuevo.");
+      setToast({ type: "error", message: "No se pudo actualizar el contacto de emergencia" });
     },
   });
 
@@ -220,10 +220,10 @@ export default function PatientCompanionsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
-              Acompañantes del paciente
+              Contacto de emergencia del paciente
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Gestione los acompañantes asociados al paciente.
+              Gestione el contacto de emergencia asociado al paciente.
             </p>
             {patient && (
               <p className="mt-1 text-xs text-slate-500">
@@ -246,21 +246,21 @@ export default function PatientCompanionsPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
           <div className="space-y-2 text-sm">
             <p className="text-xs font-semibold uppercase text-slate-500">
-              Lista de acompañantes
+              Lista de contacto de emergencia
             </p>
 
             {loadingCompanions && (
-              <p className="text-sm text-slate-500">Cargando acompañantes...</p>
+              <p className="text-sm text-slate-500">Cargando contacto de emergencia...</p>
             )}
 
             {companionsError && !loadingCompanions && (
               <p className="text-sm text-red-600">
-                Ocurrió un error al cargar los acompañantes.
+                Ocurrió un error al cargar el contacto de emergencia.
               </p>
             )}
 
             {!loadingCompanions && !companionsError && (companions?.length ?? 0) === 0 && (
-              <p className="text-sm text-slate-500">No hay acompañantes registrados.</p>
+              <p className="text-sm text-slate-500">No hay contacto de emergencia registrado.</p>
             )}
 
             {(companions?.length ?? 0) > 0 && (
@@ -402,7 +402,7 @@ export default function PatientCompanionsPage() {
             )}
           </div>
           <CompanionForm
-            title="Registrar nuevo acompañante"
+            title="Registrar nuevo contacto de emergencia"
             values={companionForm}
             error={companionError}
             isSubmitting={companionMutation.isPending}

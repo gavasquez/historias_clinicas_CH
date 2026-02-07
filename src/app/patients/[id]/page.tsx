@@ -114,7 +114,7 @@ export default function PatientDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ["companions", id] });
     },
     onError: () => {
-      setCompanionError("No se pudo registrar el acompañante. Intente de nuevo.");
+      setCompanionError("No se pudo registrar el contacto de emergencia. Intente de nuevo.");
     },
   });
 
@@ -157,6 +157,13 @@ export default function PatientDetailPage() {
             >
               Editar paciente
             </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/patients/${id}/records`)}
+              className="rounded-lg border border-sky-500 px-3 py-1.5 text-xs font-medium text-sky-700 shadow-sm transition hover:bg-sky-50"
+            >
+              Historias clínicas
+            </button>
           </div>
         </div>
 
@@ -189,7 +196,7 @@ export default function PatientDetailPage() {
                     onClick={() => setActiveTab("acompanantes")}
                     className={tabButtonClasses("acompanantes")}
                   >
-                    Acompañantes
+                    Contacto de Emergencia
                   </button>
                   <button
                     type="button"
@@ -283,17 +290,17 @@ export default function PatientDetailPage() {
               {activeTab === "acompanantes" && (
                 <div className="space-y-2 text-sm">
                   {loadingCompanions && (
-                    <p className="text-sm text-slate-500">Cargando acompañantes...</p>
+                    <p className="text-sm text-slate-500">Cargando contacto de emergencia...</p>
                   )}
 
                   {companionsError && !loadingCompanions && (
                     <p className="text-sm text-red-600">
-                      Ocurrió un error al cargar los acompañantes.
+                      Ocurrió un error al cargar el contacto de emergencia.
                     </p>
                   )}
 
                   {!loadingCompanions && !companionsError && (companions?.length ?? 0) === 0 && (
-                    <p className="text-sm text-slate-500">No hay acompañantes registrados.</p>
+                    <p className="text-sm text-slate-500">No hay contacto de emergencia registrado.</p>
                   )}
 
                   {(companions?.length ?? 0) > 0 && (
@@ -330,7 +337,7 @@ export default function PatientDetailPage() {
                       onClick={() => router.push(`/patients/${id}/companions`)}
                       className="rounded-lg border border-slate-300 px-3 py-1.5 text-[11px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
                     >
-                      Gestionar acompañantes
+                      Gestionar contacto de emergencia
                     </button>
                   </div>
                 </div>
@@ -448,8 +455,8 @@ export default function PatientDetailPage() {
                     (patientAppointments?.data?.length ?? 0) > 0 && (
                       <div className="space-y-3">
                         <div className="overflow-x-auto">
-                          <table className="min-w-full text-left text-xs">
-                            <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          <table className="min-w-full text-left text-[11px]">
+                            <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                               <tr>
                                 <th className="px-3 py-2">Fecha / Hora</th>
                                 <th className="px-3 py-2">Profesional</th>

@@ -7,6 +7,7 @@ import { createPatient, PatientCreateInput } from "@/services/patients";
 import { usePatientCatalogs } from "@/hooks/usePatientCatalogs";
 import { patientSchema } from "@/validation/patient";
 import { PatientForm } from "@/components/patients/patient-form";
+import axios from "axios";
 import type {
   TipoDocumento,
   Genero,
@@ -20,6 +21,7 @@ import type {
 
 export default function NewPatientPage() {
   const router = useRouter();
+  const [idDepartamento, setIdDepartamento] = useState<number | undefined>(undefined);
   const [form, setForm] = useState<PatientCreateInput>({
     id_tipo_documento: undefined as unknown as number,
     numero_documento: "",
@@ -28,6 +30,7 @@ export default function NewPatientPage() {
     fecha_nacimiento: "",
     telefono: "",
     email: "",
+    id_ciudad: undefined,
     id_genero: undefined,
     id_estado_civil: undefined,
     direccion: "",
@@ -55,10 +58,11 @@ export default function NewPatientPage() {
     tiposUsuario,
     eps,
     programas,
-  } = usePatientCatalogs(form.id_tipo_usuario as number | undefined);
+    departamentos,
+    ciudades,
+  } = usePatientCatalogs(form.id_tipo_usuario as number | undefined, idDepartamento);
 
   useEffect(() => {
-    // Cuando cambie el tipo de usuario, reiniciamos el programa/área seleccionado
     setForm((prev) => ({
       ...prev,
       id_programa_academico: undefined,
@@ -78,14 +82,13 @@ export default function NewPatientPage() {
 
     const parsed = patientSchema.safeParse({
       ...form,
-      // Campos requeridos: si no hay selección, mandamos 0 para que falle .positive() con el mensaje personalizado
       id_tipo_documento: Number(form.id_tipo_documento || 0),
       id_genero: Number(form.id_genero || 0),
       id_estado_civil: Number(form.id_estado_civil || 0),
+      id_ciudad: Number(form.id_ciudad || 0),
       id_sede: Number(form.id_sede || 0),
       id_programa_academico: Number(form.id_programa_academico || 0),
       id_tipo_usuario: Number(form.id_tipo_usuario || 0),
-      // Opcionales numéricos
       id_tipo_sangre: form.id_tipo_sangre ? Number(form.id_tipo_sangre) : undefined,
       id_eps: form.id_eps ? Number(form.id_eps) : undefined,
     });
@@ -113,9 +116,21 @@ export default function NewPatientPage() {
       setToast({ type: "success", message: "Paciente creado correctamente" });
       router.push("/patients");
     } catch (error) {
-      console.error(error);
-      setApiError("No se pudo crear el paciente. Intente de nuevo.");
-      setToast({ type: "error", message: "No se pudo crear el paciente" });
+      const backendMessage =
+        axios.isAxiosError(error) && error.response?.data
+          ? (error.response.data as any).message
+          : null;
+
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        const msg = backendMessage || "Ya existe un paciente registrado con este número de documento";
+        setApiError(msg);
+        setToast({ type: "error", message: msg });
+      } else {
+        console.error(error);
+        const msg = backendMessage || "No se pudo crear el paciente. Intente de nuevo.";
+        setApiError(msg);
+        setToast({ type: "error", message: "No se pudo crear el paciente" });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -126,6 +141,11 @@ export default function NewPatientPage() {
     value: string | number,
   ) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleDepartamentoChange(value: number | undefined) {
+    setIdDepartamento(value);
+    setForm((prev) => ({ ...prev, id_ciudad: undefined }));
   }
 
   return (
@@ -177,6 +197,10 @@ export default function NewPatientPage() {
           sedes={sedes}
           tiposUsuario={tiposUsuario}
           eps={eps}
+          departamentos={departamentos}
+          ciudades={ciudades}
+          idDepartamento={idDepartamento}
+          onDepartamentoChange={handleDepartamentoChange}
           programas={programas}
         />
       </section>

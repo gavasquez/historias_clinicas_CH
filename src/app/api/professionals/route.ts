@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 export async function GET(request: NextRequest) {
   try {

@@ -12,7 +12,7 @@ import {
 } from "@/services/catalogs";
 import type { ProfesionalSaludListItem, ProfessionalsResponse } from "@/types/professionals";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 export function ProfessionalsView() {
   const router = useRouter();
@@ -140,8 +140,8 @@ export function ProfessionalsView() {
 
         {!isLoading && !isError && professionals.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <table className="min-w-full text-left text-[11px]">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-3 py-2">Nombre</th>
                   <th className="px-3 py-2">Especialidad</th>
@@ -177,13 +177,22 @@ export function ProfessionalsView() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/professionals/${prof.id_profesional}`)}
-                        className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-                      >
-                        Ver agenda
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/professionals/${prof.id_profesional}/edit`)}
+                          className="rounded-lg border border-sky-300 px-2 py-1 text-[11px] font-medium text-sky-700 shadow-sm transition hover:bg-sky-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/professionals/${prof.id_profesional}`)}
+                          className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+                        >
+                          Ver agenda
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

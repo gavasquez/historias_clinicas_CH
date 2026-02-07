@@ -8,6 +8,8 @@ import {
   fetchProgramasPorTipoPoblacion,
   fetchEps,
   fetchTiposUsuario,
+  fetchDepartamentos,
+  fetchCiudades,
   type TipoDocumento,
   type Genero,
   type EstadoCivil,
@@ -16,9 +18,11 @@ import {
   type ProgramaAcademico,
   type Eps,
   type TipoUsuario,
+  type Departamento,
+  type Ciudad,
 } from "@/services/catalogs";
 
-export function usePatientCatalogs(idTipoUsuario?: number) {
+export function usePatientCatalogs(idTipoUsuario?: number, idDepartamento?: number) {
   
   const {
     data: tiposDocumento,
@@ -58,6 +62,17 @@ export function usePatientCatalogs(idTipoUsuario?: number) {
     queryFn: fetchEps,
   });
 
+  const { data: departamentos } = useQuery<Departamento[]>({
+    queryKey: ["departamentos"],
+    queryFn: fetchDepartamentos,
+  });
+
+  const { data: ciudades } = useQuery<Ciudad[]>({
+    queryKey: ["ciudades", idDepartamento],
+    enabled: !!idDepartamento,
+    queryFn: () => fetchCiudades(idDepartamento),
+  });
+
   const { data: programas } = useQuery<ProgramaAcademico[]>({
     queryKey: ["programas", idTipoUsuario],
     enabled: !!idTipoUsuario && !!tiposUsuario?.length,
@@ -67,7 +82,9 @@ export function usePatientCatalogs(idTipoUsuario?: number) {
         (tu: TipoUsuario) => tu.id_tipo_usuario === idTipoUsuario,
       )?.codigo;
       if (!tipo) return [];
-      return fetchProgramasPorTipoPoblacion(tipo);
+
+      const tipoPoblacion = idTipoUsuario === 6 ? "ESTUDIANTE" : tipo;
+      return fetchProgramasPorTipoPoblacion(tipoPoblacion);
     },
   });
 
@@ -80,6 +97,8 @@ export function usePatientCatalogs(idTipoUsuario?: number) {
     sedes,
     tiposUsuario,
     eps,
+    departamentos,
+    ciudades,
     programas,
   };
 }

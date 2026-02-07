@@ -8,6 +8,10 @@ import {
   type Sede,
   type TipoCita,
   type EstadoCita,
+  fetchModalidadesAtencion,
+  type ModalidadAtencion,
+  fetchProgramasSalud,
+  type ProgramaSalud,
 } from "@/services/catalogs";
 import type { PatientsResponse } from "@/types/patients";
 import type { ProfessionalsResponse } from "@/types/professionals";
@@ -39,16 +43,32 @@ export function useAppointmentFormCatalogs() {
     queryFn: fetchEstadosCita,
   });
 
+  const { data: modalidadesAtencionData, isLoading: loadingModalidadesAtencion } =
+    useQuery<ModalidadAtencion[]>({
+      queryKey: ["modalidades-atencion-select"],
+      queryFn: fetchModalidadesAtencion,
+    });
+
+  const { data: programasSaludData, isLoading: loadingProgramasSalud } =
+    useQuery<ProgramaSalud[]>({
+      queryKey: ["programas-salud-select"],
+      queryFn: fetchProgramasSalud,
+    });
+
   return {
     patientsData,
     professionalsData,
     sedesData,
     tiposCitaData,
     estadosCitaData,
+    modalidadesAtencionData,
+    programasSaludData,
     loadingPatients,
     loadingProfessionals,
     loadingSedes,
     loadingTiposCita,
     loadingEstadosCita,
+    loadingModalidadesAtencion,
+    loadingProgramasSalud,
   };
 }

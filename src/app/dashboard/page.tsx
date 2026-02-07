@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { AppShell } from "@/components/layout/app-shell";
 import { CalendarDays, FileText, Users } from "lucide-react";
+import prisma from "@/lib/prisma";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -10,6 +11,25 @@ export default async function DashboardPage() {
   if (!session) {
     redirect("/login");
   }
+
+  const now = new Date();
+  const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+  const startOfTomorrowUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0),
+  );
+
+  const [patientsCount, todaysAppointmentsCount, recordsCount] = await Promise.all([
+    prisma.pacientes.count(),
+    prisma.citas.count({
+      where: {
+        fecha_hora_inicio: {
+          gte: startOfTodayUtc,
+          lt: startOfTomorrowUtc,
+        },
+      },
+    }),
+    prisma.historias_clinicas.count(),
+  ]);
 
   return (
     <AppShell>
@@ -32,7 +52,7 @@ export default async function DashboardPage() {
                   Pacientes
                 </p>
                 <p className="mt-1 text-2xl font-semibold text-slate-900">
-                  --
+                  {patientsCount}
                 </p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
@@ -51,7 +71,7 @@ export default async function DashboardPage() {
                   Citas de hoy
                 </p>
                 <p className="mt-1 text-2xl font-semibold text-slate-900">
-                  --
+                  {todaysAppointmentsCount}
                 </p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
@@ -70,7 +90,7 @@ export default async function DashboardPage() {
                   Historias clínicas
                 </p>
                 <p className="mt-1 text-2xl font-semibold text-slate-900">
-                  --
+                  {recordsCount}
                 </p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 export async function GET(request: NextRequest) {
   try {
@@ -110,12 +110,18 @@ export async function POST(request: NextRequest) {
       direccion,
       telefono,
       email,
+      id_ciudad,
       id_tipo_sangre,
       id_sede,
       id_programa_academico,
       id_eps,
       condicion_particular,
       id_tipo_usuario,
+
+      contacto_emergencia_nombre,
+      contacto_emergencia_relacion,
+      contacto_emergencia_telefono,
+      contacto_emergencia_direccion,
     } = body;
 
     const toNullableInt = (value: unknown) => {
@@ -126,6 +132,8 @@ export async function POST(request: NextRequest) {
 
     const idTipoDocumentoNum = Number(id_tipo_documento);
     const numeroDocumentoTrim = String(numero_documento ?? "").trim();
+    const telefonoTrim = String(telefono ?? "").trim();
+    const idCiudadNum = Number(id_ciudad);
 
     if (
       !idTipoDocumentoNum ||
@@ -133,7 +141,10 @@ export async function POST(request: NextRequest) {
       !numeroDocumentoTrim ||
       !nombres ||
       !apellidos ||
-      !fecha_nacimiento
+      !fecha_nacimiento ||
+      !telefonoTrim ||
+      !idCiudadNum ||
+      Number.isNaN(idCiudadNum)
     ) {
       return NextResponse.json(
         { message: "Faltan datos obligatorios del paciente" },
@@ -141,28 +152,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const paciente = await prisma.pacientes.create({
-      data: {
-        id_tipo_documento: idTipoDocumentoNum,
-        numero_documento: numeroDocumentoTrim,
-        nombres,
-        apellidos,
-        fecha_nacimiento: new Date(fecha_nacimiento),
-        id_genero: toNullableInt(id_genero),
-        id_estado_civil: toNullableInt(id_estado_civil),
-        direccion: direccion ?? null,
-        telefono: telefono ?? null,
-        email: email ?? null,
-        id_tipo_sangre: toNullableInt(id_tipo_sangre),
-        id_sede: toNullableInt(id_sede),
-        id_programa_academico: toNullableInt(id_programa_academico),
-        id_eps: toNullableInt(id_eps),
-        condicion_particular: condicion_particular ?? null,
-        id_tipo_usuario: toNullableInt(id_tipo_usuario),
-      },
+    const contactoNombreTrim = String(contacto_emergencia_nombre ?? "").trim();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const prismaAny = tx as any;
+
+      const paciente = await prismaAny.pacientes.create({
+        data: {
+          id_tipo_documento: idTipoDocumentoNum,
+          numero_documento: numeroDocumentoTrim,
+          nombres,
+          apellidos,
+          fecha_nacimiento: new Date(fecha_nacimiento),
+          id_genero: toNullableInt(id_genero),
+          id_estado_civil: toNullableInt(id_estado_civil),
+          id_ciudad: idCiudadNum,
+          direccion: direccion ?? null,
+          telefono: telefonoTrim,
+          email: email ?? null,
+          id_tipo_sangre: toNullableInt(id_tipo_sangre),
+          id_sede: toNullableInt(id_sede),
+          id_programa_academico: toNullableInt(id_programa_academico),
+          id_eps: toNullableInt(id_eps),
+          condicion_particular: condicion_particular ?? null,
+          id_tipo_usuario: toNullableInt(id_tipo_usuario),
+        },
+      });
+
+      if (contactoNombreTrim) {
+        await tx.acompanantes.create({
+          data: {
+            id_paciente: paciente.id_paciente,
+            nombre: contactoNombreTrim,
+            relacion_con_paciente: contacto_emergencia_relacion
+              ? String(contacto_emergencia_relacion)
+              : null,
+            telefono: contacto_emergencia_telefono ? String(contacto_emergencia_telefono) : null,
+            direccion: contacto_emergencia_direccion ? String(contacto_emergencia_direccion) : null,
+          },
+        });
+      }
+
+      return paciente;
     });
 
-    return NextResponse.json(paciente, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error: unknown) {
     console.error("Error creating patient", error);
 

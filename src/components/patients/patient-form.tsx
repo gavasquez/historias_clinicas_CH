@@ -8,6 +8,8 @@ import type {
   ProgramaAcademico,
   Eps,
   TipoUsuario,
+  Departamento,
+  Ciudad,
 } from "@/services/catalogs";
 
 export type PatientFormMode = "create" | "edit";
@@ -31,6 +33,10 @@ interface PatientFormProps {
   tiposUsuario?: TipoUsuario[];
   eps?: Eps[];
   programas?: ProgramaAcademico[];
+  departamentos?: Departamento[];
+  ciudades?: Ciudad[];
+  idDepartamento?: number;
+  onDepartamentoChange?: (value: number | undefined) => void;
 }
 
 export function PatientForm(props: PatientFormProps) {
@@ -52,6 +58,10 @@ export function PatientForm(props: PatientFormProps) {
     tiposUsuario,
     eps,
     programas,
+    departamentos,
+    ciudades,
+    idDepartamento,
+    onDepartamentoChange,
   } = props;
 
   return (
@@ -163,7 +173,9 @@ export function PatientForm(props: PatientFormProps) {
 
         {/* Teléfono */}
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-600">Teléfono</label>
+          <label className="text-xs font-medium text-slate-600">
+            Teléfono <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             value={form.telefono ?? ""}
@@ -171,6 +183,61 @@ export function PatientForm(props: PatientFormProps) {
             placeholder="Teléfono de contacto"
             className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
+          {errors.telefono && (
+            <span className="text-xs text-red-600">{errors.telefono}</span>
+          )}
+        </div>
+
+        {/* Departamento */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">
+            Departamento <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={idDepartamento ?? ""}
+            onChange={(e) => {
+              const value = e.target.value === "" ? undefined : Number(e.target.value);
+              onDepartamentoChange?.(value);
+            }}
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          >
+            <option value="">Seleccione departamento</option>
+            {(departamentos ?? []).map((dep) => (
+              <option key={dep.id_departamento} value={dep.id_departamento}>
+                {dep.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Ciudad */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">
+            Ciudad <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={form.id_ciudad ?? ""}
+            onChange={(e) =>
+              onChange(
+                "id_ciudad",
+                e.target.value === "" ? "" : Number(e.target.value),
+              )
+            }
+            disabled={!idDepartamento || !(ciudades ?? []).length}
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+          >
+            <option value="">
+              {idDepartamento ? "Seleccione ciudad" : "Seleccione primero el departamento"}
+            </option>
+            {(ciudades ?? []).map((c) => (
+              <option key={c.id_ciudad} value={c.id_ciudad}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          {errors.id_ciudad && (
+            <span className="text-xs text-red-600">{errors.id_ciudad}</span>
+          )}
         </div>
 
         {/* Correo */}
@@ -329,7 +396,7 @@ export function PatientForm(props: PatientFormProps) {
             <option value="">Seleccione tipo de sangre</option>
             {(tiposSangre ?? []).map((ts) => (
               <option key={ts.id_tipo_sangre} value={ts.id_tipo_sangre}>
-                {ts.descripcion}
+                {ts.codigo}
               </option>
             ))}
           </select>
@@ -392,6 +459,56 @@ export function PatientForm(props: PatientFormProps) {
             onChange={(e) => onChange("condicion_particular", e.target.value)}
             placeholder="Ej: Estudiante en práctica, visitante, otro, observaciones adicionales"
             className="min-h-[64px] rounded-md border border-slate-300 px-2 py-1 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <p className="text-xs font-semibold uppercase text-slate-500">Contacto de emergencia</p>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">Nombre completo</label>
+          <input
+            type="text"
+            value={form.contacto_emergencia_nombre ?? ""}
+            onChange={(e) => onChange("contacto_emergencia_nombre", e.target.value)}
+            placeholder="Nombre del contacto"
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">Relación con el paciente</label>
+          <input
+            type="text"
+            value={form.contacto_emergencia_relacion ?? ""}
+            onChange={(e) => onChange("contacto_emergencia_relacion", e.target.value)}
+            placeholder="Ej: Madre, Padre, Tutor"
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">Teléfono</label>
+          <input
+            type="text"
+            value={form.contacto_emergencia_telefono ?? ""}
+            onChange={(e) => onChange("contacto_emergencia_telefono", e.target.value)}
+            placeholder="Teléfono del contacto"
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">Dirección</label>
+          <input
+            type="text"
+            value={form.contacto_emergencia_direccion ?? ""}
+            onChange={(e) => onChange("contacto_emergencia_direccion", e.target.value)}
+            placeholder="Dirección del contacto"
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
         </div>
       </div>

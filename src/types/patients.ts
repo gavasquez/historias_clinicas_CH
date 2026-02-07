@@ -30,6 +30,9 @@ export interface PacienteDetalleApi {
   fecha_nacimiento: string;
   telefono: string | null;
   email: string | null;
+  departamento: string | null;
+  ciudad: string | null;
+  id_ciudad: number | null;
   direccion: string | null;
   condicion_particular: string | null;
   id_genero: number | null;

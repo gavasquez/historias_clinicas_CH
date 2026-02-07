@@ -9,7 +9,7 @@ import type { AppointmentListItem, AppointmentsResponse } from "@/types/appointm
 import { getEstadoCitaBadgeClasses } from "@/lib/appointment-status";
 import Swal from "sweetalert2";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 export function AppointmentsView() {
   const router = useRouter();
@@ -179,8 +179,8 @@ export function AppointmentsView() {
 
           {!isLoading && !isError && appointments.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <table className="min-w-full text-left text-[11px]">
+                <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Fecha / Hora</th>
                     <th className="px-3 py-2">Profesional</th>
@@ -194,9 +194,16 @@ export function AppointmentsView() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700">
                   {appointments.map((cita: AppointmentListItem) => {
+                    const estadoNorm = (cita.estado_cita ?? "").trim().toUpperCase();
+
                     const isCancelled =
-                      cita.estado_cita === "Cita cancelada por el paciente" ||
-                      cita.estado_cita === "Cita cancelada por la institución o profesional";
+                      estadoNorm === "CANCELADA POR EL PACIENTE" ||
+                      estadoNorm === "CANCELADA POR LA INSTITUCIÓN" ||
+                      estadoNorm === "CANCELADA POR LA INSTITUCION" ||
+                      estadoNorm === "CANCELADA POR LA INSTITUCIÓN O PROFESIONAL" ||
+                      estadoNorm === "CANCELADA POR LA INSTITUCION O PROFESIONAL";
+
+                    const isAttendable = estadoNorm === "PROGRAMADA" || estadoNorm === "CONFIRMADA";
 
                     return (
                       <tr key={cita.id_cita} className="hover:bg-slate-50">
@@ -222,6 +229,15 @@ export function AppointmentsView() {
                             >
                               Editar
                             </button>
+                            {isAttendable && (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/appointments/${cita.id_cita}/attend`)}
+                                className="rounded-lg border border-emerald-300 px-2 py-1 text-[11px] font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                              >
+                                Atender
+                              </button>
+                            )}
                             {!isCancelled && (
                               <button
                                 type="button"
@@ -239,7 +255,8 @@ export function AppointmentsView() {
                                     input: "select",
                                     inputOptions: {
                                       CANCELADA_PAC: "Cancelada por el paciente",
-                                      CANCELADA_INST: "Cancelada por la institución o profesional",
+                                      CANCELADA_INST: "Cancelada por la Institucion",
+                                      NO_ASISTE: "Paciente no Asiste",
                                     },
                                     inputPlaceholder: "Seleccione un motivo",
                                     inputValidator: (value) => {

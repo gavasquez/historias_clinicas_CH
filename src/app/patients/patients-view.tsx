@@ -140,8 +140,8 @@ export function PatientsView() {
 
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <table className="min-w-full text-left text-[11px]">
+              <thead className="bg-slate-50 text-[10px] font-medium uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Documento</th>
                   <th className="px-4 py-3">Nombre</th>
@@ -157,7 +157,7 @@ export function PatientsView() {
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-4 py-6 text-center text-sm text-slate-500"
+                      className="px-4 py-6 text-center text-[11px] text-slate-500"
                     >
                       Cargando pacientes...
                     </td>
@@ -168,7 +168,7 @@ export function PatientsView() {
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-4 py-6 text-center text-sm text-red-600"
+                      className="px-4 py-6 text-center text-[11px] text-red-600"
                     >
                       Ocurrió un error al cargar los pacientes.
                     </td>
@@ -179,7 +179,7 @@ export function PatientsView() {
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-4 py-6 text-center text-sm text-slate-500"
+                      className="px-4 py-6 text-center text-[11px] text-slate-500"
                     >
                       No hay pacientes registrados.
                     </td>
@@ -192,7 +192,7 @@ export function PatientsView() {
                       key={p.id_paciente}
                       className="border-t border-slate-100 hover:bg-slate-50/60"
                     >
-                      <td className="px-4 py-3 text-xs md:text-sm">
+                      <td className="px-4 py-3">
                         <span className="font-medium text-slate-800">
                           {p.tipos_documento?.codigo ?? ""}
                         </span>{" "}
@@ -200,24 +200,24 @@ export function PatientsView() {
                           {p.numero_documento}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs md:text-sm">
+                      <td className="px-4 py-3">
                         {p.nombres} {p.apellidos}
                       </td>
-                      <td className="px-4 py-3 text-xs md:text-sm">
+                      <td className="px-4 py-3">
                         {p.tipos_usuario?.descripcion ?? ""}
                       </td>
-                      <td className="px-4 py-3 text-xs md:text-sm">
+                      <td className="px-4 py-3">
                         {p.programas_academicos?.nombre ?? ""}
                       </td>
-                      <td className="px-4 py-3 text-xs md:text-sm">
+                      <td className="px-4 py-3">
                         {p.sedes?.nombre ?? ""}
                       </td>
-                      <td className="px-4 py-3 text-xs md:text-sm">
+                      <td className="px-4 py-3">
                         <span className={estadoBadgeClasses(p.activo)}>
                           {p.activo === false ? "Inactivo" : "Activo"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-xs md:text-sm">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"

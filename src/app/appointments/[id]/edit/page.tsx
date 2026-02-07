@@ -13,6 +13,7 @@ import type { PatientsResponse } from "@/types/patients";
 import type { ProfessionalsResponse } from "@/types/professionals";
 import type { AppointmentDetail } from "@/services/appointments";
 import { getAppointmentById } from "@/services/appointments";
+import { fetchAttentionDiagnoses, type AttentionDiagnosis } from "@/services/attentions";
 import type { AppointmentFormState, SelectOption } from "@/types/appointments-forms";
 import { useAppointmentFormCatalogs } from "@/hooks/use-appointment-form-catalogs";
 
@@ -26,6 +27,7 @@ export default function EditAppointmentPage() {
   const [isClient, setIsClient] = useState(false);
   const [form, setForm] = useState<AppointmentFormState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAttentionSection, setShowAttentionSection] = useState(true);
 
   useEffect(() => {
     setIsClient(true);
@@ -37,6 +39,7 @@ export default function EditAppointmentPage() {
     sedesData,
     tiposCitaData,
     estadosCitaData,
+    programasSaludData,
     loadingPatients,
     loadingProfessionals,
   } = useAppointmentFormCatalogs();
@@ -47,6 +50,35 @@ export default function EditAppointmentPage() {
     queryFn: () => getAppointmentById(String(id)),
   });
 
+  const estadoIdForAttend = (() => {
+    const fromForm = form?.id_estado_cita ? Number(form.id_estado_cita) : null;
+    if (fromForm && Number.isInteger(fromForm) && fromForm > 0) return fromForm;
+    const fromCita = citaData?.id_estado_cita ?? null;
+    if (fromCita && Number.isInteger(fromCita) && fromCita > 0) return fromCita;
+    return null;
+  })();
+
+  const estado =
+    estadoIdForAttend && estadosCitaData
+      ? estadosCitaData.find((e) => e.id_estado_cita === estadoIdForAttend) ?? null
+      : null;
+
+  const estadoCodigoNorm = (estado?.codigo ?? "").trim().toUpperCase();
+  const estadoDescripcionNorm = (estado?.descripcion ?? "").trim().toUpperCase();
+
+  const canAttend = estadoCodigoNorm === "PROGRAMADA" || estadoDescripcionNorm === "PROGRAMADA";
+
+  const { data: diagnosesData, isLoading: loadingDiagnoses } = useQuery<AttentionDiagnosis[]>(
+    {
+      queryKey: ["appointment-edit-diagnoses", citaData?.ultima_atencion?.id_atencion],
+      enabled: !!citaData?.ultima_atencion?.id_atencion,
+      queryFn: () =>
+        citaData?.ultima_atencion?.id_atencion
+          ? fetchAttentionDiagnoses(citaData.ultima_atencion.id_atencion)
+          : Promise.resolve([]),
+    },
+  );
+
   useEffect(() => {
     if (citaData && !form) {
       setForm({
@@ -55,9 +87,17 @@ export default function EditAppointmentPage() {
         id_sede: citaData.id_sede ? String(citaData.id_sede) : "",
         id_tipo_cita: citaData.id_tipo_cita ? String(citaData.id_tipo_cita) : "",
         id_estado_cita: citaData.id_estado_cita ? String(citaData.id_estado_cita) : "",
+        id_modalidad_atencion: citaData.id_modalidad_atencion
+          ? String(citaData.id_modalidad_atencion)
+          : "",
+        id_programa_salud: citaData.id_programa_salud ? String(citaData.id_programa_salud) : "",
         fecha_hora_inicio: citaData.fecha_hora_inicio.slice(0, 16),
         fecha_hora_fin: citaData.fecha_hora_fin ? citaData.fecha_hora_fin.slice(0, 16) : "",
-        motivo: citaData.motivo ?? "",
+        seguimiento: citaData.seguimiento ? "SI" : "NO",
+        tipo_seguimiento:
+          citaData.seguimiento && citaData.tipo_seguimiento
+            ? ((citaData.tipo_seguimiento as any) as "CRONICAS" | "SALUD")
+            : "",
         canal_recordatorio: citaData.canal_recordatorio ?? "",
       });
     }
@@ -72,6 +112,13 @@ export default function EditAppointmentPage() {
       const idSedeNum = form.id_sede ? Number(form.id_sede) : undefined;
       const idTipoCitaNum = form.id_tipo_cita ? Number(form.id_tipo_cita) : undefined;
       const idEstadoCitaNum = form.id_estado_cita ? Number(form.id_estado_cita) : undefined;
+      const idModalidadAtencionNum = form.id_modalidad_atencion
+        ? Number(form.id_modalidad_atencion)
+        : undefined;
+      const idProgramaSaludNum = form.id_programa_salud ? Number(form.id_programa_salud) : undefined;
+
+      const seguimientoBool = form.seguimiento === "SI";
+      const tipoSeguimientoValue = seguimientoBool ? form.tipo_seguimiento : "";
 
       return apiClient.put(`/appointments/${id}`, {
         id_paciente: idPacienteNum,
@@ -81,8 +128,11 @@ export default function EditAppointmentPage() {
         id_sede: idSedeNum,
         id_tipo_cita: idTipoCitaNum,
         id_estado_cita: idEstadoCitaNum,
+        id_modalidad_atencion: idModalidadAtencionNum,
+        id_programa_salud: idProgramaSaludNum,
+        seguimiento: seguimientoBool,
+        tipo_seguimiento: tipoSeguimientoValue || undefined,
         canal_recordatorio: form.canal_recordatorio || undefined,
-        motivo: form.motivo || undefined,
       });
     },
     onSuccess: () => {
@@ -105,12 +155,15 @@ export default function EditAppointmentPage() {
 
     if (
       !form.id_paciente.trim() ||
+      !form.id_programa_salud.trim() ||
       !form.id_profesional.trim() ||
       !form.id_sede.trim() ||
       !form.id_tipo_cita.trim() ||
       !form.fecha_hora_inicio.trim()
     ) {
-      setError("Debe completar paciente, profesional, sede, tipo de cita y fecha/hora de inicio.");
+      setError(
+        "Debe completar paciente, programa transversal, profesional, sede, tipo de cita y fecha/hora de inicio.",
+      );
       return;
     }
 
@@ -145,6 +198,26 @@ export default function EditAppointmentPage() {
             >
               Volver al listado
             </button>
+            {id && (
+              <button
+                type="button"
+                onClick={() => router.push(`/appointments/${id}/summary`)}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+              >
+                Ver resumen clínico
+              </button>
+            )}
+            {id &&
+              citaData &&
+              canAttend && (
+              <button
+                type="button"
+                onClick={() => router.push(`/appointments/${id}/attend`)}
+                className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+              >
+                Atender cita
+              </button>
+            )}
           </div>
         </div>
 
@@ -190,6 +263,42 @@ export default function EditAppointmentPage() {
                       ? {
                           ...prev,
                           id_paciente: selected ? String(selected.value) : "",
+                        }
+                      : prev,
+                  );
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">
+                Programa Transversal <span className="text-red-500">*</span>
+              </label>
+              <Select
+                isClearable={false}
+                isSearchable
+                classNamePrefix="react-select"
+                placeholder="Seleccione un programa"
+                options={(programasSaludData ?? []).map((p) => ({
+                  value: p.id_programa_salud,
+                  label: p.nombre,
+                }))}
+                value={(() => {
+                  const idNum = form.id_programa_salud ? Number(form.id_programa_salud) : null;
+                  if (!idNum) return null;
+                  const opts = (programasSaludData ?? []).map((p) => ({
+                    value: p.id_programa_salud,
+                    label: p.nombre,
+                  }));
+                  return opts.find((o) => o.value === idNum) ?? null;
+                })()}
+                onChange={(option: any) => {
+                  const selected = option as SelectOption | null;
+                  setForm((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          id_programa_salud: selected ? String(selected.value) : "",
                         }
                       : prev,
                   );
@@ -377,17 +486,53 @@ export default function EditAppointmentPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-1 md:col-span-2">
-              <label className="text-xs font-medium text-slate-600">Motivo</label>
-              <textarea
-                value={form.motivo}
-                onChange={(e) =>
-                  setForm((prev) => (prev ? { ...prev, motivo: e.target.value } : prev))
-                }
-                className="min-h-[64px] rounded-md border border-slate-300 px-2 py-1 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                placeholder="Motivo de la cita (opcional)"
-              />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">Seguimiento</label>
+              <select
+                value={form.seguimiento}
+                onChange={(e) => {
+                  const next = e.target.value === "SI" ? "SI" : "NO";
+                  setForm((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          seguimiento: next,
+                          tipo_seguimiento: next === "SI" ? prev.tipo_seguimiento : "",
+                        }
+                      : prev,
+                  );
+                }}
+                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              >
+                <option value="NO">No</option>
+                <option value="SI">Sí</option>
+              </select>
             </div>
+
+            {form.seguimiento === "SI" && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Tipo de seguimiento</label>
+                <select
+                  value={form.tipo_seguimiento}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            tipo_seguimiento: v === "CRONICAS" || v === "SALUD" ? v : "",
+                          }
+                        : prev,
+                    );
+                  }}
+                  className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="CRONICAS">Condiciones crónicas</option>
+                  <option value="SALUD">Situaciones de salud</option>
+                </select>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1 md:col-span-2">
               <label className="text-xs font-medium text-slate-600">Canal de recordatorio</label>

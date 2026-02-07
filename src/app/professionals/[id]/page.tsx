@@ -31,6 +31,8 @@ export default function ProfessionalDetailPage() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
+  const [activeTab, setActiveTab] = useState<"datos" | "disponibilidad" | "citas">("datos");
+
   const [availabilityForm, setAvailabilityForm] = useState<ProfessionalAvailabilityCreateInput>({
     id_sede: 0,
     dia_semana: 1,
@@ -82,6 +84,7 @@ export default function ProfessionalDetailPage() {
     queryFn: fetchSedes,
   });
 
+
   const {
     data: availability,
     isLoading: loadingAvailability,
@@ -101,6 +104,11 @@ export default function ProfessionalDetailPage() {
       });
     },
   });
+
+  const tabButtonClasses = (tab: typeof activeTab) =>
+    tab === activeTab
+      ? "rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+      : "rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100";
 
   const createAvailabilityMutation = useMutation({
     mutationFn: (input: ProfessionalAvailabilityCreateInput) =>
@@ -154,6 +162,13 @@ export default function ProfessionalDetailPage() {
           <div className="flex gap-2">
             <button
               type="button"
+              onClick={() => router.push(`/professionals/${id}/edit`)}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+            >
+              Editar
+            </button>
+            <button
+              type="button"
               onClick={() => router.push("/professionals")}
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
             >
@@ -161,87 +176,115 @@ export default function ProfessionalDetailPage() {
             </button>
           </div>
         </div>
-
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          {isLoading && (
-            <p className="text-sm text-slate-500">Cargando información del profesional...</p>
-          )}
-
-          {isError && !isLoading && (
-            <p className="text-sm text-red-600">
-              Ocurrió un error al cargar la información del profesional.
-            </p>
-          )}
-
-          {!isLoading && !isError && !hasData && (
-            <p className="text-sm text-slate-500">Profesional no encontrado.</p>
-          )}
-
-          {!isLoading && !isError && hasData && data && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1 text-sm">
-                <p className="text-xs font-semibold uppercase text-slate-500">Identificación</p>
-                <p className="text-sm font-medium text-slate-900">{data.nombre_completo}</p>
-                {data.email && (
-                  <p className="text-xs text-slate-600">{data.email}</p>
-                )}
-              </div>
-
-              <div className="space-y-1 text-sm">
-                <p className="text-xs font-semibold uppercase text-slate-500">Estado</p>
-                <span
-                  className={
-                    data.activo
-                      ? "inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
-                      : "inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
-                  }
-                >
-                  {data.activo ? "Activo" : "Inactivo"}
-                </span>
-              </div>
-
-              <div className="space-y-1 text-sm">
-                <p className="text-xs font-semibold uppercase text-slate-500">Especialidad</p>
-                <p className="text-sm text-slate-800">
-                  {data.especialidad?.nombre ?? "No registrada"}
-                </p>
-                {data.especialidad?.descripcion && (
-                  <p className="text-xs text-slate-600">{data.especialidad.descripcion}</p>
-                )}
-              </div>
-
-              <div className="space-y-1 text-sm">
-                <p className="text-xs font-semibold uppercase text-slate-500">Sede</p>
-                <p className="text-sm text-slate-800">{data.sede?.nombre ?? "No registrada"}</p>
-                {(data.sede?.ciudad || data.sede?.departamento) && (
-                  <p className="text-xs text-slate-600">
-                    {[data.sede?.ciudad, data.sede?.departamento].filter(Boolean).join(" - ")}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-1 text-sm">
-                <p className="text-xs font-semibold uppercase text-slate-500">Registro médico</p>
-                <p className="text-sm text-slate-800">{data.registro_medico ?? "No registrado"}</p>
-              </div>
-
-              <div className="space-y-1 text-sm">
-                <p className="text-xs font-semibold uppercase text-slate-500">Teléfono de contacto</p>
-                <p className="text-sm text-slate-800">{data.telefono_contacto ?? "No registrado"}</p>
-              </div>
-            </div>
-          )}
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("datos")}
+              className={tabButtonClasses("datos")}
+            >
+              Datos
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("disponibilidad")}
+              className={tabButtonClasses("disponibilidad")}
+            >
+              Disponibilidad
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("citas")}
+              className={tabButtonClasses("citas")}
+            >
+              Citas
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase text-slate-500">Disponibilidad</p>
-              <p className="text-xs text-slate-600">
-                Configura los horarios en los que el profesional atiende por sede.
+        {activeTab === "datos" && (
+          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            {isLoading && (
+              <p className="text-sm text-slate-500">Cargando información del profesional...</p>
+            )}
+
+            {isError && !isLoading && (
+              <p className="text-sm text-red-600">
+                Ocurrió un error al cargar la información del profesional.
               </p>
-            </div>
+            )}
+
+            {!isLoading && !isError && !hasData && (
+              <p className="text-sm text-slate-500">Profesional no encontrado.</p>
+            )}
+
+            {!isLoading && !isError && hasData && data && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1 text-sm">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Identificación</p>
+                  <p className="text-sm font-medium text-slate-900">{data.nombre_completo}</p>
+                  {data.email && (
+                    <p className="text-xs text-slate-600">{data.email}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1 text-sm">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Estado</p>
+                  <span
+                    className={
+                      data.activo
+                        ? "inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                        : "inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                    }
+                  >
+                    {data.activo ? "Activo" : "Inactivo"}
+                  </span>
+                </div>
+
+                <div className="space-y-1 text-sm">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Especialidad</p>
+                  <p className="text-sm text-slate-800">
+                    {data.especialidad?.nombre ?? "No registrada"}
+                  </p>
+                  {data.especialidad?.descripcion && (
+                    <p className="text-xs text-slate-600">{data.especialidad.descripcion}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1 text-sm">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Sede</p>
+                  <p className="text-sm text-slate-800">{data.sede?.nombre ?? "No registrada"}</p>
+                  {(data.sede?.ciudad || data.sede?.departamento) && (
+                    <p className="text-xs text-slate-600">
+                      {[data.sede?.ciudad, data.sede?.departamento].filter(Boolean).join(" - ")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1 text-sm">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Registro médico</p>
+                  <p className="text-sm text-slate-800">{data.registro_medico ?? "No registrado"}</p>
+                </div>
+
+                <div className="space-y-1 text-sm">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Teléfono de contacto</p>
+                  <p className="text-sm text-slate-800">{data.telefono_contacto ?? "No registrado"}</p>
+                </div>
+              </div>
+            )}
           </div>
+        )}
+
+        {activeTab === "disponibilidad" && (
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase text-slate-500">Disponibilidad</p>
+                <p className="text-xs text-slate-600">
+                  Configura los horarios en los que el profesional atiende por sede.
+                </p>
+              </div>
+            </div>
 
           {availabilityFeedback && (
             <p
@@ -402,8 +445,8 @@ export default function ProfessionalDetailPage() {
 
           {!loadingAvailability && !availabilityError && (availability?.length ?? 0) > 0 && (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <table className="min-w-full text-left text-[11px]">
+                <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Sede</th>
                     <th className="px-3 py-2">Día</th>
@@ -463,7 +506,9 @@ export default function ProfessionalDetailPage() {
             </div>
           )}
         </div>
+        )}
 
+        {activeTab === "citas" && (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -505,8 +550,8 @@ export default function ProfessionalDetailPage() {
 
           {!loadingAppointments && !appointmentsError && (appointments?.length ?? 0) > 0 && (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <table className="min-w-full text-left text-[11px]">
+                <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Fecha / Hora</th>
                     <th className="px-3 py-2">Paciente</th>
@@ -561,8 +606,8 @@ export default function ProfessionalDetailPage() {
                                     input: "select",
                                     inputOptions: {
                                       CANCELADA_PAC: "Cancelada por el paciente",
-                                      CANCELADA_INST:
-                                        "Cancelada por la institución o profesional",
+                                      CANCELADA_INST: "Cancelada por la Institucion",
+                                      NO_ASISTE: "Paciente no Asiste",
                                     },
                                     inputPlaceholder: "Seleccione un motivo",
                                     inputValidator: (value) => {
@@ -595,6 +640,7 @@ export default function ProfessionalDetailPage() {
             </div>
           )}
         </div>
+        )}
       </section>
     </AppShell>
   );

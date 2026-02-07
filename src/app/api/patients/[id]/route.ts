@@ -12,7 +12,8 @@ export async function GET(
       return NextResponse.json({ message: "ID inválido" }, { status: 400 });
     }
 
-    const paciente = await prisma.pacientes.findUnique({
+    const prismaAny = prisma as any;
+    const paciente = await prismaAny.pacientes.findUnique({
       where: { id_paciente: id },
       include: {
         tipos_documento: true,
@@ -23,6 +24,13 @@ export async function GET(
         estados_civiles: true,
         tipos_sangre: true,
         eps: true,
+        ciudades: {
+          select: {
+            id_ciudad: true,
+            id_departamento: true,
+            nombre: true,
+          },
+        },
       },
     });
 
@@ -33,7 +41,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(paciente);
+    return NextResponse.json({
+      ...paciente,
+      id_departamento: paciente?.ciudades?.id_departamento ?? null,
+    });
   } catch (error) {
     console.error("Error fetching patient detail", error);
     return NextResponse.json(
@@ -70,6 +81,7 @@ export async function PUT(
       fecha_nacimiento,
       id_genero,
       id_estado_civil,
+      id_ciudad,
       direccion,
       telefono,
       email,
@@ -121,8 +133,27 @@ export async function PUT(
     if (id_genero !== undefined) updateData.id_genero = toNullableInt(id_genero);
     if (id_estado_civil !== undefined)
       updateData.id_estado_civil = toNullableInt(id_estado_civil);
+    if (id_ciudad !== undefined) {
+      const idCiudadNum = Number(id_ciudad);
+      if (!idCiudadNum || Number.isNaN(idCiudadNum)) {
+        return NextResponse.json(
+          { message: "La ciudad es obligatoria" },
+          { status: 400 },
+        );
+      }
+      updateData.id_ciudad = idCiudadNum;
+    }
     if (direccion !== undefined) updateData.direccion = direccion ?? null;
-    if (telefono !== undefined) updateData.telefono = telefono ?? null;
+    if (telefono !== undefined) {
+      const telefonoTrim = String(telefono ?? "").trim();
+      if (!telefonoTrim) {
+        return NextResponse.json(
+          { message: "El teléfono es obligatorio" },
+          { status: 400 },
+        );
+      }
+      updateData.telefono = telefonoTrim;
+    }
     if (email !== undefined) updateData.email = email ?? null;
     if (id_tipo_sangre !== undefined)
       updateData.id_tipo_sangre = toNullableInt(id_tipo_sangre);
@@ -145,7 +176,8 @@ export async function PUT(
       updateData.activo = activo;
     }
 
-    const pacienteActualizado = await prisma.pacientes.update({
+    const prismaAny = prisma as any;
+    const pacienteActualizado = await prismaAny.pacientes.update({
       where: { id_paciente: id },
       data: updateData,
     });

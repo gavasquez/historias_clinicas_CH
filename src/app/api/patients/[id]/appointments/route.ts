@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseDateOnlyToUtc } from "@/lib/date-time";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 function addDaysUtc(date: Date, days: number) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);

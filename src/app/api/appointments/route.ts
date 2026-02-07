@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { validateAvailabilityOrThrow } from "@/lib/availability-validator";
 
-const PAGE_SIZE = 10;
-const DEFAULT_APPOINTMENT_DURATION_MINUTES = 30;
+const PAGE_SIZE = 5;
+const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
 
 export async function GET(request: NextRequest) {
   try {
@@ -124,8 +124,13 @@ export async function POST(request: NextRequest) {
       id_tipo_cita,
       id_estado_cita,
       canal_recordatorio,
-      motivo,
+      id_modalidad_atencion,
+      id_programa_salud,
+      seguimiento,
+      tipo_seguimiento,
     } = body;
+
+    const prismaAny = prisma as any;
 
     const idPacienteNum = Number(id_paciente);
     const idProfesionalNum = Number(id_profesional);
@@ -162,6 +167,16 @@ export async function POST(request: NextRequest) {
     const idSedeNum = id_sede != null ? Number(id_sede) : null;
     const idTipoCitaNum = id_tipo_cita != null ? Number(id_tipo_cita) : null;
     const idEstadoCitaNum = id_estado_cita != null ? Number(id_estado_cita) : null;
+    const idModalidadAtencionNum =
+      id_modalidad_atencion != null ? Number(id_modalidad_atencion) : null;
+    const idProgramaSaludNum = Number(id_programa_salud);
+
+    if (!Number.isInteger(idProgramaSaludNum) || idProgramaSaludNum <= 0) {
+      return NextResponse.json(
+        { message: "El programa transversal es obligatorio" },
+        { status: 400 },
+      );
+    }
 
     const idSedeValid =
       idSedeNum != null && Number.isInteger(idSedeNum) && idSedeNum > 0 ? idSedeNum : null;
@@ -211,7 +226,7 @@ export async function POST(request: NextRequest) {
       throw e;
     }
 
-    const cita = await prisma.citas.create({
+    const cita = await prismaAny.citas.create({
       data: {
         id_paciente: idPacienteNum,
         id_profesional: idProfesionalNum,
@@ -224,10 +239,19 @@ export async function POST(request: NextRequest) {
           idEstadoCitaNum && Number.isInteger(idEstadoCitaNum) && idEstadoCitaNum > 0
             ? idEstadoCitaNum
             : null,
+        id_modalidad_atencion:
+          idModalidadAtencionNum && Number.isInteger(idModalidadAtencionNum) && idModalidadAtencionNum > 0
+            ? idModalidadAtencionNum
+            : null,
+        id_programa_salud: idProgramaSaludNum,
         fecha_hora_inicio: fechaInicio,
         fecha_hora_fin: fechaFin,
+        seguimiento: seguimiento === true,
+        tipo_seguimiento:
+          seguimiento === true && typeof tipo_seguimiento === "string" && tipo_seguimiento.trim()
+            ? tipo_seguimiento.trim()
+            : null,
         canal_recordatorio: canal_recordatorio ?? null,
-        motivo: motivo ?? null,
       },
     });
 

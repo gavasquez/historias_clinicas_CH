@@ -37,15 +37,18 @@ export default function NewAppointmentPage() {
     id_sede: "",
     id_tipo_cita: "",
     id_estado_cita: "",
+    id_modalidad_atencion: "",
+    id_programa_salud: "",
     fecha_hora_inicio: "",
     fecha_hora_fin: "",
-    motivo: "",
+    seguimiento: "NO",
+    tipo_seguimiento: "",
     canal_recordatorio: "",
   });
 
   const [error, setError] = useState<string | null>(null);
 
-  const DEFAULT_APPOINTMENT_DURATION_MINUTES = 30;
+  const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
 
   const validateProfessionalAvailability = async () => {
     const professionalId = Number(form.id_profesional);
@@ -110,6 +113,8 @@ export default function NewAppointmentPage() {
     estadosCitaData,
     loadingPatients,
     loadingProfessionals,
+    modalidadesAtencionData,
+    programasSaludData,
   } = useAppointmentFormCatalogs();
 
   // Estado por defecto: PROGRAMADA, si existe en el catálogo
@@ -130,6 +135,13 @@ export default function NewAppointmentPage() {
       const idSedeNum = form.id_sede ? Number(form.id_sede) : undefined;
       const idTipoCitaNum = form.id_tipo_cita ? Number(form.id_tipo_cita) : undefined;
       const idEstadoCitaNum = form.id_estado_cita ? Number(form.id_estado_cita) : undefined;
+      const idModalidadAtencionNum = form.id_modalidad_atencion
+        ? Number(form.id_modalidad_atencion)
+        : undefined;
+      const idProgramaSaludNum = form.id_programa_salud ? Number(form.id_programa_salud) : undefined;
+
+      const seguimientoBool = form.seguimiento === "SI";
+      const tipoSeguimientoValue = seguimientoBool ? form.tipo_seguimiento : "";
 
       return apiClient.post("/appointments", {
         id_paciente: idPacienteNum,
@@ -139,8 +151,11 @@ export default function NewAppointmentPage() {
         id_sede: idSedeNum,
         id_tipo_cita: idTipoCitaNum,
         id_estado_cita: idEstadoCitaNum,
+        id_modalidad_atencion: idModalidadAtencionNum,
+        id_programa_salud: idProgramaSaludNum,
+        seguimiento: seguimientoBool,
+        tipo_seguimiento: tipoSeguimientoValue || undefined,
         canal_recordatorio: form.canal_recordatorio || undefined,
-        motivo: form.motivo || undefined,
       });
     },
     onSuccess: () => {
@@ -164,12 +179,15 @@ export default function NewAppointmentPage() {
 
     if (
       !form.id_paciente.trim() ||
+      !form.id_programa_salud.trim() ||
       !form.id_profesional.trim() ||
       !form.id_sede.trim() ||
       !form.id_tipo_cita.trim() ||
       !form.fecha_hora_inicio.trim()
     ) {
-      setError("Debe completar paciente, profesional, sede, tipo de cita y fecha/hora de inicio.");
+      setError(
+        "Debe completar paciente, programa transversal, profesional, sede, tipo de cita y fecha/hora de inicio.",
+      );
       return;
     }
 
@@ -251,6 +269,72 @@ export default function NewAppointmentPage() {
                   setForm((prev) => ({
                     ...prev,
                     id_paciente: selected ? String(selected.value) : "",
+                  }));
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">
+                Programa Transversal <span className="text-red-500">*</span>
+              </label>
+              <Select
+                isClearable={false}
+                isSearchable
+                classNamePrefix="react-select"
+                placeholder="Seleccione un programa"
+                options={(programasSaludData ?? []).map((p) => ({
+                  value: p.id_programa_salud,
+                  label: p.nombre,
+                }))}
+                value={(() => {
+                  const id = form.id_programa_salud ? Number(form.id_programa_salud) : null;
+                  if (!id) return null;
+                  const opts = (programasSaludData ?? []).map((p) => ({
+                    value: p.id_programa_salud,
+                    label: p.nombre,
+                  }));
+                  return opts.find((o) => o.value === id) ?? null;
+                })()}
+                onChange={(option: any) => {
+                  const selected = option as SelectOption | null;
+                  setForm((prev) => ({
+                    ...prev,
+                    id_programa_salud: selected ? String(selected.value) : "",
+                  }));
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">
+                Modalidad de atención <span className="text-red-500">*</span>
+              </label>
+              <Select
+                isClearable
+                isSearchable
+                classNamePrefix="react-select"
+                placeholder="Seleccione una modalidad"
+                options={(modalidadesAtencionData ?? []).map((m) => ({
+                  value: m.id_modalidad_atencion,
+                  label: m.descripcion,
+                }))}
+                value={(() => {
+                  const id = form.id_modalidad_atencion
+                    ? Number(form.id_modalidad_atencion)
+                    : null;
+                  if (!id) return null;
+                  const opts = (modalidadesAtencionData ?? []).map((m) => ({
+                    value: m.id_modalidad_atencion,
+                    label: m.descripcion,
+                  }));
+                  return opts.find((o) => o.value === id) ?? null;
+                })()}
+                onChange={(option: any) => {
+                  const selected = option as SelectOption | null;
+                  setForm((prev) => ({
+                    ...prev,
+                    id_modalidad_atencion: selected ? String(selected.value) : "",
                   }));
                 }}
               />
@@ -384,15 +468,45 @@ export default function NewAppointmentPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-1 md:col-span-2">
-              <label className="text-xs font-medium text-slate-600">Motivo</label>
-              <textarea
-                value={form.motivo}
-                onChange={(e) => setForm((prev) => ({ ...prev, motivo: e.target.value }))}
-                className="min-h-[64px] rounded-md border border-slate-300 px-2 py-1 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                placeholder="Motivo de la cita (opcional)"
-              />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">Seguimiento</label>
+              <select
+                value={form.seguimiento}
+                onChange={(e) => {
+                  const next = e.target.value === "SI" ? "SI" : "NO";
+                  setForm((prev) => ({
+                    ...prev,
+                    seguimiento: next,
+                    tipo_seguimiento: next === "SI" ? prev.tipo_seguimiento : "",
+                  }));
+                }}
+                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              >
+                <option value="NO">No</option>
+                <option value="SI">Sí</option>
+              </select>
             </div>
+
+            {form.seguimiento === "SI" && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Tipo de seguimiento</label>
+                <select
+                  value={form.tipo_seguimiento}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      tipo_seguimiento: v === "CRONICAS" || v === "SALUD" ? v : "",
+                    }));
+                  }}
+                  className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="CRONICAS">Condiciones crónicas</option>
+                  <option value="SALUD">Situaciones de salud</option>
+                </select>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1 md:col-span-2">
               <label className="text-xs font-medium text-slate-600">

@@ -17,6 +17,14 @@ export interface ProfessionalCreateInput {
   activo?: boolean;
 }
 
+export interface ProfessionalUpdateInput {
+  id_sede?: number;
+  id_especialidad?: number;
+  registro_medico?: string;
+  telefono_contacto?: string;
+  activo?: boolean;
+}
+
 export async function fetchProfessionals(
   page: number,
   filters: ProfessionalFilters = {},
@@ -48,5 +56,13 @@ export async function getProfessionalById(
 
 export async function createProfessional(input: ProfessionalCreateInput) {
   const res = await apiClient.post("/professionals", input);
+  return res.data;
+}
+
+export async function updateProfessional(
+  id_profesional: number | string,
+  input: ProfessionalUpdateInput,
+): Promise<ProfessionalDetail> {
+  const res = await apiClient.put<ProfessionalDetail>(`/professionals/${id_profesional}`, input);
   return res.data;
 }

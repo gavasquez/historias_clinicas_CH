@@ -50,6 +50,19 @@ export interface TipoUsuario {
   descripcion: string;
 }
 
+export interface Departamento {
+  id_departamento: number;
+  nombre: string;
+  codigo_dane: string | null;
+}
+
+export interface Ciudad {
+  id_ciudad: number;
+  id_departamento: number;
+  nombre: string;
+  codigo_dane: string | null;
+}
+
 export interface TipoCita {
   id_tipo_cita: number;
   codigo: string;
@@ -60,6 +73,43 @@ export interface EstadoCita {
   id_estado_cita: number;
   codigo: string;
   descripcion: string;
+}
+
+export interface TipoHistoriaClinica {
+  id_tipo_historia: number;
+  codigo: string;
+  descripcion: string;
+}
+
+export interface TipoAtencion {
+  id_tipo_atencion: number;
+  codigo: string;
+  descripcion: string;
+}
+
+export interface ModalidadAtencion {
+  id_modalidad_atencion: number;
+  codigo: string;
+  descripcion: string;
+}
+
+export interface ProgramaSalud {
+  id_programa_salud: number;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
+}
+
+export interface Cie10Item {
+  codigo: string;
+  nombre: string | null;
+  descripcion: string | null;
+}
+
+export interface Role {
+  id_rol: number;
+  nombre: string;
+  descripcion: string | null;
 }
 
 export async function fetchTiposDocumento(): Promise<TipoDocumento[]> {
@@ -106,6 +156,11 @@ export async function fetchProgramasPorTipoPoblacion(
   return res.data;
 }
 
+export async function fetchRoles(): Promise<Role[]> {
+  const res = await apiClient.get<Role[]>("/catalogs/roles");
+  return res.data;
+}
+
 export async function fetchEps(): Promise<Eps[]> {
   const res = await apiClient.get<Eps[]>("/catalogs/eps");
   return res.data;
@@ -116,6 +171,20 @@ export async function fetchTiposUsuario(): Promise<TipoUsuario[]> {
   return res.data;
 }
 
+export async function fetchDepartamentos(): Promise<Departamento[]> {
+  const res = await apiClient.get<Departamento[]>("/catalogs/departments");
+  return res.data;
+}
+
+export async function fetchCiudades(departmentId?: number): Promise<Ciudad[]> {
+  const res = await apiClient.get<Ciudad[]>("/catalogs/cities", {
+    params: {
+      departmentId: departmentId || undefined,
+    },
+  });
+  return res.data;
+}
+
 export async function fetchTiposCita(): Promise<TipoCita[]> {
   const res = await apiClient.get<TipoCita[]>("/catalogs/appointment-types");
   return res.data;
@@ -123,5 +192,35 @@ export async function fetchTiposCita(): Promise<TipoCita[]> {
 
 export async function fetchEstadosCita(): Promise<EstadoCita[]> {
   const res = await apiClient.get<EstadoCita[]>("/catalogs/appointment-statuses");
+  return res.data;
+}
+
+export async function fetchTiposHistoriaClinica(): Promise<TipoHistoriaClinica[]> {
+  const res = await apiClient.get<TipoHistoriaClinica[]>("/catalogs/history-types");
+  return res.data;
+}
+
+export async function fetchTiposAtencion(): Promise<TipoAtencion[]> {
+  const res = await apiClient.get<TipoAtencion[]>("/catalogs/attention-types");
+  return res.data;
+}
+
+export async function fetchModalidadesAtencion(): Promise<ModalidadAtencion[]> {
+  const res = await apiClient.get<ModalidadAtencion[]>("/catalogs/attention-modalities");
+  return res.data;
+}
+
+export async function fetchProgramasSalud(): Promise<ProgramaSalud[]> {
+  const res = await apiClient.get<ProgramaSalud[]>("/catalogs/health-programs");
+  return res.data;
+}
+
+export async function searchCie10(query: string, take: number = 20): Promise<Cie10Item[]> {
+  const res = await apiClient.get<Cie10Item[]>("/catalogs/cie10", {
+    params: {
+      query: query.trim(),
+      take,
+    },
+  });
   return res.data;
 }

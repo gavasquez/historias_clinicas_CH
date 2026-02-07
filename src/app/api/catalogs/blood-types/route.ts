@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 export async function GET() {
   try {
     const items = await prisma.tipos_sangre.findMany({
-      orderBy: { descripcion: "asc" },
+      orderBy: [{ codigo: "asc" }, { descripcion: "asc" }],
     });
     return NextResponse.json(items);
   } catch (error) {
