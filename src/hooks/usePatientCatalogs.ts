@@ -83,7 +83,18 @@ export function usePatientCatalogs(idTipoUsuario?: number, idDepartamento?: numb
       )?.codigo;
       if (!tipo) return [];
 
-      const tipoPoblacion = idTipoUsuario === 6 ? "ESTUDIANTE" : tipo;
+      const tipoPoblacion = (() => {
+        if (tipo === "PROFESOR" || tipo === "EGRESADO" || tipo === "ESTUDIANTE_PTA") {
+          return "ESTUDIANTE";
+        }
+        if (tipo === "ADMINISTRATIVO") {
+          return "ADMIN";
+        }
+        if (tipo === "EXTERNO") {
+          return "EXTERNO";
+        }
+        return tipo;
+      })();
       return fetchProgramasPorTipoPoblacion(tipoPoblacion);
     },
   });

@@ -14,6 +14,7 @@ export default function NewUserPage() {
     username: "",
     nombre_completo: "",
     email: "",
+    telefono: "",
     password: "",
     id_rol: 2,
   });
@@ -43,6 +44,12 @@ export default function NewUserPage() {
         throw new Error("El email es obligatorio.");
       }
 
+      const telefono = (form.telefono ?? "").trim();
+
+      if (!telefono) {
+        throw new Error("El teléfono es obligatorio.");
+      }
+
       if (!form.id_rol || form.id_rol <= 0) {
         throw new Error("El rol del usuario es obligatorio.");
       }
@@ -59,6 +66,7 @@ export default function NewUserPage() {
         username: form.username.trim(),
         nombre_completo: form.nombre_completo.trim(),
         email,
+        telefono,
         password: form.password,
         id_rol: form.id_rol,
       };
@@ -173,31 +181,18 @@ export default function NewUserPage() {
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-600">
-                  Rol del usuario <span className="text-red-600">*</span>
+                  Teléfono <span className="text-red-600">*</span>
                 </label>
-                <select
-                  value={form.id_rol}
+                <input
+                  type="tel"
+                  value={form.telefono || ""}
                   onChange={(e) =>
-                    setForm((prev) => ({ ...prev, id_rol: Number(e.target.value) || 0 }))
+                    setForm((prev) => ({ ...prev, telefono: e.target.value }))
                   }
                   required
                   className="h-8 w-full rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  disabled={loadingRoles || rolesError}
-                >
-                  <option value={0} disabled>
-                    {loadingRoles
-                      ? "Cargando roles..."
-                      : rolesError
-                      ? "Error cargando roles"
-                      : "Seleccione un rol"}
-                  </option>
-                  {roles?.map((r) => (
-                    <option key={r.id_rol} value={r.id_rol}>
-                      {r.nombre}
-                      {r.descripcion ? ` — ${r.descripcion}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Teléfono"
+                />
               </div>
             </div>
 
@@ -230,6 +225,37 @@ export default function NewUserPage() {
                   className="h-8 w-full rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   placeholder="Repita la contraseña"
                 />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600">
+                  Rol del usuario <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={form.id_rol}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, id_rol: Number(e.target.value) || 0 }))
+                  }
+                  required
+                  className="h-8 w-full rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  disabled={loadingRoles || rolesError}
+                >
+                  <option value={0} disabled>
+                    {loadingRoles
+                      ? "Cargando roles..."
+                      : rolesError
+                      ? "Error cargando roles"
+                      : "Seleccione un rol"}
+                  </option>
+                  {roles?.map((r) => (
+                    <option key={r.id_rol} value={r.id_rol}>
+                      {r.nombre}
+                      {r.descripcion ? ` — ${r.descripcion}` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

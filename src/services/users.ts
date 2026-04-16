@@ -5,6 +5,7 @@ export interface UserCreateInput {
   username: string;
   nombre_completo: string;
   email?: string;
+  telefono: string;
   password: string;
   id_rol: number;
   activo?: boolean;

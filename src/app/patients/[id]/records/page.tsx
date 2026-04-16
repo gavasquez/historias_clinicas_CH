@@ -1,12 +1,22 @@
 "use client";
 
 import { useRouter, useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPatientDetailById } from "@/services/patients";
 import { fetchPatientRecords } from "@/services/patient-records";
 import { fetchHistoryDetail } from "@/services/histories";
+import {
+  fetchModalidadesAtencion,
+  fetchTiposAtencion,
+  fetchTiposHistoriaClinica,
+} from "@/services/catalogs";
+import { apiClient } from "@/lib/api";
+import {
+  AttentionDiagnosesSection,
+  type DiagnosisDraft,
+} from "@/app/appointments/[id]/attend/components/AttentionDiagnosesSection";
 import type { PacienteDetalle } from "@/types/patients";
 import type { PatientClinicalRecordsResponse } from "@/types/patient-records";
 import type { HistoryDetailResponse } from "@/types/histories";
@@ -16,10 +26,39 @@ export default function PatientRecordsPage() {
   const params = useParams<{ id: string; }>();
   const id = params?.id;
 
+  const queryClient = useQueryClient();
+
   const [selectedHistoryId, setSelectedHistoryId] = useState<number | null>(null);
   const [expandedAttentions, setExpandedAttentions] = useState<Record<number, boolean>>({});
+
+  const [showNewHistoryModal, setShowNewHistoryModal] = useState(false);
+  const [newHistoryStep, setNewHistoryStep] = useState<1 | 2>(1);
+  const [selectedTipoHistoriaId, setSelectedTipoHistoriaId] = useState<number | null>(null);
+  const [selectedNewHistoryTarget, setSelectedNewHistoryTarget] = useState<
+    "ATTENTION_RECORD" | "OUTPATIENT" | null
+  >(null);
+  const [newHistoryWarning, setNewHistoryWarning] = useState<string | null>(null);
+
   const [showEvolutionModal, setShowEvolutionModal] = useState(false);
-  const [evolutionNote, setEvolutionNote] = useState("");
+  const [evolutionTab, setEvolutionTab] = useState<"new" | "history">("new");
+  const [evolutionForm, setEvolutionForm] = useState({
+    id_tipo_atencion: "",
+    id_modalidad_atencion: "",
+    nota_atencion: "",
+    analisis: "",
+    plan_manejo: "",
+  });
+  const [diagnosticosDraft, setDiagnosticosDraft] = useState<DiagnosisDraft[]>([]);
+  const [evolutionError, setEvolutionError] = useState<string | null>(null);
+  const [evolutionSuccess, setEvolutionSuccess] = useState<string | null>(null);
+
+  const isEvolutionFormValid =
+    evolutionForm.id_tipo_atencion.trim().length > 0 &&
+    evolutionForm.id_modalidad_atencion.trim().length > 0 &&
+    evolutionForm.nota_atencion.trim().length > 0 &&
+    evolutionForm.analisis.trim().length > 0 &&
+    evolutionForm.plan_manejo.trim().length > 0 &&
+    diagnosticosDraft.length > 0;
 
   const { data, isLoading, isError } = useQuery<PacienteDetalle | null>( {
     queryKey: [ "patient-records", id ],
@@ -52,6 +91,147 @@ export default function PatientRecordsPage() {
     return historyDetail?.data ?? null;
   }, [historyDetail]);
 
+  const { data: tiposAtencionData } = useQuery({
+    queryKey: ["catalog-attention-types"],
+    queryFn: () => fetchTiposAtencion(),
+  });
+
+  const { data: modalidadesAtencionData } = useQuery({
+    queryKey: ["catalog-attention-modalities"],
+    queryFn: () => fetchModalidadesAtencion(),
+  });
+
+  const { data: tiposHistoriaClinicaData } = useQuery({
+    queryKey: ["catalog-history-types"],
+    queryFn: () => fetchTiposHistoriaClinica(),
+  });
+
+  const openNewHistoryModal = () => {
+    setSelectedTipoHistoriaId(null);
+    setSelectedNewHistoryTarget(null);
+    setNewHistoryStep(1);
+    setNewHistoryWarning(null);
+    setShowNewHistoryModal(true);
+  };
+
+  const selectHistoryType = (target: "ATTENTION_RECORD" | "OUTPATIENT") => {
+    const rows = (tiposHistoriaClinicaData as any[] | undefined) ?? [];
+
+    const targetCodigo =
+      target === "ATTENTION_RECORD" ? "REG_ATENCION_SALUD" : "HC_CONSULTA_EXTERNA";
+
+    const found = rows.find((t: any) => String(t?.codigo ?? "") === targetCodigo);
+
+    if (!found?.id_tipo_historia) {
+      setSelectedTipoHistoriaId(null);
+      setSelectedNewHistoryTarget(target);
+      setNewHistoryWarning(
+        `No se encontró el tipo en el catálogo (${targetCodigo}). Revisa la tabla tipos_historia_clinica o ejecuta el seed.`,
+      );
+      setNewHistoryStep(2);
+      return;
+    }
+
+    setNewHistoryWarning(null);
+    setSelectedTipoHistoriaId(Number(found.id_tipo_historia));
+    setSelectedNewHistoryTarget(target);
+    setNewHistoryStep(2);
+  };
+
+  const goScheduleAppointment = () => {
+    if (!id) return;
+    setShowNewHistoryModal(false);
+    router.push(`/appointments/new?patientId=${encodeURIComponent(String(id))}`);
+  };
+
+  const goFillHistoryDirectly = () => {
+    if (!id) return;
+    setShowNewHistoryModal(false);
+    if (selectedNewHistoryTarget === "OUTPATIENT") {
+      router.push(`/patients/${id}/records/new/outpatient`);
+      return;
+    }
+
+    const qs = selectedTipoHistoriaId ? `?id_tipo_historia=${selectedTipoHistoriaId}` : "";
+    router.push(`/patients/${id}/records/new${qs}`);
+  };
+
+  const evolutionNotesEnabled = selectedHistoryId != null && showEvolutionModal;
+  const { data: evolutionNotesData, isLoading: loadingEvolutionNotes } = useQuery({
+    queryKey: ["history-evolution-notes", selectedHistoryId],
+    enabled: evolutionNotesEnabled,
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: any[] }>(
+        `/histories/${selectedHistoryId}/evolution-notes`,
+      );
+      return res.data;
+    },
+  });
+
+  const createEvolutionNoteMutation = useMutation({
+    mutationFn: async () => {
+      if (selectedHistoryId == null) return;
+
+      setEvolutionError(null);
+      setEvolutionSuccess(null);
+
+      const payload = {
+        id_tipo_atencion: evolutionForm.id_tipo_atencion || null,
+        id_modalidad_atencion: evolutionForm.id_modalidad_atencion || null,
+        nota_atencion: evolutionForm.nota_atencion,
+        analisis: evolutionForm.analisis,
+        plan_manejo: evolutionForm.plan_manejo,
+        diagnosticos: diagnosticosDraft.map((d) => ({
+          codigo_cie10: d.codigo_cie10,
+          es_principal: d.es_principal,
+        })),
+      };
+
+      return apiClient.post(`/histories/${selectedHistoryId}/evolution-notes`, payload);
+    },
+    onSuccess: async () => {
+      if (selectedHistoryId != null) {
+        await queryClient.invalidateQueries({
+          queryKey: ["history-evolution-notes", selectedHistoryId],
+        });
+        await queryClient.invalidateQueries({ queryKey: ["history-detail", selectedHistoryId] });
+      }
+      setEvolutionSuccess("Nota de evolución guardada correctamente.");
+      setEvolutionForm({
+        id_tipo_atencion: "",
+        id_modalidad_atencion: "",
+        nota_atencion: "",
+        analisis: "",
+        plan_manejo: "",
+      });
+      setDiagnosticosDraft([]);
+    },
+    onError: (err: any) => {
+      const backendMessage = err?.response?.data?.message;
+      setEvolutionError(
+        typeof backendMessage === "string" && backendMessage.trim().length > 0
+          ? backendMessage
+          : err?.message || "No se pudo guardar la nota de evolución.",
+      );
+    },
+  });
+
+  const openEvolutionModalForHistory = (historyId: number) => {
+    setSelectedHistoryId(historyId);
+    setEvolutionError(null);
+    setEvolutionSuccess(null);
+    setEvolutionTab("new");
+    setEvolutionForm({
+      id_tipo_atencion: "",
+      id_modalidad_atencion: "",
+      nota_atencion: "",
+      analisis: "",
+      plan_manejo: "",
+    });
+    setDiagnosticosDraft([]);
+    setShowEvolutionModal(true);
+  };
+
   return (
     <AppShell>
       <section className="space-y-4">
@@ -74,7 +254,7 @@ export default function PatientRecordsPage() {
             </button>
             <button
               type="button"
-              onClick={ () => router.push( `/patients/${ id }/records/new` ) }
+              onClick={openNewHistoryModal}
               className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700"
             >
               Nueva historia clínica
@@ -226,9 +406,7 @@ export default function PatientRecordsPage() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setSelectedHistoryId(h.id_historia);
-                                    setEvolutionNote("");
-                                    setShowEvolutionModal(true);
+                                    openEvolutionModalForHistory(h.id_historia);
                                   }}
                                   className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
                                 >
@@ -265,8 +443,9 @@ export default function PatientRecordsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setEvolutionNote("");
-                      setShowEvolutionModal(true);
+                      if (selectedHistoryId != null) {
+                        openEvolutionModalForHistory(selectedHistoryId);
+                      }
                     }}
                     className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
@@ -275,12 +454,11 @@ export default function PatientRecordsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setShowEvolutionModal(false);
                       setSelectedHistoryId(null);
                     }}
                     className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
-                    Cerrar
+                    Cerrar detalle
                   </button>
                 </div>
               </div>
@@ -432,38 +610,204 @@ export default function PatientRecordsPage() {
 
         {selectedHistoryId != null && showEvolutionModal && (
           <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-2"
             role="dialog"
             aria-modal="true"
           >
-            <div className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-xl">
-              <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Nota de evolución</h3>
-                  <p className="mt-0.5 text-xs text-slate-600">Historia #{selectedHistoryId}</p>
+            <div className="flex max-h-[95vh] w-screen max-w-none flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+              <div className="border-b border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold uppercase text-white">
+                      NOTA DE EVOLUCIÓN
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600">Historia #{selectedHistoryId}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowEvolutionModal(false)}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cerrar
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowEvolutionModal(false)}
-                  className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Cerrar
-                </button>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEvolutionTab("new")}
+                    className={
+                      evolutionTab === "new"
+                        ? "rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white"
+                        : "rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    }
+                  >
+                    Nueva nota
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEvolutionTab("history")}
+                    className={
+                      evolutionTab === "history"
+                        ? "rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white"
+                        : "rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    }
+                  >
+                    Historial
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-3 p-4">
-                <textarea
-                  value={evolutionNote}
-                  onChange={(e) => setEvolutionNote(e.target.value)}
-                  rows={6}
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs text-slate-800 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  placeholder="Escriba aquí la nota de evolución..."
-                />
+              <div className="flex-1 overflow-auto p-4">
+                {evolutionError && (
+                  <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {evolutionError}
+                  </p>
+                )}
+                {evolutionSuccess && (
+                  <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {evolutionSuccess}
+                  </p>
+                )}
 
-                <p className="text-[11px] text-slate-500">
-                  Esta funcionalidad está lista en interfaz. Falta habilitar el guardado en base de datos.
-                </p>
+                {!isEvolutionFormValid && evolutionTab === "new" && (
+                  <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Todos los campos son obligatorios (incluye al menos un diagnóstico CIE-10).
+                  </p>
+                )}
 
+                {evolutionTab === "new" && (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-4">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="mb-2 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">
+                          FECHA Y HORA
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-slate-500">Fecha de atención</p>
+                            <p className="text-xs text-slate-800">{new Date().toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-slate-500">Hora</p>
+                            <p className="text-xs text-slate-800">{new Date().toLocaleTimeString()}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="mb-2 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">
+                          CLASIFICACIÓN DE ATENCIÓN
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-700">Tipo de atención</label>
+                            <select
+                              value={evolutionForm.id_tipo_atencion}
+                              onChange={(e) =>
+                                setEvolutionForm((prev) => ({
+                                  ...prev,
+                                  id_tipo_atencion: e.target.value,
+                                }))
+                              }
+                              className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                            >
+                              <option value="">Seleccione...</option>
+                              {(tiposAtencionData as any[] | undefined)?.map((t: any) => (
+                                <option key={t.id_tipo_atencion} value={String(t.id_tipo_atencion)}>
+                                  {t.descripcion}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-700">Modalidad de atención</label>
+                            <select
+                              value={evolutionForm.id_modalidad_atencion}
+                              onChange={(e) =>
+                                setEvolutionForm((prev) => ({
+                                  ...prev,
+                                  id_modalidad_atencion: e.target.value,
+                                }))
+                              }
+                              className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                            >
+                              <option value="">Seleccione...</option>
+                              {(modalidadesAtencionData as any[] | undefined)?.map((m: any) => (
+                                <option key={m.id_modalidad_atencion} value={String(m.id_modalidad_atencion)}>
+                                  {m.descripcion}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <AttentionDiagnosesSection
+                        attentionId={null}
+                        diagnosticosDraft={diagnosticosDraft}
+                        setDiagnosticosDraft={setDiagnosticosDraft}
+                        form={evolutionForm}
+                        setForm={setEvolutionForm}
+                        setError={setEvolutionError}
+                        setSuccessMessage={setEvolutionSuccess}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="mb-2 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">
+                          NOTA DE ATENCIÓN
+                        </div>
+                        <label className="text-[11px] font-semibold text-slate-700">Nota de Atención</label>
+                        <textarea
+                          value={evolutionForm.nota_atencion}
+                          onChange={(e) =>
+                            setEvolutionForm((p) => ({ ...p, nota_atencion: e.target.value }))
+                          }
+                          rows={6}
+                          className="mt-1 w-full rounded-md border border-slate-300 p-2 text-xs text-slate-800 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          placeholder="Escriba aquí la nota de atención..."
+                        />
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="mb-2 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">
+                          OBSERVACIÓN / ANÁLISIS
+                        </div>
+                        <label className="text-[11px] font-semibold text-slate-700">Observación / Análisis</label>
+                        <textarea
+                          value={evolutionForm.analisis}
+                          onChange={(e) =>
+                            setEvolutionForm((p) => ({ ...p, analisis: e.target.value }))
+                          }
+                          rows={5}
+                          className="mt-1 w-full rounded-md border border-slate-300 p-2 text-xs text-slate-800 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          placeholder="Observación / análisis"
+                        />
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="mb-2 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">
+                          PLAN DE MANEJO
+                        </div>
+                        <label className="text-[11px] font-semibold text-slate-700">Plan de manejo</label>
+                        <textarea
+                          value={evolutionForm.plan_manejo}
+                          onChange={(e) =>
+                            setEvolutionForm((p) => ({ ...p, plan_manejo: e.target.value }))
+                          }
+                          rows={5}
+                          className="mt-1 w-full rounded-md border border-slate-300 p-2 text-xs text-slate-800 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          placeholder="Plan de manejo"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="sticky bottom-0 border-t border-slate-200 bg-white p-4">
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
@@ -474,12 +818,127 @@ export default function PatientRecordsPage() {
                   </button>
                   <button
                     type="button"
-                    disabled
-                    className="rounded-md bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500"
+                    onClick={() => createEvolutionNoteMutation.mutate()}
+                    disabled={
+                      evolutionTab !== "new" ||
+                      !isEvolutionFormValid ||
+                      createEvolutionNoteMutation.isPending
+                    }
+                    className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Guardar
+                    {createEvolutionNoteMutation.isPending ? "Guardando..." : "Guardar"}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showNewHistoryModal && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
+              <div className="border-b border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold uppercase text-white">
+                      NUEVA HISTORIA CLÍNICA
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600">Seleccione el flujo a realizar</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewHistoryModal(false)}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4">
+                {newHistoryStep === 1 && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-slate-700">1) Tipo</p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => selectHistoryType("ATTENTION_RECORD")}
+                        className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 hover:bg-slate-50"
+                      >
+                        <div className="font-semibold text-slate-900">Registro de atención de salud</div>
+                        <div className="mt-1 text-[11px] text-slate-600">
+                          Crea/gestiona historia para una atención.
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => selectHistoryType("OUTPATIENT")}
+                        className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 hover:bg-slate-50"
+                      >
+                        <div className="font-semibold text-slate-900">Historia clínica de consulta externa</div>
+                        <div className="mt-1 text-[11px] text-slate-600">
+                          Crea/gestiona historia para consulta externa.
+                        </div>
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Si el catálogo no está configurado, podrás seleccionar el tipo en el formulario.
+                    </p>
+                  </div>
+                )}
+
+                {newHistoryStep === 2 && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-slate-700">2) ¿Cómo deseas continuar?</p>
+                    {newHistoryWarning && (
+                      <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {newHistoryWarning}
+                      </p>
+                    )}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={goScheduleAppointment}
+                        className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 hover:bg-slate-50"
+                      >
+                        <div className="font-semibold text-slate-900">Agendar una cita</div>
+                        <div className="mt-1 text-[11px] text-slate-600">
+                          Redirige a agendamiento.
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={goFillHistoryDirectly}
+                        className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 hover:bg-slate-50"
+                      >
+                        <div className="font-semibold text-slate-900">Diligenciar directamente</div>
+                        <div className="mt-1 text-[11px] text-slate-600">
+                          Abre el formulario de creación de historia.
+                        </div>
+                      </button>
+                    </div>
+                    <div className="flex justify-between gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewHistoryStep(1)}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Atrás
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewHistoryModal(false)}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

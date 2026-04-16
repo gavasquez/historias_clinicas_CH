@@ -111,6 +111,8 @@ export async function POST(request: NextRequest) {
       telefono,
       email,
       id_ciudad,
+      grupo_poblacional,
+      grupo_poblacional_otro,
       id_tipo_sangre,
       id_sede,
       id_programa_academico,
@@ -133,6 +135,7 @@ export async function POST(request: NextRequest) {
     const idTipoDocumentoNum = Number(id_tipo_documento);
     const numeroDocumentoTrim = String(numero_documento ?? "").trim();
     const telefonoTrim = String(telefono ?? "").trim();
+    const direccionTrim = String(direccion ?? "").trim();
     const idCiudadNum = Number(id_ciudad);
 
     if (
@@ -142,6 +145,7 @@ export async function POST(request: NextRequest) {
       !nombres ||
       !apellidos ||
       !fecha_nacimiento ||
+      !direccionTrim ||
       !telefonoTrim ||
       !idCiudadNum ||
       Number.isNaN(idCiudadNum)
@@ -167,7 +171,11 @@ export async function POST(request: NextRequest) {
           id_genero: toNullableInt(id_genero),
           id_estado_civil: toNullableInt(id_estado_civil),
           id_ciudad: idCiudadNum,
-          direccion: direccion ?? null,
+          direccion: direccionTrim,
+          grupo_poblacional: grupo_poblacional ? String(grupo_poblacional) : null,
+          grupo_poblacional_otro: grupo_poblacional_otro
+            ? String(grupo_poblacional_otro)
+            : null,
           telefono: telefonoTrim,
           email: email ?? null,
           id_tipo_sangre: toNullableInt(id_tipo_sangre),

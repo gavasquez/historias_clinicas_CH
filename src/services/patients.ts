@@ -24,6 +24,13 @@ export interface PatientCreateInput {
   id_genero?: number;
   id_estado_civil?: number;
   direccion?: string;
+  grupo_poblacional?:
+    | "DISCAPACIDAD"
+    | "VICTIMA_CONFLICTO_ARMADO"
+    | "NINGUNA"
+    | "OTRA"
+    | "";
+  grupo_poblacional_otro?: string;
   id_tipo_sangre?: number;
   id_sede?: number;
   id_programa_academico?: number;

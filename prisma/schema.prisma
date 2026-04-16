@@ -33,55 +33,57 @@ model archivos_adjuntos {
 }
 
 model atenciones_salud {
-  id_atencion                 Int                           @id @default(autoincrement())
-  id_historia                 Int
-  id_profesional              Int?
-  id_tipo_atencion            Int?
-  id_modalidad_atencion       Int?
-  id_cita                     Int?
-  fecha_hora                  DateTime                      @default(now()) @db.Timestamp(6)
-  llega_por_sus_medios        Boolean?
-  llega_por_sus_medios_cual   String?                        @db.VarChar(120)
-  estado_a_la_llegada         String?                        @db.VarChar(20)
+  id_atencion                           Int                                   @id @default(autoincrement())
+  id_historia                           Int
+  id_profesional                        Int?
+  id_tipo_atencion                      Int?
+  id_modalidad_atencion                 Int?
+  id_cita                               Int?
+  fecha_hora                            DateTime                              @default(now()) @db.Timestamp(6)
+  analisis                              String?
+  llega_por_sus_medios                  Boolean?
+  llega_por_sus_medios_cual             String?                               @db.VarChar(120)
+  estado_a_la_llegada                   String?                               @db.VarChar(20)
   caso_accidente_intoxicacion_violencia Boolean?
-  fecha_ocurrencia_evento     DateTime?                      @db.Date
-  lugar_ocurrencia_evento     String?                        @db.VarChar(150)
-  notificacion_policia        Boolean?
-  notificacion_cti            Boolean?
-  notificacion_acudiente      Boolean?
-  notificacion_otro           Boolean?
-  notificacion_otro_cual      String?                        @db.VarChar(120)
-  hc_anamnesis_atencion        hc_anamnesis_atencion?
-  hc_antecedentes_atencion     hc_antecedentes_atencion[]
-  hc_antecedentes_traumaticos_atencion hc_antecedentes_traumaticos_atencion?
-  hc_atencion_cierre           hc_atencion_cierre?
-  hc_ssr_atencion             hc_ssr_atencion?
-  hc_tamizajes_atencion       hc_tamizajes_atencion?
-  hc_examen_fisico_atencion   hc_examen_fisico_atencion?
-  hc_valoracion_sistemas_atencion hc_valoracion_sistemas_atencion?
-  historias_clinicas          historias_clinicas            @relation(fields: [id_historia], references: [id_historia], onDelete: Cascade, onUpdate: NoAction)
-  modalidades_atencion        modalidades_atencion?         @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion], onDelete: NoAction, onUpdate: NoAction)
-  profesionales_salud         profesionales_salud?          @relation(fields: [id_profesional], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
-  tipos_atencion              tipos_atencion?               @relation(fields: [id_tipo_atencion], references: [id_tipo_atencion], onDelete: NoAction, onUpdate: NoAction)
-  citas                       citas?                        @relation(fields: [id_cita], references: [id_cita], onDelete: NoAction, onUpdate: NoAction, map: "fk_atencion_cita")
-  certificados_medicos        certificados_medicos[]
-  consentimientos_paciente    consentimientos_paciente[]
-  desistimientos_programa     desistimientos_programa[]
-  diagnosticos_atencion       diagnosticos_atencion[]
-  eventos_seguimiento_cronico eventos_seguimiento_cronico[]
-  examenes_diagnosticos       examenes_diagnosticos[]
-  formulas_medicas            formulas_medicas[]
-  recomendaciones_medicas     recomendaciones_medicas[]
-  rutas_activadas_atencion    rutas_activadas_atencion[]
+  fecha_ocurrencia_evento               DateTime?                             @db.Date
+  lugar_ocurrencia_evento               String?                               @db.VarChar(150)
+  notificacion_policia                  Boolean?
+  notificacion_cti                      Boolean?
+  notificacion_acudiente                Boolean?
+  notificacion_otro                     Boolean?
+  notificacion_otro_cual                String?                               @db.VarChar(120)
+  hc_anamnesis_atencion                 hc_anamnesis_atencion?
+  hc_antecedentes_atencion              hc_antecedentes_atencion[]
+  hc_antecedentes_traumaticos_atencion  hc_antecedentes_traumaticos_atencion?
+  hc_atencion_cierre                    hc_atencion_cierre?
+  hc_ssr_atencion                       hc_ssr_atencion?
+  hc_habitos_atencion                   hc_habitos_atencion?
+  hc_tamizajes_atencion                 hc_tamizajes_atencion?
+  hc_examen_fisico_atencion             hc_examen_fisico_atencion?
+  hc_valoracion_sistemas_atencion       hc_valoracion_sistemas_atencion?
+  historias_clinicas                    historias_clinicas                    @relation(fields: [id_historia], references: [id_historia], onDelete: Cascade, onUpdate: NoAction)
+  modalidades_atencion                  modalidades_atencion?                 @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion], onDelete: NoAction, onUpdate: NoAction)
+  profesionales_salud                   profesionales_salud?                  @relation(fields: [id_profesional], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
+  tipos_atencion                        tipos_atencion?                       @relation(fields: [id_tipo_atencion], references: [id_tipo_atencion], onDelete: NoAction, onUpdate: NoAction)
+  citas                                 citas?                                @relation(fields: [id_cita], references: [id_cita], onDelete: NoAction, onUpdate: NoAction, map: "fk_atencion_cita")
+  certificados_medicos                  certificados_medicos[]
+  consentimientos_paciente              consentimientos_paciente[]
+  desistimientos_programa               desistimientos_programa[]
+  diagnosticos_atencion                 diagnosticos_atencion[]
+  eventos_seguimiento_cronico           eventos_seguimiento_cronico[]
+  examenes_diagnosticos                 examenes_diagnosticos[]
+  formulas_medicas                      formulas_medicas[]
+  recomendaciones_medicas               recomendaciones_medicas[]
+  rutas_activadas_atencion              rutas_activadas_atencion[]
 }
 
 model hc_anamnesis_atencion {
-  id_hc_anamnesis  Int              @id @default(autoincrement())
-  id_atencion      Int              @unique
-  motivo_consulta  String?
+  id_hc_anamnesis   Int              @id @default(autoincrement())
+  id_atencion       Int              @unique
+  motivo_consulta   String?
   enfermedad_actual String?
-  fecha_creacion   DateTime         @default(now()) @db.Timestamp(6)
-  atenciones_salud atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  fecha_creacion    DateTime         @default(now()) @db.Timestamp(6)
+  atenciones_salud  atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([id_atencion], map: "idx_hc_anamnesis_atencion")
 }
@@ -111,55 +113,76 @@ model hc_antecedentes_traumaticos_atencion {
 }
 
 model hc_atencion_cierre {
-  id_hc_atencion_cierre Int              @id @default(autoincrement())
-  id_atencion           Int              @unique
-  recomendaciones        String?
-  certificado_opcion     String?          @db.VarChar(50)
-  certificado_restricciones String?
-  certificado_recomendaciones String?
-  seguimiento_opcion     String?          @db.VarChar(50)
-  seguimiento_fecha      DateTime?        @db.Date
-  fecha_creacion         DateTime         @default(now()) @db.Timestamp(6)
-  atenciones_salud       atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  id_hc_atencion_cierre        Int              @id @default(autoincrement())
+  id_atencion                  Int              @unique
+  conducta_plan_estudio_manejo String?
+  recomendaciones              String?
+  certificado_emitido          Boolean?
+  certificado_opcion           String?          @db.VarChar(50)
+  certificado_restricciones    String?
+  certificado_recomendaciones  String?
+  notificacion_emitida         Boolean?
+  seguimiento_notificacion     String?          @db.VarChar(50)
+  notificacion_observaciones   String?
+  seguimiento_opcion           String?          @db.VarChar(50)
+  seguimiento_fecha            DateTime?        @db.Date
+  fecha_creacion               DateTime         @default(now()) @db.Timestamp(6)
+  atenciones_salud             atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([id_atencion], map: "idx_hc_atencion_cierre")
 }
 
 model hc_ssr_atencion {
-  id_hc_ssr      Int              @id @default(autoincrement())
-  id_atencion    Int              @unique
-  contenido      String?
-  fecha_creacion DateTime         @default(now()) @db.Timestamp(6)
+  id_hc_ssr        Int              @id @default(autoincrement())
+  id_atencion      Int              @unique
+  contenido        String?
+  fecha_creacion   DateTime         @default(now()) @db.Timestamp(6)
   atenciones_salud atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([id_atencion], map: "idx_hc_ssr_atencion")
 }
 
+model hc_habitos_atencion {
+  id_hc_habitos           Int              @id @default(autoincrement())
+  id_atencion             Int              @unique
+  tabaco_cigarrillo       String?          @db.VarChar(255)
+  alcohol                 String?          @db.VarChar(255)
+  sustancias_psicoactivas String?          @db.VarChar(255)
+  otros                   String?          @db.VarChar(255)
+  actividad_fisica        String?          @db.VarChar(255)
+  alimentacion            String?          @db.VarChar(255)
+  otras_actividades       String?          @db.VarChar(255)
+  fecha_creacion          DateTime         @default(now()) @db.Timestamp(6)
+  atenciones_salud        atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_atencion], map: "idx_hc_habitos_atencion")
+}
+
 model hc_tamizajes_atencion {
-  id_hc_tamizaje Int              @id @default(autoincrement())
-  id_atencion    Int              @unique
-  contenido      String?
-  fecha_creacion DateTime         @default(now()) @db.Timestamp(6)
+  id_hc_tamizaje   Int              @id @default(autoincrement())
+  id_atencion      Int              @unique
+  contenido        String?
+  fecha_creacion   DateTime         @default(now()) @db.Timestamp(6)
   atenciones_salud atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([id_atencion], map: "idx_hc_tamizajes_atencion")
 }
 
 model hc_examen_fisico_atencion {
-  id_hc_examen_fisico Int         @id @default(autoincrement())
-  id_atencion         Int         @unique
+  id_hc_examen_fisico Int              @id @default(autoincrement())
+  id_atencion         Int              @unique
   contenido           String?
-  fecha_creacion      DateTime    @default(now()) @db.Timestamp(6)
+  fecha_creacion      DateTime         @default(now()) @db.Timestamp(6)
   atenciones_salud    atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([id_atencion], map: "idx_hc_examen_fisico_atencion")
 }
 
 model hc_valoracion_sistemas_atencion {
-  id_hc_valoracion_sistemas Int   @id @default(autoincrement())
-  id_atencion               Int   @unique
+  id_hc_valoracion_sistemas Int              @id @default(autoincrement())
+  id_atencion               Int              @unique
   contenido                 String?
-  fecha_creacion            DateTime @default(now()) @db.Timestamp(6)
+  fecha_creacion            DateTime         @default(now()) @db.Timestamp(6)
   atenciones_salud          atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([id_atencion], map: "idx_hc_val_sistemas_atencion")
@@ -211,36 +234,39 @@ model certificados_medicos {
 }
 
 model cie10 {
-  codigo      String @id @db.VarChar(10)
-  nombre      String @db.VarChar(255)
-  descripcion String? @db.VarChar(255)
-  activo      Boolean @default(true)
-
-  diagnosticos_atencion diagnosticos_atencion[]
+  codigo                                String                                  @id @db.VarChar(10)
+  nombre                                String                                  @db.VarChar(255)
+  descripcion                           String?                                 @db.VarChar(255)
+  activo                                Boolean                                 @default(true)
+  notas_evolucion_historia_diagnosticos notas_evolucion_historia_diagnosticos[]
+  diagnosticos_atencion                 diagnosticos_atencion[]
 }
 
 model citas {
-  id_cita              Int                 @id @default(autoincrement())
-  id_paciente          Int
-  id_profesional       Int
-  id_sede              Int?
-  id_tipo_cita         Int?
-  id_estado_cita       Int?
-  id_modalidad_atencion Int?
-  id_programa_salud    Int?
-  fecha_hora_inicio    DateTime            @db.Timestamp(6)
-  fecha_hora_fin       DateTime?           @db.Timestamp(6)
-  seguimiento          Boolean             @default(false)
-  tipo_seguimiento     String?             @db.VarChar(30)
-  canal_recordatorio   String?             @db.VarChar(50)
-  atenciones_salud     atenciones_salud[]
-  estados_cita         estados_cita?       @relation(fields: [id_estado_cita], references: [id_estado_cita])
-  pacientes            pacientes           @relation(fields: [id_paciente], references: [id_paciente])
-  profesionales_salud  profesionales_salud @relation(fields: [id_profesional], references: [id_profesional])
-  sedes                sedes?              @relation(fields: [id_sede], references: [id_sede])
-  tipos_cita           tipos_cita?         @relation(fields: [id_tipo_cita], references: [id_tipo_cita])
-  modalidades_atencion modalidades_atencion? @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion])
-  programas_salud      programas_salud?    @relation(fields: [id_programa_salud], references: [id_programa_salud])
+  id_cita                        Int                   @id @default(autoincrement())
+  id_paciente                    Int
+  id_profesional                 Int
+  id_sede                        Int?
+  id_tipo_cita                   Int?
+  id_estado_cita                 Int?
+  id_modalidad_atencion          Int?
+  id_programa_salud              Int?
+  fecha_hora_inicio              DateTime              @db.Timestamp(6)
+  fecha_hora_fin                 DateTime?             @db.Timestamp(6)
+  seguimiento                    Boolean               @default(false)
+  tipo_seguimiento               String?               @db.VarChar(30)
+  canal_recordatorio             String?               @db.VarChar(50)
+  atenciones_salud               atenciones_salud[]
+  estados_cita                   estados_cita?         @relation(fields: [id_estado_cita], references: [id_estado_cita])
+  pacientes                      pacientes             @relation(fields: [id_paciente], references: [id_paciente])
+  profesionales_salud            profesionales_salud   @relation(fields: [id_profesional], references: [id_profesional])
+  sedes                          sedes?                @relation(fields: [id_sede], references: [id_sede])
+  tipos_cita                     tipos_cita?           @relation(fields: [id_tipo_cita], references: [id_tipo_cita])
+  modalidades_atencion           modalidades_atencion? @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion])
+  programas_salud                programas_salud?      @relation(fields: [id_programa_salud], references: [id_programa_salud])
+  tipos_atencion                 tipos_atencion?       @relation(fields: [tipos_atencionId_tipo_atencion], references: [id_tipo_atencion])
+  tipos_atencionId_tipo_atencion Int?
+
   @@index([id_paciente], map: "idx_citas_paciente")
   @@index([id_profesional, fecha_hora_inicio], map: "idx_citas_profesional")
 }
@@ -413,22 +439,54 @@ model generos {
 }
 
 model historias_clinicas {
-  id_historia                Int                    @id @default(autoincrement())
+  id_historia                Int                        @id @default(autoincrement())
   id_paciente                Int
   id_tipo_historia           Int
   id_profesional_responsable Int?
-  fecha_apertura             DateTime               @default(now()) @db.Timestamp(6)
-  estado                     String?                @default("activa") @db.VarChar(50)
+  fecha_apertura             DateTime                   @default(now()) @db.Timestamp(6)
+  estado                     String?                    @default("activa") @db.VarChar(50)
   motivo_consulta            String?
   enfermedad_actual          String?
   antecedentes_personales    String?
   antecedentes_familiares    String?
   atenciones_salud           atenciones_salud[]
-  pacientes                  pacientes              @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
-  profesionales_salud        profesionales_salud?   @relation(fields: [id_profesional_responsable], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
-  tipos_historia_clinica     tipos_historia_clinica @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
+  notas_evolucion_historia   notas_evolucion_historia[]
+  pacientes                  pacientes                  @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
+  profesionales_salud        profesionales_salud?       @relation(fields: [id_profesional_responsable], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
+  tipos_historia_clinica     tipos_historia_clinica     @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([id_paciente], map: "idx_historia_paciente")
+}
+
+model notas_evolucion_historia {
+  id_nota_evolucion     Int      @id @default(autoincrement())
+  id_historia           Int
+  fecha_hora            DateTime @default(now()) @db.Timestamp(6)
+  id_tipo_atencion      Int?
+  id_modalidad_atencion Int?
+  nota_atencion         String?
+  analisis              String?
+  plan_manejo           String?
+
+  historias_clinicas   historias_clinicas                      @relation(fields: [id_historia], references: [id_historia], onDelete: Cascade, onUpdate: NoAction)
+  tipos_atencion       tipos_atencion?                         @relation(fields: [id_tipo_atencion], references: [id_tipo_atencion], onDelete: NoAction, onUpdate: NoAction)
+  modalidades_atencion modalidades_atencion?                   @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion], onDelete: NoAction, onUpdate: NoAction)
+  diagnosticos         notas_evolucion_historia_diagnosticos[]
+
+  @@index([id_historia], map: "idx_notas_evolucion_historia")
+}
+
+model notas_evolucion_historia_diagnosticos {
+  id_nota_dx        Int     @id @default(autoincrement())
+  id_nota_evolucion Int
+  codigo_cie10      String
+  es_principal      Boolean @default(false)
+
+  notas_evolucion_historia notas_evolucion_historia @relation(fields: [id_nota_evolucion], references: [id_nota_evolucion], onDelete: Cascade, onUpdate: NoAction)
+  cie10                    cie10                    @relation(fields: [codigo_cie10], references: [codigo], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_nota_evolucion], map: "idx_nota_evolucion_dx")
+  @@index([codigo_cie10], map: "idx_nota_evolucion_dx_cie10")
 }
 
 model items_formula {
@@ -444,11 +502,12 @@ model items_formula {
 }
 
 model modalidades_atencion {
-  id_modalidad_atencion Int                @id @default(autoincrement())
-  codigo                String             @unique @db.VarChar(50)
-  descripcion           String             @db.VarChar(150)
-  atenciones_salud      atenciones_salud[]
-  citas                 citas[]
+  id_modalidad_atencion    Int                        @id @default(autoincrement())
+  codigo                   String                     @unique @db.VarChar(50)
+  descripcion              String                     @db.VarChar(150)
+  atenciones_salud         atenciones_salud[]
+  citas                    citas[]
+  notas_evolucion_historia notas_evolucion_historia[]
 }
 
 model pacientes {
@@ -464,6 +523,8 @@ model pacientes {
   ciudad                   String?                    @db.VarChar(100)
   id_ciudad                Int?
   direccion                String?                    @db.VarChar(200)
+  grupo_poblacional        String?                    @db.VarChar(50)
+  grupo_poblacional_otro   String?                    @db.VarChar(150)
   telefono                 String?                    @db.VarChar(50)
   email                    String?                    @db.VarChar(150)
   id_tipo_sangre           Int?
@@ -496,19 +557,19 @@ model pacientes {
 }
 
 model departamentos {
-  id_departamento Int       @id @default(autoincrement())
-  nombre          String    @unique @db.VarChar(100)
-  codigo_dane     String?   @unique @db.VarChar(10)
+  id_departamento Int        @id @default(autoincrement())
+  nombre          String     @unique @db.VarChar(100)
+  codigo_dane     String?    @unique @db.VarChar(10)
   ciudades        ciudades[]
 }
 
 model ciudades {
-  id_ciudad        Int            @id @default(autoincrement())
-  id_departamento  Int
-  nombre           String         @db.VarChar(120)
-  codigo_dane      String?        @unique @db.VarChar(10)
-  departamentos    departamentos  @relation(fields: [id_departamento], references: [id_departamento], onDelete: NoAction, onUpdate: NoAction)
-  pacientes        pacientes[]
+  id_ciudad       Int           @id @default(autoincrement())
+  id_departamento Int
+  nombre          String        @db.VarChar(120)
+  codigo_dane     String?       @unique @db.VarChar(10)
+  departamentos   departamentos @relation(fields: [id_departamento], references: [id_departamento], onDelete: NoAction, onUpdate: NoAction)
+  pacientes       pacientes[]
 
   @@unique([id_departamento, nombre])
   @@index([id_departamento], map: "idx_ciudades_departamento")
@@ -537,7 +598,7 @@ model profesionales_salud {
   id_sede                      Int?
   id_especialidad              Int?
   registro_medico              String?                        @db.VarChar(100)
-  telefono_contacto            String?                        @db.VarChar(50)
+  firma_digital                String?                        @db.Text
   activo                       Boolean                        @default(true)
   atenciones_salud             atenciones_salud[]
   citas                        citas[]
@@ -615,14 +676,14 @@ model rutas_atencion {
 }
 
 model sedes {
-  id_sede                 Int                       @id @default(autoincrement())
-  nombre                  String                    @db.VarChar(100)
-  ciudad                  String?                   @db.VarChar(100)
-  departamento            String?                   @db.VarChar(100)
-  citas                   citas[]
-  desistimientos_programa desistimientos_programa[]
-  pacientes               pacientes[]
-  profesionales_salud     profesionales_salud[]
+  id_sede                      Int                            @id @default(autoincrement())
+  nombre                       String                         @db.VarChar(100)
+  ciudad                       String?                        @db.VarChar(100)
+  departamento                 String?                        @db.VarChar(100)
+  citas                        citas[]
+  desistimientos_programa      desistimientos_programa[]
+  pacientes                    pacientes[]
+  profesionales_salud          profesionales_salud[]
   disponibilidades_profesional disponibilidades_profesional[]
 }
 
@@ -643,10 +704,12 @@ model seguimientos_cronicos {
 }
 
 model tipos_atencion {
-  id_tipo_atencion Int                @id @default(autoincrement())
-  codigo           String             @unique @db.VarChar(50)
-  descripcion      String             @db.VarChar(150)
-  atenciones_salud atenciones_salud[]
+  id_tipo_atencion         Int                        @id @default(autoincrement())
+  codigo                   String                     @unique @db.VarChar(50)
+  descripcion              String                     @db.VarChar(150)
+  atenciones_salud         atenciones_salud[]
+  citas                    citas[]
+  notas_evolucion_historia notas_evolucion_historia[]
 }
 
 model tipos_certificado_medico {
@@ -725,6 +788,7 @@ model usuarios {
   password_hash             String                      @db.VarChar(255)
   nombre_completo           String                      @db.VarChar(150)
   email                     String?                     @unique @db.VarChar(150)
+  telefono                  String                      @db.VarChar(50)
   activo                    Boolean                     @default(true)
   id_rol                    Int
   fecha_creacion            DateTime                    @default(now()) @db.Timestamp(6)

@@ -10,6 +10,7 @@ import {
   createProfessionalAvailability,
   deleteProfessionalAvailability,
   fetchProfessionalAvailability,
+  updateProfessionalAvailability,
 } from "@/services/professional-availability";
 import { fetchSedes, type Sede } from "@/services/catalogs";
 import type { ProfessionalDetail } from "@/types/professionals";
@@ -43,10 +44,52 @@ export default function ProfessionalDetailPage() {
     fecha_fin_vigencia: "",
   });
 
+  const updateAvailabilityMutation = useMutation({
+    mutationFn: (params: { availabilityId: number; input: ProfessionalAvailabilityCreateInput }) =>
+      updateProfessionalAvailability(String(id), params.availabilityId, params.input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["professional-availability", id] });
+      setAvailabilityFeedback({
+        type: "success",
+        message: "Disponibilidad actualizada correctamente.",
+      });
+      setEditingAvailability(null);
+    },
+    onError: (err: unknown) => {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as any).response?.data?.message
+          : null;
+      setAvailabilityFeedback({
+        type: "error",
+        message:
+          typeof message === "string" && message.trim().length > 0
+            ? message
+            : "No se pudo actualizar. Verifica la información e intenta de nuevo.",
+      });
+    },
+  });
+
   const [availabilityFeedback, setAvailabilityFeedback] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  const [availabilityFilterSedeId, setAvailabilityFilterSedeId] = useState<number>(0);
+  const [availabilityFilterDate, setAvailabilityFilterDate] = useState<string>("");
+  const [availabilityPage, setAvailabilityPage] = useState<number>(1);
+  const AVAILABILITY_PAGE_SIZE = 10;
+
+  const [editingAvailability, setEditingAvailability] = useState<ProfessionalAvailability | null>(null);
+  const [editAvailabilityForm, setEditAvailabilityForm] = useState<ProfessionalAvailabilityCreateInput>({
+    id_sede: 0,
+    dia_semana: 1,
+    hora_inicio: "08:00",
+    hora_fin: "12:00",
+    capacidad_simultanea: 1,
+    fecha_inicio_vigencia: "",
+    fecha_fin_vigencia: "",
+  });
 
   const dayLabel = (day: number) => {
     const map: Record<number, string> = {
@@ -95,6 +138,32 @@ export default function ProfessionalDetailPage() {
     queryFn: () => fetchProfessionalAvailability(String(id)),
   });
 
+  const filteredAvailability = useMemo(() => {
+    const items = availability ?? [];
+    const sedeId = availabilityFilterSedeId;
+    const date = availabilityFilterDate.trim();
+
+    const filtered = items.filter((a) => {
+      if (sedeId > 0 && a.id_sede !== sedeId) return false;
+      if (!date) return true;
+      const startOk = !a.fecha_inicio_vigencia || a.fecha_inicio_vigencia <= date;
+      const endOk = !a.fecha_fin_vigencia || a.fecha_fin_vigencia >= date;
+      return startOk && endOk;
+    });
+
+    return filtered;
+  }, [availability, availabilityFilterSedeId, availabilityFilterDate]);
+
+  const availabilityTotalPages = useMemo(() => {
+    return Math.max(Math.ceil(filteredAvailability.length / AVAILABILITY_PAGE_SIZE), 1);
+  }, [filteredAvailability.length]);
+
+  const availabilityPageItems = useMemo(() => {
+    const page = Math.min(Math.max(availabilityPage, 1), availabilityTotalPages);
+    const start = (page - 1) * AVAILABILITY_PAGE_SIZE;
+    return filteredAvailability.slice(start, start + AVAILABILITY_PAGE_SIZE);
+  }, [filteredAvailability, availabilityPage, availabilityTotalPages]);
+
   const cancelMutation = useMutation({
     mutationFn: ({ citaId, codigoEstado }: { citaId: number; codigoEstado: string }) =>
       cancelAppointment(citaId, codigoEstado),
@@ -111,8 +180,20 @@ export default function ProfessionalDetailPage() {
       : "rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100";
 
   const createAvailabilityMutation = useMutation({
-    mutationFn: (input: ProfessionalAvailabilityCreateInput) =>
-      createProfessionalAvailability(String(id), input),
+    mutationFn: async (input: ProfessionalAvailabilityCreateInput) => {
+      if (Number(input.dia_semana) === 0) {
+        const base = { ...input };
+        return Promise.all(
+          [1, 2, 3, 4, 5, 6, 7].map((d) =>
+            createProfessionalAvailability(String(id), {
+              ...base,
+              dia_semana: d,
+            }),
+          ),
+        );
+      }
+      return createProfessionalAvailability(String(id), input);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["professional-availability", id] });
       setAvailabilityFeedback({
@@ -266,9 +347,39 @@ export default function ProfessionalDetailPage() {
                   <p className="text-sm text-slate-800">{data.registro_medico ?? "No registrado"}</p>
                 </div>
 
-                <div className="space-y-1 text-sm">
-                  <p className="text-xs font-semibold uppercase text-slate-500">Teléfono de contacto</p>
-                  <p className="text-sm text-slate-800">{data.telefono_contacto ?? "No registrado"}</p>
+                <div className="space-y-1 text-sm md:col-span-2">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Firma digital</p>
+                  {!data.firma_digital ? (
+                    <p className="text-sm text-slate-800">No cargada</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void Swal.fire({
+                            title: "Firma digital",
+                            imageUrl: data.firma_digital ?? undefined,
+                            imageAlt: "Firma digital",
+                            showCloseButton: true,
+                            showConfirmButton: false,
+                            background: "#ffffff",
+                            width: 700,
+                            imageWidth: 640,
+                          });
+                        }}
+                        className="text-left text-xs font-medium text-sky-700 hover:underline"
+                      >
+                        Ver firma
+                      </button>
+                      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white p-2">
+                        <img
+                          src={data.firma_digital}
+                          alt="Firma digital"
+                          className="max-h-40 w-auto max-w-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -332,6 +443,7 @@ export default function ProfessionalDetailPage() {
                 }
                 className="h-8 rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               >
+                <option value={0}>Todos los días</option>
                 {[1, 2, 3, 4, 5, 6, 7].map((d) => (
                   <option key={d} value={d}>
                     {dayLabel(d)}
@@ -371,11 +483,12 @@ export default function ProfessionalDetailPage() {
             </div>
 
             <div className="flex flex-col gap-1 md:col-span-3">
-              <label className="text-xs font-medium text-slate-600">Vigencia (opcional)</label>
+              <label className="text-xs font-medium text-slate-600">Vigencia</label>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="date"
                   value={availabilityForm.fecha_inicio_vigencia ?? ""}
+                  required
                   onChange={(e) =>
                     setAvailabilityForm((prev) => ({
                       ...prev,
@@ -387,6 +500,7 @@ export default function ProfessionalDetailPage() {
                 <input
                   type="date"
                   value={availabilityForm.fecha_fin_vigencia ?? ""}
+                  required
                   onChange={(e) =>
                     setAvailabilityForm((prev) => ({
                       ...prev,
@@ -396,9 +510,6 @@ export default function ProfessionalDetailPage() {
                   className="h-8 rounded-md border border-slate-300 px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
               </div>
-              <p className="text-[11px] text-slate-500">
-                Si no se define, la disponibilidad aplica para cualquier fecha.
-              </p>
             </div>
           </div>
 
@@ -407,18 +518,32 @@ export default function ProfessionalDetailPage() {
               type="button"
               disabled={createAvailabilityMutation.isPending || !id || availabilityForm.id_sede <= 0}
               onClick={() => {
+                if (!availabilityForm.fecha_inicio_vigencia?.trim()) {
+                  Swal.fire({
+                    title: "Vigencia requerida",
+                    text: "Debe diligenciar la fecha de inicio de vigencia.",
+                    icon: "warning",
+                    confirmButtonText: "Aceptar",
+                    confirmButtonColor: "#2563eb",
+                  });
+                  return;
+                }
+
+                if (!availabilityForm.fecha_fin_vigencia?.trim()) {
+                  Swal.fire({
+                    title: "Vigencia requerida",
+                    text: "Debe diligenciar la fecha fin de vigencia.",
+                    icon: "warning",
+                    confirmButtonText: "Aceptar",
+                    confirmButtonColor: "#2563eb",
+                  });
+                  return;
+                }
+
                 const payload: ProfessionalAvailabilityCreateInput = {
                   ...availabilityForm,
-                  fecha_inicio_vigencia:
-                    availabilityForm.fecha_inicio_vigencia &&
-                    availabilityForm.fecha_inicio_vigencia.trim().length > 0
-                      ? availabilityForm.fecha_inicio_vigencia
-                      : undefined,
-                  fecha_fin_vigencia:
-                    availabilityForm.fecha_fin_vigencia &&
-                    availabilityForm.fecha_fin_vigencia.trim().length > 0
-                      ? availabilityForm.fecha_fin_vigencia
-                      : undefined,
+                  fecha_inicio_vigencia: availabilityForm.fecha_inicio_vigencia,
+                  fecha_fin_vigencia: availabilityForm.fecha_fin_vigencia,
                 };
 
                 createAvailabilityMutation.mutate(payload);
@@ -444,8 +569,61 @@ export default function ProfessionalDetailPage() {
           )}
 
           {!loadingAvailability && !availabilityError && (availability?.length ?? 0) > 0 && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-[11px]">
+            <div className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-600">Filtrar por sede</label>
+                  <select
+                    value={availabilityFilterSedeId}
+                    onChange={(e) => {
+                      setAvailabilityFilterSedeId(Number(e.target.value));
+                      setAvailabilityPage(1);
+                    }}
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                    <option value={0}>Todas</option>
+                    {(sedes ?? []).map((s) => (
+                      <option key={s.id_sede} value={s.id_sede}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-600">Filtrar por fecha</label>
+                  <input
+                    type="date"
+                    value={availabilityFilterDate}
+                    onChange={(e) => {
+                      setAvailabilityFilterDate(e.target.value);
+                      setAvailabilityPage(1);
+                    }}
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                  <p className="text-[11px] text-slate-500">Muestra disponibilidades vigentes para esa fecha.</p>
+                </div>
+
+                <div className="flex items-end justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvailabilityFilterSedeId(0);
+                      setAvailabilityFilterDate("");
+                      setAvailabilityPage(1);
+                    }}
+                    className="h-8 rounded-md border border-slate-300 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Limpiar filtros
+                  </button>
+                </div>
+              </div>
+
+              {filteredAvailability.length === 0 ? (
+                <p className="text-sm text-slate-500">No hay resultados con los filtros seleccionados.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-[11px]">
                 <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Sede</th>
@@ -457,7 +635,7 @@ export default function ProfessionalDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700">
-                  {availability!.map((a) => (
+                  {availabilityPageItems.map((a) => (
                     <tr key={a.id_disponibilidad} className="hover:bg-slate-50">
                       <td className="px-3 py-2">
                         {(sedes ?? []).find((s) => s.id_sede === a.id_sede)?.nombre ??
@@ -476,36 +654,249 @@ export default function ProfessionalDetailPage() {
                           : "-"}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <button
-                          type="button"
-                          disabled={deleteAvailabilityMutation.isPending}
-                          onClick={async () => {
-                            const result = await Swal.fire({
-                              title: "¿Eliminar disponibilidad?",
-                              text: "Esta acción no se puede deshacer.",
-                              icon: "warning",
-                              showCancelButton: true,
-                              confirmButtonText: "Eliminar",
-                              cancelButtonText: "Cancelar",
-                              confirmButtonColor: "#ef4444",
-                              cancelButtonColor: "#6b7280",
-                            });
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            disabled={deleteAvailabilityMutation.isPending || updateAvailabilityMutation.isPending}
+                            onClick={() => {
+                              setAvailabilityFeedback(null);
+                              setEditingAvailability(a);
+                              setEditAvailabilityForm({
+                                id_sede: a.id_sede ?? 0,
+                                dia_semana: a.dia_semana,
+                                hora_inicio: a.hora_inicio,
+                                hora_fin: a.hora_fin,
+                                capacidad_simultanea: a.capacidad_simultanea,
+                                fecha_inicio_vigencia: a.fecha_inicio_vigencia ?? "",
+                                fecha_fin_vigencia: a.fecha_fin_vigencia ?? "",
+                              });
+                            }}
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deleteAvailabilityMutation.isPending || updateAvailabilityMutation.isPending}
+                            onClick={async () => {
+                              const result = await Swal.fire({
+                                title: "¿Eliminar disponibilidad?",
+                                text: "Esta acción no se puede deshacer.",
+                                icon: "warning",
+                                showCancelButton: true,
+                                confirmButtonText: "Eliminar",
+                                cancelButtonText: "Cancelar",
+                                confirmButtonColor: "#ef4444",
+                                cancelButtonColor: "#6b7280",
+                              });
 
-                            if (!result.isConfirmed) return;
-                            deleteAvailabilityMutation.mutate(a.id_disponibilidad);
-                          }}
-                          className="rounded-lg border border-red-300 px-2 py-1 text-[11px] font-medium text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Eliminar
-                        </button>
+                              if (!result.isConfirmed) return;
+                              deleteAvailabilityMutation.mutate(a.id_disponibilidad);
+                            }}
+                            className="rounded-lg border border-red-300 px-2 py-1 text-[11px] font-medium text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                  </table>
+                </div>
+              )}
+
+              {filteredAvailability.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-slate-600">
+                    Mostrando {(availabilityPage - 1) * AVAILABILITY_PAGE_SIZE + 1} - {Math.min(availabilityPage * AVAILABILITY_PAGE_SIZE, filteredAvailability.length)} de {filteredAvailability.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={availabilityPage <= 1}
+                      onClick={() => setAvailabilityPage((p) => Math.max(p - 1, 1))}
+                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-[11px] text-slate-700">
+                      Página {availabilityPage} / {availabilityTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={availabilityPage >= availabilityTotalPages}
+                      onClick={() => setAvailabilityPage((p) => Math.min(p + 1, availabilityTotalPages))}
+                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
+        )}
+
+        {editingAvailability && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+            <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Editar disponibilidad</h2>
+                  <p className="mt-0.5 text-xs text-slate-600">Disponibilidad #{editingAvailability.id_disponibilidad}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingAvailability(null)}
+                  className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Sede</label>
+                    <select
+                      value={editAvailabilityForm.id_sede}
+                      onChange={(e) =>
+                        setEditAvailabilityForm((prev) => ({
+                          ...prev,
+                          id_sede: Number(e.target.value),
+                        }))
+                      }
+                      className="h-8 rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                      <option value={0}>Seleccione</option>
+                      {(sedes ?? []).map((s) => (
+                        <option key={s.id_sede} value={s.id_sede}>
+                          {s.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Día</label>
+                    <select
+                      value={editAvailabilityForm.dia_semana}
+                      onChange={(e) =>
+                        setEditAvailabilityForm((prev) => ({
+                          ...prev,
+                          dia_semana: Number(e.target.value),
+                        }))
+                      }
+                      className="h-8 rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                        <option key={d} value={d}>
+                          {dayLabel(d)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Inicio</label>
+                    <input
+                      type="time"
+                      value={editAvailabilityForm.hora_inicio}
+                      onChange={(e) =>
+                        setEditAvailabilityForm((prev) => ({
+                          ...prev,
+                          hora_inicio: e.target.value,
+                        }))
+                      }
+                      className="h-8 rounded-md border border-slate-300 px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Fin</label>
+                    <input
+                      type="time"
+                      value={editAvailabilityForm.hora_fin}
+                      onChange={(e) =>
+                        setEditAvailabilityForm((prev) => ({
+                          ...prev,
+                          hora_fin: e.target.value,
+                        }))
+                      }
+                      className="h-8 rounded-md border border-slate-300 px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <label className="text-xs font-medium text-slate-600">Vigencia (opcional)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={editAvailabilityForm.fecha_inicio_vigencia ?? ""}
+                        onChange={(e) =>
+                          setEditAvailabilityForm((prev) => ({
+                            ...prev,
+                            fecha_inicio_vigencia: e.target.value,
+                          }))
+                        }
+                        className="h-8 rounded-md border border-slate-300 px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                      <input
+                        type="date"
+                        value={editAvailabilityForm.fecha_fin_vigencia ?? ""}
+                        onChange={(e) =>
+                          setEditAvailabilityForm((prev) => ({
+                            ...prev,
+                            fecha_fin_vigencia: e.target.value,
+                          }))
+                        }
+                        className="h-8 rounded-md border border-slate-300 px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAvailability(null)}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updateAvailabilityMutation.isPending || editAvailabilityForm.id_sede <= 0}
+                    onClick={() => {
+                      const payload: ProfessionalAvailabilityCreateInput = {
+                        ...editAvailabilityForm,
+                        fecha_inicio_vigencia:
+                          editAvailabilityForm.fecha_inicio_vigencia &&
+                          editAvailabilityForm.fecha_inicio_vigencia.trim().length > 0
+                            ? editAvailabilityForm.fecha_inicio_vigencia
+                            : undefined,
+                        fecha_fin_vigencia:
+                          editAvailabilityForm.fecha_fin_vigencia &&
+                          editAvailabilityForm.fecha_fin_vigencia.trim().length > 0
+                            ? editAvailabilityForm.fecha_fin_vigencia
+                            : undefined,
+                      };
+
+                      updateAvailabilityMutation.mutate({
+                        availabilityId: editingAvailability.id_disponibilidad,
+                        input: payload,
+                      });
+                    }}
+                    className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {updateAvailabilityMutation.isPending ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === "citas" && (

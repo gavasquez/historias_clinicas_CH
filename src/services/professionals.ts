@@ -13,7 +13,7 @@ export interface ProfessionalCreateInput {
   id_sede?: number;
   id_especialidad?: number;
   registro_medico?: string;
-  telefono_contacto?: string;
+  firma_digital?: string;
   activo?: boolean;
 }
 
@@ -21,7 +21,7 @@ export interface ProfessionalUpdateInput {
   id_sede?: number;
   id_especialidad?: number;
   registro_medico?: string;
-  telefono_contacto?: string;
+  firma_digital?: string;
   activo?: boolean;
 }
 

@@ -147,7 +147,6 @@ export function ProfessionalsView() {
                   <th className="px-3 py-2">Especialidad</th>
                   <th className="px-3 py-2">Sede</th>
                   <th className="px-3 py-2">Registro</th>
-                  <th className="px-3 py-2">Teléfono</th>
                   <th className="px-3 py-2">Estado</th>
                   <th className="px-3 py-2 text-right">Acciones</th>
                 </tr>
@@ -164,7 +163,6 @@ export function ProfessionalsView() {
                     <td className="px-3 py-2">{prof.especialidad ?? "No registrada"}</td>
                     <td className="px-3 py-2">{prof.sede ?? "No registrada"}</td>
                     <td className="px-3 py-2">{prof.registro_medico ?? "No registrado"}</td>
-                    <td className="px-3 py-2">{prof.telefono_contacto ?? "No registrado"}</td>
                     <td className="px-3 py-2">
                       <span
                         className={

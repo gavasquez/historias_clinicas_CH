@@ -34,6 +34,8 @@ export default function NewPatientPage() {
     id_genero: undefined,
     id_estado_civil: undefined,
     direccion: "",
+    grupo_poblacional: undefined,
+    grupo_poblacional_otro: "",
     id_tipo_sangre: undefined,
     id_sede: undefined,
     id_programa_academico: undefined,
@@ -82,6 +84,7 @@ export default function NewPatientPage() {
 
     const parsed = patientSchema.safeParse({
       ...form,
+      grupo_poblacional: form.grupo_poblacional ? form.grupo_poblacional : undefined,
       id_tipo_documento: Number(form.id_tipo_documento || 0),
       id_genero: Number(form.id_genero || 0),
       id_estado_civil: Number(form.id_estado_civil || 0),
@@ -111,6 +114,7 @@ export default function NewPatientPage() {
     try {
       await createPatient({
         ...form,
+        grupo_poblacional: form.grupo_poblacional ? form.grupo_poblacional : undefined,
         id_tipo_documento: Number(form.id_tipo_documento),
       });
       setToast({ type: "success", message: "Paciente creado correctamente" });

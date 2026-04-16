@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       especialidad: p.especialidades?.nombre ?? null,
       sede: p.sedes?.nombre ?? null,
       registro_medico: p.registro_medico ?? null,
-      telefono_contacto: p.telefono_contacto ?? null,
+      firma_digital: (p as any).firma_digital ?? null,
       activo: p.activo,
     }));
 
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       id_sede,
       id_especialidad,
       registro_medico,
-      telefono_contacto,
+      firma_digital,
       activo,
     } = body;
 
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         id_sede: id_sede ?? null,
         id_especialidad: id_especialidad ?? null,
         registro_medico: registro_medico ?? null,
-        telefono_contacto: telefono_contacto ?? null,
+        firma_digital: typeof firma_digital === "string" ? firma_digital : null,
         activo: activo ?? true,
       },
       include: {
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       especialidad: profesional.especialidades?.nombre ?? null,
       sede: profesional.sedes?.nombre ?? null,
       registro_medico: profesional.registro_medico ?? null,
-      telefono_contacto: profesional.telefono_contacto ?? null,
+      firma_digital: (profesional as any).firma_digital ?? null,
       activo: profesional.activo,
     };
 

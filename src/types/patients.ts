@@ -34,6 +34,8 @@ export interface PacienteDetalleApi {
   ciudad: string | null;
   id_ciudad: number | null;
   direccion: string | null;
+  grupo_poblacional: string | null;
+  grupo_poblacional_otro: string | null;
   condicion_particular: string | null;
   id_genero: number | null;
   id_estado_civil: number | null;
@@ -54,6 +56,8 @@ export interface PacienteDetalle {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
+  grupo_poblacional: string | null;
+  grupo_poblacional_otro: string | null;
   condicion_particular: string | null;
   tipos_documento: { codigo: string; descripcion?: string } | null;
   tipos_usuario: { descripcion: string } | null;

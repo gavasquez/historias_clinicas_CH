@@ -22,10 +22,34 @@ export async function createAttentionDiagnosis(
     codigo_cie10: string;
     es_principal?: boolean;
     id_tipo_confirmacion?: number | null;
+    codigo_confirmacion?: string | null;
   },
 ): Promise<AttentionDiagnosis> {
   const res = await apiClient.post<AttentionDiagnosis>(`/attentions/${idAtencion}/diagnoses`, payload);
   return res.data;
+}
+
+export async function updateAttentionDiagnosis(
+  idAtencion: number,
+  idDiagnostico: number,
+  payload: {
+    id_tipo_confirmacion?: number | null;
+    codigo_confirmacion?: string | null;
+    es_principal?: boolean | null;
+  },
+): Promise<AttentionDiagnosis> {
+  const res = await apiClient.patch<AttentionDiagnosis>(
+    `/attentions/${idAtencion}/diagnoses/${idDiagnostico}`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function deleteAttentionDiagnosis(
+  idAtencion: number,
+  idDiagnostico: number,
+): Promise<void> {
+  await apiClient.delete(`/attentions/${idAtencion}/diagnoses/${idDiagnostico}`);
 }
 
 export interface AttentionsReportFilters {

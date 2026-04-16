@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPatientDetailById } from "@/services/patients";
@@ -27,6 +27,7 @@ interface HistoriaFormState {
 export default function NewPatientRecordPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const id = params?.id;
 
   const [isClient, setIsClient] = useState(false);
@@ -34,6 +35,16 @@ export default function NewPatientRecordPage() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    const idTipoFromQuery = searchParams.get("id_tipo_historia");
+    const parsed = idTipoFromQuery ? Number(idTipoFromQuery) : null;
+    if (!parsed || !Number.isInteger(parsed) || parsed <= 0) return;
+    setForm((prev) => ({
+      ...prev,
+      id_tipo_historia: String(parsed),
+    }));
+  }, [searchParams]);
 
   const [form, setForm] = useState<HistoriaFormState>({
     id_tipo_historia: "",

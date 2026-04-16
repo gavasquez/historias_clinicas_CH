@@ -104,6 +104,7 @@ export default function UsersPage() {
                   <th className="px-4 py-3">Usuario</th>
                   <th className="px-4 py-3">Nombre completo</th>
                   <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Teléfono</th>
                   <th className="px-4 py-3">Rol</th>
                   <th className="px-4 py-3">Profesional</th>
                   <th className="px-4 py-3">Creación</th>
@@ -115,7 +116,7 @@ export default function UsersPage() {
                 {isLoading && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-6 text-center text-[11px] text-slate-500"
                     >
                       Cargando usuarios...
@@ -126,7 +127,7 @@ export default function UsersPage() {
                 {isError && !isLoading && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-6 text-center text-[11px] text-red-600"
                     >
                       Ocurrió un error al cargar los usuarios.
@@ -137,7 +138,7 @@ export default function UsersPage() {
                 {!isLoading && !isError && users.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-6 text-center text-[11px] text-slate-500"
                     >
                       No se encontraron usuarios.
@@ -159,6 +160,9 @@ export default function UsersPage() {
                       </td>
                       <td className="px-4 py-3">
                         {u.email ?? "Sin email"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {u.telefono || "-"}
                       </td>
                       <td className="px-4 py-3">
                         <div className="space-y-0.5">
@@ -212,7 +216,7 @@ export default function UsersPage() {
 
                               const result = await Swal.fire({
                                 title: "¿Crear profesional de salud?",
-                                html: `Se creará el registro en <b>profesionales de salud</b> para:<br/><br/><b>${u.nombre_completo}</b><br/>Usuario: <b>${u.username ?? "-"}</b><br/>Email: <b>${u.email ?? "Sin email"}</b>`,
+                                html: `Se creará el registro en <b>profesionales de salud</b> para:<br/><br/><b>${u.nombre_completo}</b><br/>Usuario: <b>${u.username ?? "-"}</b><br/>Email: <b>${u.email ?? "Sin email"}</b><br/>Teléfono: <b>${u.telefono || "-"}</b>`,
                                 icon: "question",
                                 showCancelButton: true,
                                 confirmButtonText: "Confirmar",

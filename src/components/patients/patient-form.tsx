@@ -64,6 +64,8 @@ export function PatientForm(props: PatientFormProps) {
     onDepartamentoChange,
   } = props;
 
+  const grupoPoblacional = form.grupo_poblacional ?? "";
+
   return (
     <form
       onSubmit={onSubmit}
@@ -255,6 +257,23 @@ export function PatientForm(props: PatientFormProps) {
           {errors.email && <span className="text-xs text-red-600">{errors.email}</span>}
         </div>
 
+        {/* Dirección */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">
+            Dirección <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={form.direccion ?? ""}
+            onChange={(e) => onChange("direccion", e.target.value)}
+            placeholder="Dirección de residencia"
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          />
+          {errors.direccion && (
+            <span className="text-xs text-red-600">{errors.direccion}</span>
+          )}
+        </div>
+
         {/* Tipo de usuario */}
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-600">
@@ -368,18 +387,6 @@ export function PatientForm(props: PatientFormProps) {
           )}
         </div>
 
-        {/* Dirección */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-600">Dirección</label>
-          <input
-            type="text"
-            value={form.direccion ?? ""}
-            onChange={(e) => onChange("direccion", e.target.value)}
-            placeholder="Dirección de residencia"
-            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-          />
-        </div>
-
         {/* Tipo de sangre */}
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-600">Tipo de sangre</label>
@@ -450,6 +457,56 @@ export function PatientForm(props: PatientFormProps) {
             ))}
           </select>
         </div>
+
+        {/* Grupo poblacional */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-600">Grupo poblacional</label>
+          <select
+            value={grupoPoblacional}
+            onChange={(e) => {
+              const value = e.target.value;
+              onChange(
+                "grupo_poblacional",
+                value === ""
+                  ? ""
+                  : (value as
+                      | "DISCAPACIDAD"
+                      | "VICTIMA_CONFLICTO_ARMADO"
+                      | "NINGUNA"
+                      | "OTRA"),
+              );
+              if (value !== "OTRA") {
+                onChange("grupo_poblacional_otro", "");
+              }
+            }}
+            className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          >
+            <option value="">Seleccione grupo poblacional</option>
+            <option value="DISCAPACIDAD">Discapacidad</option>
+            <option value="VICTIMA_CONFLICTO_ARMADO">Victima de conflicto armado</option>
+            <option value="NINGUNA">Ninguna</option>
+            <option value="OTRA">Otra</option>
+          </select>
+          {errors.grupo_poblacional && (
+            <span className="text-xs text-red-600">{errors.grupo_poblacional}</span>
+          )}
+        </div>
+
+        {grupoPoblacional === "OTRA" && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-600">¿Cuál?</label>
+            <input
+              type="text"
+              value={form.grupo_poblacional_otro ?? ""}
+              onChange={(e) => onChange("grupo_poblacional_otro", e.target.value)}
+              placeholder="Especifique"
+              className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            />
+            {errors.grupo_poblacional_otro && (
+              <span className="text-xs text-red-600">{errors.grupo_poblacional_otro}</span>
+            )}
+          </div>
+        )}
 
         {/* Condición particular */}
         <div className="flex flex-col gap-1 md:col-span-2">

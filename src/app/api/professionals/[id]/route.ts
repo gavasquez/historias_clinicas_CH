@@ -37,7 +37,7 @@ export async function GET(
       email: profesional.usuarios.email,
       activo: profesional.activo,
       registro_medico: profesional.registro_medico ?? null,
-      telefono_contacto: profesional.telefono_contacto ?? null,
+      firma_digital: (profesional as any).firma_digital ?? null,
       especialidad: profesional.especialidades
         ? {
             nombre: profesional.especialidades.nombre,
@@ -80,7 +80,7 @@ export async function PUT(
       id_sede,
       id_especialidad,
       registro_medico,
-      telefono_contacto,
+      firma_digital,
       activo,
     } = body ?? {};
 
@@ -98,8 +98,8 @@ export async function PUT(
       data.registro_medico = registro_medico.trim() || null;
     }
 
-    if (typeof telefono_contacto === "string") {
-      data.telefono_contacto = telefono_contacto.trim() || null;
+    if (typeof firma_digital === "string") {
+      data.firma_digital = firma_digital || null;
     }
 
     if (typeof activo === "boolean") {
@@ -129,7 +129,7 @@ export async function PUT(
       email: updated.usuarios.email,
       activo: updated.activo,
       registro_medico: updated.registro_medico ?? null,
-      telefono_contacto: updated.telefono_contacto ?? null,
+      firma_digital: (updated as any).firma_digital ?? null,
       especialidad: updated.especialidades
         ? {
             nombre: updated.especialidades.nombre,

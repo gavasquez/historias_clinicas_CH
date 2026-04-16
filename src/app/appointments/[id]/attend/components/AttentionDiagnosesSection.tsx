@@ -2,10 +2,17 @@
 
 import React, { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { searchCie10, type Cie10Item } from "@/services/catalogs";
+import {
+  fetchDiagnosisConfirmationTypes,
+  searchCie10,
+  type Cie10Item,
+  type DiagnosisConfirmationType,
+} from "@/services/catalogs";
 import {
   fetchAttentionDiagnoses,
   createAttentionDiagnosis,
+  updateAttentionDiagnosis,
+  deleteAttentionDiagnosis,
   type AttentionDiagnosis,
 } from "@/services/attentions";
 
@@ -14,26 +21,81 @@ export interface DiagnosisDraft {
   cie10_nombre?: string | null;
   cie10_descripcion?: string | null;
   es_principal: boolean;
+  codigo_confirmacion?: "CN" | "CR" | "ID" | null;
 }
 
 export function AttentionDiagnosesSection({
   attentionId,
   diagnosticosDraft,
   setDiagnosticosDraft,
+  form,
+  setForm,
   setError,
   setSuccessMessage,
 }: {
   attentionId: number | null;
   diagnosticosDraft: DiagnosisDraft[];
   setDiagnosticosDraft: (next: DiagnosisDraft[] | ((prev: DiagnosisDraft[]) => DiagnosisDraft[])) => void;
+  form: any;
+  setForm: any;
   setError: (message: string | null) => void;
   setSuccessMessage: (message: string | null) => void;
 }) {
   const [cie10Query, setCie10Query] = useState("");
   const [cie10Results, setCie10Results] = useState<Cie10Item[]>([]);
   const [cie10Loading, setCie10Loading] = useState(false);
-  const [selectedCie10Code, setSelectedCie10Code] = useState<string | null>(null);
-  const [isPrincipal, setIsPrincipal] = useState(false);
+
+  const { data: confirmationTypes } = useQuery<DiagnosisConfirmationType[]>({
+    queryKey: ["diagnosis-confirmations"],
+    queryFn: fetchDiagnosisConfirmationTypes,
+  });
+
+  const updatePrincipalMutation = useMutation({
+    mutationFn: async (input: { id_diagnostico: number; es_principal: boolean }) => {
+      if (!attentionId) throw new Error("No hay atención activa");
+      return updateAttentionDiagnosis(attentionId, input.id_diagnostico, {
+        es_principal: input.es_principal,
+      });
+    },
+    onSuccess: () => {
+      refetchDiagnoses();
+    },
+    onError: (err: any) => {
+      const backendMessage = err?.response?.data?.message;
+      setError(
+        typeof backendMessage === "string" && backendMessage.trim().length > 0
+          ? backendMessage
+          : err?.message || "No se pudo actualizar el diagnóstico principal.",
+      );
+    },
+  });
+
+  const deleteDiagnosisMutation = useMutation({
+    mutationFn: async (input: { id_diagnostico: number }) => {
+      if (!attentionId) throw new Error("No hay atención activa");
+      return deleteAttentionDiagnosis(attentionId, input.id_diagnostico);
+    },
+    onSuccess: () => {
+      refetchDiagnoses();
+    },
+    onError: (err: any) => {
+      const backendMessage = err?.response?.data?.message;
+      setError(
+        typeof backendMessage === "string" && backendMessage.trim().length > 0
+          ? backendMessage
+          : err?.message || "No se pudo eliminar el diagnóstico.",
+      );
+    },
+  });
+
+  const confirmationOptions =
+    confirmationTypes && confirmationTypes.length > 0
+      ? confirmationTypes
+      : ([
+          { id_tipo_confirmacion: 0, codigo: "CN", descripcion: "Confirmado Nuevo" },
+          { id_tipo_confirmacion: 0, codigo: "CR", descripcion: "Confirmado Repetido" },
+          { id_tipo_confirmacion: 0, codigo: "ID", descripcion: "Impresión Diagnóstica" },
+        ] as DiagnosisConfirmationType[]);
 
   const addDraftDiagnosis = (item: Cie10Item, opts: { esPrincipal?: boolean } = {}) => {
     setDiagnosticosDraft((prev) => {
@@ -47,6 +109,7 @@ export function AttentionDiagnosesSection({
           cie10_nombre: item.nombre ?? null,
           cie10_descripcion: item.descripcion ?? null,
           es_principal: opts.esPrincipal === true,
+          codigo_confirmacion: null,
         },
       ];
 
@@ -67,20 +130,17 @@ export function AttentionDiagnosesSection({
   });
 
   const diagnosesMutation = useMutation({
-    mutationFn: async () => {
-      if (!attentionId || !selectedCie10Code) {
-        throw new Error("Debe seleccionar un código CIE-10");
-      }
-
+    mutationFn: async (payload: { codigo_cie10: string }) => {
+      if (!attentionId) throw new Error("No hay atención activa");
       return createAttentionDiagnosis(attentionId, {
-        codigo_cie10: selectedCie10Code,
-        es_principal: isPrincipal,
+        codigo_cie10: payload.codigo_cie10,
+        es_principal: false,
+        codigo_confirmacion: null,
       });
     },
     onSuccess: () => {
       setError(null);
       setSuccessMessage("Diagnóstico registrado correctamente.");
-      setIsPrincipal(false);
       refetchDiagnoses();
     },
     onError: (err: any) => {
@@ -89,6 +149,26 @@ export function AttentionDiagnosesSection({
         typeof backendMessage === "string" && backendMessage.trim().length > 0
           ? backendMessage
           : err?.message || "No se pudo registrar el diagnóstico. Intente de nuevo.",
+      );
+    },
+  });
+
+  const updateConfirmacionMutation = useMutation({
+    mutationFn: async (input: { id_diagnostico: number; codigo_confirmacion: string | null }) => {
+      if (!attentionId) throw new Error("No hay atención activa");
+      return updateAttentionDiagnosis(attentionId, input.id_diagnostico, {
+        codigo_confirmacion: input.codigo_confirmacion,
+      });
+    },
+    onSuccess: () => {
+      refetchDiagnoses();
+    },
+    onError: (err: any) => {
+      const backendMessage = err?.response?.data?.message;
+      setError(
+        typeof backendMessage === "string" && backendMessage.trim().length > 0
+          ? backendMessage
+          : err?.message || "No se pudo actualizar el tipo de confirmación del diagnóstico.",
       );
     },
   });
@@ -160,6 +240,31 @@ export function AttentionDiagnosesSection({
                 <p className="text-slate-700">
                   <span className="font-semibold">Nombre:</span> {d.cie10_nombre || "-"}
                 </p>
+                <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-700">
+                  <span className="font-semibold">Tipo:</span>
+                  {confirmationOptions.map((opt) => (
+                    <label key={opt.codigo} className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(d.codigo_confirmacion ?? null) === (opt.codigo as any)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setDiagnosticosDraft((prev) =>
+                            prev.map((x, i) =>
+                              i === idx
+                                ? { ...x, codigo_confirmacion: checked ? (opt.codigo as any) : null }
+                                : x,
+                            ),
+                          );
+                        }}
+                        className="h-3 w-3 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                      />
+                      <span title={opt.descripcion}>
+                        {opt.codigo} - {opt.descripcion}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <label className="inline-flex items-center gap-2 text-[11px] text-slate-700">
@@ -246,81 +351,22 @@ export function AttentionDiagnosesSection({
                             return;
                           }
 
-                          setSelectedCie10Code(item.codigo);
+                          diagnosesMutation.mutate({ codigo_cie10: item.codigo });
                         }}
-                        className="rounded border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                        disabled={attentionId ? diagnosesMutation.isPending : false}
+                        className="rounded border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Usar
+                        {attentionId
+                          ? diagnosesMutation.isPending
+                            ? "Guardando..."
+                            : "Agregar"
+                          : "Agregar"}
                       </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {selectedCie10Code && (
-          <div className="mt-2 flex flex-col gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-[11px] text-emerald-800">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Código seleccionado:</span>
-              <span className="rounded bg-white px-2 py-0.5 font-mono text-[11px] text-emerald-900 shadow-sm">
-                {selectedCie10Code}
-              </span>
-            </div>
-            <label className="inline-flex items-center gap-2 text-[11px]">
-              <input
-                type="checkbox"
-                checked={isPrincipal}
-                onChange={(e) => setIsPrincipal(e.target.checked)}
-                className="h-3 w-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span>Marcar como diagnóstico principal</span>
-            </label>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!selectedCie10Code) return;
-
-                  if (!attentionId) {
-                    const selectedItem = cie10Results.find((r) => r.codigo === selectedCie10Code);
-                    setDiagnosticosDraft((prev) => {
-                      const already = prev.some((d) => d.codigo_cie10 === selectedCie10Code);
-                      if (already) return prev;
-
-                      const next: DiagnosisDraft[] = [
-                        ...prev,
-                        {
-                          codigo_cie10: selectedCie10Code,
-                          cie10_nombre: selectedItem?.nombre ?? null,
-                          cie10_descripcion: selectedItem?.descripcion ?? null,
-                          es_principal: isPrincipal,
-                        },
-                      ];
-
-                      const idxPrincipal = next.findIndex((d) => d.es_principal);
-                      if (idxPrincipal < 0) return next;
-                      return next.map((d, idx) => ({ ...d, es_principal: idx === idxPrincipal }));
-                    });
-                    setError(null);
-                    setSuccessMessage("Diagnóstico agregado (pendiente de guardar la atención). ");
-                    setIsPrincipal(false);
-                    return;
-                  }
-
-                  diagnosesMutation.mutate();
-                }}
-                disabled={attentionId ? diagnosesMutation.isPending : false}
-                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {attentionId
-                  ? diagnosesMutation.isPending
-                    ? "Guardando diagnóstico..."
-                    : "Agregar diagnóstico"
-                  : "Agregar a la lista"}
-              </button>
-            </div>
           </div>
         )}
       </div>
@@ -377,24 +423,71 @@ export function AttentionDiagnosesSection({
                       <th className="px-2 py-1.5">Principal</th>
                       <th className="px-2 py-1.5">CIE-10</th>
                       <th className="px-2 py-1.5">Nombre</th>
+                      <th className="px-2 py-1.5">Tipo</th>
                       <th className="px-2 py-1.5">Descripción</th>
+                      <th className="px-2 py-1.5 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {diagnoses.map((d) => (
                       <tr key={d.id_diagnostico} className="border-t border-slate-100">
                         <td className="px-2 py-1.5 text-center">
-                          {d.es_principal ? (
-                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                              Principal
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-slate-400">Secundario</span>
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={d.es_principal}
+                            onChange={(e) => {
+                              updatePrincipalMutation.mutate({
+                                id_diagnostico: d.id_diagnostico,
+                                es_principal: e.target.checked,
+                              });
+                            }}
+                            disabled={updatePrincipalMutation.isPending}
+                            className="h-3 w-3 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                            title="Marcar como principal"
+                          />
                         </td>
                         <td className="px-2 py-1.5 font-mono text-[11px] text-slate-800">{d.codigo_cie10}</td>
                         <td className="px-2 py-1.5 text-slate-800">{d.cie10_nombre}</td>
+                        <td className="px-2 py-1.5 text-slate-700">
+                          <div className="flex flex-wrap items-center gap-3">
+                            {confirmationOptions.map((opt) => (
+                              <label key={opt.codigo} className="inline-flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    (d.id_tipo_confirmacion ?? null) ===
+                                    (opt.id_tipo_confirmacion ? opt.id_tipo_confirmacion : null)
+                                  }
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    updateConfirmacionMutation.mutate({
+                                      id_diagnostico: d.id_diagnostico,
+                                      codigo_confirmacion: checked ? String(opt.codigo) : null,
+                                    });
+                                  }}
+                                  disabled={updateConfirmacionMutation.isPending}
+                                  className="h-3 w-3 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                />
+                                <span title={opt.descripcion}>
+                                  {opt.codigo} - {opt.descripcion}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </td>
                         <td className="px-2 py-1.5 text-slate-600">{d.cie10_descripcion}</td>
+                        <td className="px-2 py-1.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteDiagnosisMutation.mutate({ id_diagnostico: d.id_diagnostico });
+                            }}
+                            disabled={deleteDiagnosisMutation.isPending}
+                            className="rounded border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Eliminar
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -4,6 +4,18 @@ import { parseDateOnlyToUtc, parseTimeToUtcDate, timeFromUtcDate } from "@/lib/d
 
 const DEFAULT_CAPACIDAD_SIMULTANEA = 1;
 
+function toMinutesUtc(d: Date) {
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
+
+function dateOnlyOrMin(d: Date | null) {
+  return d ? d.getTime() : Number.NEGATIVE_INFINITY;
+}
+
+function dateOnlyOrMax(d: Date | null) {
+  return d ? d.getTime() : Number.POSITIVE_INFINITY;
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
@@ -23,7 +35,11 @@ export async function GET(
     const items = await prisma.disponibilidades_profesional.findMany({
       where: {
         id_profesional: professionalId,
-        ...(idSede && Number.isInteger(idSede) && idSede > 0 ? { id_sede: idSede } : {}),
+        ...(idSede && Number.isInteger(idSede) && idSede > 0
+          ? {
+              OR: [{ id_sede: idSede }, { id_sede: null }],
+            }
+          : {}),
       },
       orderBy: [{ id_sede: "asc" }, { dia_semana: "asc" }, { hora_inicio: "asc" }],
     });
@@ -105,21 +121,31 @@ export async function POST(
       );
     }
 
-    const fechaInicioVigencia = fecha_inicio_vigencia
-      ? parseDateOnlyToUtc(String(fecha_inicio_vigencia))
-      : null;
-    const fechaFinVigencia = fecha_fin_vigencia
-      ? parseDateOnlyToUtc(String(fecha_fin_vigencia))
-      : null;
+    if (!fecha_inicio_vigencia || !String(fecha_inicio_vigencia).trim()) {
+      return NextResponse.json(
+        { message: "La fecha_inicio_vigencia es obligatoria" },
+        { status: 400 },
+      );
+    }
 
-    if (fecha_inicio_vigencia && !fechaInicioVigencia) {
+    if (!fecha_fin_vigencia || !String(fecha_fin_vigencia).trim()) {
+      return NextResponse.json(
+        { message: "La fecha_fin_vigencia es obligatoria" },
+        { status: 400 },
+      );
+    }
+
+    const fechaInicioVigencia = parseDateOnlyToUtc(String(fecha_inicio_vigencia));
+    const fechaFinVigencia = parseDateOnlyToUtc(String(fecha_fin_vigencia));
+
+    if (!fechaInicioVigencia) {
       return NextResponse.json(
         { message: "La fecha_inicio_vigencia no es válida (YYYY-MM-DD)" },
         { status: 400 },
       );
     }
 
-    if (fecha_fin_vigencia && !fechaFinVigencia) {
+    if (!fechaFinVigencia) {
       return NextResponse.json(
         { message: "La fecha_fin_vigencia no es válida (YYYY-MM-DD)" },
         { status: 400 },
@@ -136,6 +162,49 @@ export async function POST(
     const capacidad = Number.isInteger(Number(capacidad_simultanea))
       ? Math.max(Number(capacidad_simultanea), 1)
       : DEFAULT_CAPACIDAD_SIMULTANEA;
+
+    const existing = await prisma.disponibilidades_profesional.findMany({
+      where: {
+        id_profesional: professionalId,
+        id_sede: idSedeNum,
+        dia_semana: diaSemanaNum,
+        es_excepcion: false,
+      },
+      select: {
+        id_disponibilidad: true,
+        hora_inicio: true,
+        hora_fin: true,
+        fecha_inicio_vigencia: true,
+        fecha_fin_vigencia: true,
+      },
+    });
+
+    const newStartMin = toMinutesUtc(start);
+    const newEndMin = toMinutesUtc(end);
+    const newStartDate = dateOnlyOrMin(fechaInicioVigencia);
+    const newEndDate = dateOnlyOrMax(fechaFinVigencia);
+
+    const hasOverlap = existing.some((e) => {
+      const eStartMin = toMinutesUtc(e.hora_inicio);
+      const eEndMin = toMinutesUtc(e.hora_fin);
+      const timeOverlap = newStartMin < eEndMin && newEndMin > eStartMin;
+      if (!timeOverlap) return false;
+
+      const eStartDate = dateOnlyOrMin(e.fecha_inicio_vigencia);
+      const eEndDate = dateOnlyOrMax(e.fecha_fin_vigencia);
+      const dateOverlap = newStartDate <= eEndDate && newEndDate >= eStartDate;
+      return dateOverlap;
+    });
+
+    if (hasOverlap) {
+      return NextResponse.json(
+        {
+          message:
+            "Ya existe una disponibilidad que se cruza con la sede, día, vigencia y horario seleccionados.",
+        },
+        { status: 400 },
+      );
+    }
 
     const created = await prisma.disponibilidades_profesional.create({
       data: {

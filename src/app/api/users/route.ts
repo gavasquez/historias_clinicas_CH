@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
           username: true,
           nombre_completo: true,
           email: true,
+          telefono: true,
           activo: true,
           fecha_creacion: true,
           roles: {
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
       username: u.username,
       nombre_completo: u.nombre_completo,
       email: u.email,
+      telefono: u.telefono,
       activo: u.activo,
       fecha_creacion: u.fecha_creacion.toISOString(),
       rol: u.roles
@@ -108,6 +110,7 @@ export async function POST(request: NextRequest) {
       username,
       nombre_completo,
       email,
+      telefono,
       password,
       id_rol,
       activo = true,
@@ -123,6 +126,13 @@ export async function POST(request: NextRequest) {
     if (!nombre_completo || typeof nombre_completo !== "string" || !nombre_completo.trim()) {
       return NextResponse.json(
         { message: "El nombre completo es obligatorio." },
+        { status: 400 },
+      );
+    }
+
+    if (!telefono || typeof telefono !== "string" || !telefono.trim()) {
+      return NextResponse.json(
+        { message: "El teléfono es obligatorio." },
         { status: 400 },
       );
     }
@@ -148,6 +158,7 @@ export async function POST(request: NextRequest) {
         username: username.trim(),
         nombre_completo: nombre_completo.trim(),
         email: email && typeof email === "string" ? email.trim() : null,
+        telefono: telefono.trim(),
         password_hash,
         id_rol,
         activo: Boolean(activo),
@@ -159,6 +170,7 @@ export async function POST(request: NextRequest) {
         id_usuario: created.id_usuario,
         nombre_completo: created.nombre_completo,
         email: created.email,
+        telefono: created.telefono,
         activo: created.activo,
       },
       { status: 201 },
@@ -193,7 +205,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { nombre_completo, email, password, activo } = body ?? {};
+    const { nombre_completo, email, telefono, password, activo } = body ?? {};
 
     const data: Prisma.usuariosUpdateInput = {};
 
@@ -203,6 +215,10 @@ export async function PUT(request: NextRequest) {
 
     if (typeof email === "string") {
       data.email = email.trim() || null;
+    }
+
+    if (typeof telefono === "string" && telefono.trim()) {
+      data.telefono = telefono.trim();
     }
 
     if (typeof activo === "boolean") {
@@ -230,6 +246,7 @@ export async function PUT(request: NextRequest) {
       id_usuario: updated.id_usuario,
       nombre_completo: updated.nombre_completo,
       email: updated.email,
+      telefono: updated.telefono,
       activo: updated.activo,
     });
   } catch (error: unknown) {

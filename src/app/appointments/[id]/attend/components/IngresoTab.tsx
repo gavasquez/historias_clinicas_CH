@@ -81,7 +81,7 @@ export function IngresoTab({ citaData, form, setForm }: { citaData: any; form: a
               }))
             }
             className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-slate-100"
-            placeholder="Ej: Ambulancia, Policía, Familiar"
+            placeholder="Ingrese el medio por el que llegó el paciente"
           />
         </div>
       </div>
@@ -121,70 +121,6 @@ export function IngresoTab({ citaData, form, setForm }: { citaData: any; form: a
           </label>
         </div>
       </div>
-
-      <div className="space-y-1">
-        <p className="text-xs font-medium text-slate-600">Caso de accidente, intoxicación o violencia</p>
-        <div className="flex flex-wrap gap-4 text-xs text-slate-700">
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="radio"
-              name="caso_aiv"
-              checked={form.caso_accidente_intoxicacion_violencia === "SI"}
-              onChange={() => setForm((prev: any) => ({ ...prev, caso_accidente_intoxicacion_violencia: "SI" }))}
-              className="h-3 w-3"
-            />
-            <span>Sí</span>
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="radio"
-              name="caso_aiv"
-              checked={form.caso_accidente_intoxicacion_violencia === "NO"}
-              onChange={() =>
-                setForm((prev: any) => ({
-                  ...prev,
-                  caso_accidente_intoxicacion_violencia: "NO",
-                  fecha_ocurrencia_evento: "",
-                  lugar_ocurrencia_evento: "",
-                  notificacion_policia: false,
-                  notificacion_cti: false,
-                  notificacion_acudiente: false,
-                  notificacion_otro: false,
-                  notificacion_otro_cual: "",
-                }))
-              }
-              className="h-3 w-3"
-            />
-            <span>No</span>
-          </label>
-        </div>
-      </div>
-
-      {form.caso_accidente_intoxicacion_violencia === "SI" && (
-        <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-600">Fecha ocurrencia</label>
-              <input
-                type="date"
-                value={form.fecha_ocurrencia_evento}
-                onChange={(e) => setForm((prev: any) => ({ ...prev, fecha_ocurrencia_evento: e.target.value }))}
-                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-600">Lugar</label>
-              <input
-                type="text"
-                value={form.lugar_ocurrencia_evento}
-                onChange={(e) => setForm((prev: any) => ({ ...prev, lugar_ocurrencia_evento: e.target.value }))}
-                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                placeholder="Lugar de ocurrencia"
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

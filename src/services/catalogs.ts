@@ -106,6 +106,12 @@ export interface Cie10Item {
   descripcion: string | null;
 }
 
+export interface DiagnosisConfirmationType {
+  id_tipo_confirmacion: number;
+  codigo: string;
+  descripcion: string;
+}
+
 export interface Role {
   id_rol: number;
   nombre: string;
@@ -222,5 +228,10 @@ export async function searchCie10(query: string, take: number = 20): Promise<Cie
       take,
     },
   });
+  return res.data;
+}
+
+export async function fetchDiagnosisConfirmationTypes(): Promise<DiagnosisConfirmationType[]> {
+  const res = await apiClient.get<DiagnosisConfirmationType[]>("/catalogs/diagnosis-confirmations");
   return res.data;
 }

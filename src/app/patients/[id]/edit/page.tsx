@@ -65,6 +65,16 @@ export default function EditPatientPage() {
       if (pacienteApi.id_departamento) {
         setIdDepartamento(pacienteApi.id_departamento);
       }
+
+      const grupoPoblacionalValue = (() => {
+        const value = pacienteApi.grupo_poblacional;
+        if (value === "DISCAPACIDAD") return "DISCAPACIDAD";
+        if (value === "VICTIMA_CONFLICTO_ARMADO") return "VICTIMA_CONFLICTO_ARMADO";
+        if (value === "NINGUNA") return "NINGUNA";
+        if (value === "OTRA") return "OTRA";
+        return "";
+      })();
+
       setForm({
         id_tipo_documento: pacienteApi.id_tipo_documento,
         numero_documento: pacienteApi.numero_documento,
@@ -77,6 +87,8 @@ export default function EditPatientPage() {
         id_genero: pacienteApi.id_genero ?? undefined,
         id_estado_civil: pacienteApi.id_estado_civil ?? undefined,
         direccion: pacienteApi.direccion ?? "",
+        grupo_poblacional: grupoPoblacionalValue,
+        grupo_poblacional_otro: pacienteApi.grupo_poblacional_otro ?? "",
         id_tipo_sangre: pacienteApi.id_tipo_sangre ?? undefined,
         id_sede: pacienteApi.id_sede ?? undefined,
         id_programa_academico: pacienteApi.id_programa_academico ?? undefined,
@@ -111,6 +123,7 @@ export default function EditPatientPage() {
 
     const parsed = patientSchema.safeParse({
       ...form,
+      grupo_poblacional: form.grupo_poblacional ? form.grupo_poblacional : undefined,
       id_tipo_documento: Number(form.id_tipo_documento || 0),
       id_genero: Number(form.id_genero || 0),
       id_estado_civil: Number(form.id_estado_civil || 0),
@@ -140,6 +153,7 @@ export default function EditPatientPage() {
     try {
       await updatePatient(String(id), {
         ...form,
+        grupo_poblacional: form.grupo_poblacional ? form.grupo_poblacional : undefined,
         id_tipo_documento: Number(form.id_tipo_documento),
       });
       setToast({ type: "success", message: "Paciente actualizado correctamente" });
@@ -383,6 +397,23 @@ export default function EditPatientPage() {
                 )}
               </div>
 
+              {/* Dirección */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">
+                  Dirección <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.direccion ?? ""}
+                  onChange={(e) => handleChange("direccion", e.target.value)}
+                  placeholder="Dirección de residencia"
+                  className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                />
+                {errors.direccion && (
+                  <span className="text-xs text-red-600">{errors.direccion}</span>
+                )}
+              </div>
+
               {/* Tipo de usuario */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-600">
@@ -495,18 +526,6 @@ export default function EditPatientPage() {
                 )}
               </div>
 
-              {/* Dirección */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-600">Dirección</label>
-                <input
-                  type="text"
-                  value={form.direccion ?? ""}
-                  onChange={(e) => handleChange("direccion", e.target.value)}
-                  placeholder="Dirección de residencia"
-                  className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                />
-              </div>
-
               {/* Tipo de sangre */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-600">Tipo de sangre</label>
@@ -577,6 +596,56 @@ export default function EditPatientPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Grupo poblacional */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Grupo poblacional</label>
+                <select
+                  value={form.grupo_poblacional ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    handleChange(
+                      "grupo_poblacional",
+                      value === ""
+                        ? ""
+                        : (value as
+                            | "DISCAPACIDAD"
+                            | "VICTIMA_CONFLICTO_ARMADO"
+                            | "NINGUNA"
+                            | "OTRA"),
+                    );
+                    if (value !== "OTRA") {
+                      handleChange("grupo_poblacional_otro", "");
+                    }
+                  }}
+                  className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Seleccione grupo poblacional</option>
+                  <option value="DISCAPACIDAD">Discapacidad</option>
+                  <option value="VICTIMA_CONFLICTO_ARMADO">Victima de conflicto armado</option>
+                  <option value="NINGUNA">Ninguna</option>
+                  <option value="OTRA">Otra</option>
+                </select>
+                {errors.grupo_poblacional && (
+                  <span className="text-xs text-red-600">{errors.grupo_poblacional}</span>
+                )}
+              </div>
+
+              {form.grupo_poblacional === "OTRA" && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-600">¿Cuál?</label>
+                  <input
+                    type="text"
+                    value={form.grupo_poblacional_otro ?? ""}
+                    onChange={(e) => handleChange("grupo_poblacional_otro", e.target.value)}
+                    placeholder="Especifique"
+                    className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                  {errors.grupo_poblacional_otro && (
+                    <span className="text-xs text-red-600">{errors.grupo_poblacional_otro}</span>
+                  )}
+                </div>
+              )}
 
               {/* Condición particular */}
               <div className="flex flex-col gap-1 md:col-span-2">

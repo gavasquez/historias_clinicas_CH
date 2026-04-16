@@ -85,6 +85,8 @@ export async function PUT(
       direccion,
       telefono,
       email,
+      grupo_poblacional,
+      grupo_poblacional_otro,
       id_tipo_sangre,
       id_sede,
       id_programa_academico,
@@ -143,7 +145,24 @@ export async function PUT(
       }
       updateData.id_ciudad = idCiudadNum;
     }
-    if (direccion !== undefined) updateData.direccion = direccion ?? null;
+    if (direccion !== undefined) {
+      const direccionTrim = String(direccion ?? "").trim();
+      if (!direccionTrim) {
+        return NextResponse.json(
+          { message: "La dirección es obligatoria" },
+          { status: 400 },
+        );
+      }
+      updateData.direccion = direccionTrim;
+    }
+    if (grupo_poblacional !== undefined)
+      updateData.grupo_poblacional = grupo_poblacional
+        ? String(grupo_poblacional)
+        : null;
+    if (grupo_poblacional_otro !== undefined)
+      updateData.grupo_poblacional_otro = grupo_poblacional_otro
+        ? String(grupo_poblacional_otro)
+        : null;
     if (telefono !== undefined) {
       const telefonoTrim = String(telefono ?? "").trim();
       if (!telefonoTrim) {

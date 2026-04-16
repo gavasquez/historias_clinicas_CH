@@ -22,6 +22,17 @@ export async function GET(
             usuarios: true,
           },
         },
+        notas_evolucion_historia: {
+          orderBy: { fecha_hora: "desc" },
+          include: {
+            tipos_atencion: true,
+            modalidades_atencion: true,
+            diagnosticos: {
+              orderBy: { es_principal: "desc" },
+              include: { cie10: true },
+            },
+          },
+        },
         atenciones_salud: {
           orderBy: { fecha_hora: "desc" },
           include: {

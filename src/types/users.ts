@@ -3,6 +3,7 @@ export interface UserListItem {
   username?: string;
   nombre_completo: string;
   email: string | null;
+  telefono: string;
   activo: boolean;
   fecha_creacion?: string;
   rol?: {

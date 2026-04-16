@@ -63,10 +63,12 @@ export async function POST(
       codigo_cie10,
       es_principal,
       id_tipo_confirmacion,
+      codigo_confirmacion,
     }: {
       codigo_cie10: string;
       es_principal?: boolean;
       id_tipo_confirmacion?: number | null;
+      codigo_confirmacion?: string | null;
     } = body;
 
     if (!codigo_cie10 || typeof codigo_cie10 !== "string") {
@@ -93,12 +95,40 @@ export async function POST(
       });
     }
 
+    const codigoConfirmacionTrim = String(codigo_confirmacion ?? "")
+      .trim()
+      .toUpperCase();
+    const idTipoConfirmacionNum =
+      id_tipo_confirmacion === null || id_tipo_confirmacion === undefined
+        ? null
+        : Number(id_tipo_confirmacion);
+
+    const resolvedConfirmacionId = await (async () => {
+      if (Number.isInteger(idTipoConfirmacionNum) && (idTipoConfirmacionNum as number) > 0) {
+        return idTipoConfirmacionNum as number;
+      }
+
+      if (
+        codigoConfirmacionTrim !== "CN" &&
+        codigoConfirmacionTrim !== "CR" &&
+        codigoConfirmacionTrim !== "ID"
+      ) {
+        return null;
+      }
+
+      const found = await prisma.tipos_confirmacion_diagnostico.findUnique({
+        where: { codigo: codigoConfirmacionTrim },
+        select: { id_tipo_confirmacion: true },
+      });
+      return found?.id_tipo_confirmacion ?? null;
+    })();
+
     const diag = await prisma.diagnosticos_atencion.create({
       data: {
         id_atencion: idAtencion,
         codigo_cie10,
         es_principal: !!es_principal,
-        id_tipo_confirmacion: id_tipo_confirmacion ?? null,
+        id_tipo_confirmacion: resolvedConfirmacionId,
       },
       include: {
         cie10: true,

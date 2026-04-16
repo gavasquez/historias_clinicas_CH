@@ -36,3 +36,15 @@ export async function deleteProfessionalAvailability(
 ): Promise<void> {
   await apiClient.delete(`/professionals/${professionalId}/availability/${availabilityId}`);
 }
+
+export async function updateProfessionalAvailability(
+  professionalId: number | string,
+  availabilityId: number | string,
+  input: ProfessionalAvailabilityCreateInput,
+): Promise<ProfessionalAvailability> {
+  const res = await apiClient.put<ProfessionalAvailability>(
+    `/professionals/${professionalId}/availability/${availabilityId}`,
+    input,
+  );
+  return res.data;
+}

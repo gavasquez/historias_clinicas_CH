@@ -6,6 +6,8 @@ export interface AppointmentFilters {
   paciente?: string;
   estado?: string;
   tipoCita?: string;
+  fecha?: string;
+  id_sede?: number;
 }
 
 export interface AppointmentReportFilters {
@@ -71,6 +73,8 @@ export async function fetchAppointments(
       paciente: filters.paciente || undefined,
       estado: filters.estado || undefined,
       tipoCita: filters.tipoCita || undefined,
+      fecha: filters.fecha || undefined,
+      id_sede: typeof filters.id_sede === "number" ? filters.id_sede : undefined,
     },
   });
   return res.data;

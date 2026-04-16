@@ -5,6 +5,12 @@ import { validateAvailabilityOrThrow } from "@/lib/availability-validator";
 const PAGE_SIZE = 5;
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
 
+function computeEndDate(params: { start: Date; end: Date | null }) {
+  const { start, end } = params;
+  if (end && !Number.isNaN(end.getTime())) return end;
+  return new Date(start.getTime() + DEFAULT_APPOINTMENT_DURATION_MINUTES * 60_000);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -13,6 +19,10 @@ export async function GET(request: NextRequest) {
     const paciente = searchParams.get("paciente")?.trim() || "";
     const estado = searchParams.get("estado")?.trim() || "";
     const tipoCita = searchParams.get("tipoCita")?.trim() || "";
+    const fecha = searchParams.get("fecha")?.trim() || "";
+    const idSedeParam = searchParams.get("id_sede");
+
+    const idSede = idSedeParam != null && idSedeParam.trim() !== "" ? Number(idSedeParam) : null;
 
     const page = Math.max(Number(pageParam) || 1, 1);
     const skip = (page - 1) * PAGE_SIZE;
@@ -61,7 +71,23 @@ export async function GET(request: NextRequest) {
             },
           }
         : {}),
+      ...(Number.isInteger(idSede as any) && (idSede as number) > 0
+        ? {
+            id_sede: idSede,
+          }
+        : {}),
     };
+
+    if (fecha) {
+      const start = new Date(`${fecha}T00:00:00`);
+      const end = new Date(`${fecha}T23:59:59.999`);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        where.fecha_hora_inicio = {
+          gte: start,
+          lte: end,
+        };
+      }
+    }
 
     const total = await prisma.citas.count({ where });
 
@@ -224,6 +250,55 @@ export async function POST(request: NextRequest) {
         );
       }
       throw e;
+    }
+
+    const availabilityItems = await prisma.disponibilidades_profesional.findMany({
+      where: {
+        id_profesional: idProfesionalNum,
+        id_sede: idSedeValid,
+        dia_semana: ((fechaInicio.getDay() + 6) % 7) + 1,
+        es_excepcion: false,
+      },
+      orderBy: [{ hora_inicio: "asc" }],
+    });
+
+    const intervalCapacity = (() => {
+      const startMin = fechaInicio.getHours() * 60 + fechaInicio.getMinutes();
+      const endMin = fechaFin.getHours() * 60 + fechaFin.getMinutes();
+      const item = availabilityItems.find((i) => {
+        const aStart = i.hora_inicio.getUTCHours() * 60 + i.hora_inicio.getUTCMinutes();
+        const aEnd = i.hora_fin.getUTCHours() * 60 + i.hora_fin.getUTCMinutes();
+        return startMin >= aStart && endMin <= aEnd;
+      });
+      const cap = item?.capacidad_simultanea ?? 1;
+      return Math.max(Number(cap) || 1, 1);
+    })();
+
+    const possibleOverlaps = await prisma.citas.findMany({
+      where: {
+        id_profesional: idProfesionalNum,
+        fecha_hora_inicio: { lt: fechaFin },
+        OR: [{ fecha_hora_fin: { gt: fechaInicio } }, { fecha_hora_fin: null }],
+      },
+      select: {
+        id_cita: true,
+        fecha_hora_inicio: true,
+        fecha_hora_fin: true,
+      },
+    });
+
+    const overlaps = possibleOverlaps.reduce((acc, c) => {
+      const s = c.fecha_hora_inicio;
+      const e = computeEndDate({ start: c.fecha_hora_inicio, end: c.fecha_hora_fin });
+      const isOverlap = s < fechaFin && e > fechaInicio;
+      return acc + (isOverlap ? 1 : 0);
+    }, 0);
+
+    if (overlaps >= intervalCapacity) {
+      return NextResponse.json(
+        { message: "El profesional ya tiene una cita programada en ese horario" },
+        { status: 400 },
+      );
     }
 
     const cita = await prismaAny.citas.create({

@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
         id_sede: null,
         id_especialidad: null,
         registro_medico: null,
-        telefono_contacto: null,
         activo: true,
       },
       select: {

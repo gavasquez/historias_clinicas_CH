@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Swal from "sweetalert2";
@@ -13,6 +13,8 @@ export default function EditProfessionalPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id;
+
+  const firmaInputRef = useRef<HTMLInputElement | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -36,7 +38,7 @@ export default function EditProfessionalPage() {
     id_sede: 0,
     id_especialidad: 0,
     registro_medico: "",
-    telefono_contacto: "",
+    firma_digital: "",
     activo: true,
   });
 
@@ -57,7 +59,7 @@ export default function EditProfessionalPage() {
       id_sede: sedeIdFromName,
       id_especialidad: especialidadIdFromName,
       registro_medico: data.registro_medico ?? "",
-      telefono_contacto: data.telefono_contacto ?? "",
+      firma_digital: data.firma_digital ?? "",
       activo: data.activo,
     });
   }, [data, sedeIdFromName, especialidadIdFromName]);
@@ -69,7 +71,7 @@ export default function EditProfessionalPage() {
         id_sede: form.id_sede,
         id_especialidad: form.id_especialidad,
         registro_medico: form.registro_medico,
-        telefono_contacto: form.telefono_contacto,
+        firma_digital: form.firma_digital,
         activo: form.activo,
       });
     },
@@ -200,15 +202,96 @@ export default function EditProfessionalPage() {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">Teléfono de contacto</label>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-slate-600">Firma digital (imagen)</label>
                   <input
-                    type="text"
-                    value={form.telefono_contacto}
-                    onChange={(e) => setForm((prev) => ({ ...prev, telefono_contacto: e.target.value }))}
-                    className="h-8 w-full rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    placeholder="Ej: 3001234567"
+                    type="file"
+                    accept="image/*"
+                    ref={firmaInputRef}
+                    onClick={(e) => {
+                      (e.currentTarget as HTMLInputElement).value = "";
+                    }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      if (!file.type.startsWith("image/")) {
+                        Swal.fire({
+                          title: "Archivo inválido",
+                          text: "El archivo de firma debe ser una imagen.",
+                          icon: "error",
+                          confirmButtonText: "Cerrar",
+                          confirmButtonColor: "#ef4444",
+                        });
+                        setForm((prev) => ({ ...prev, firma_digital: "" }));
+                        return;
+                      }
+
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const result = typeof reader.result === "string" ? reader.result : "";
+                        setForm((prev) => ({ ...prev, firma_digital: result }));
+                      };
+                      reader.onerror = () => {
+                        Swal.fire({
+                          title: "Error",
+                          text: "No se pudo leer el archivo de firma. Intente de nuevo.",
+                          icon: "error",
+                          confirmButtonText: "Cerrar",
+                          confirmButtonColor: "#ef4444",
+                        });
+                        setForm((prev) => ({ ...prev, firma_digital: "" }));
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs leading-9 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 file:mr-3 file:h-9 file:border-0 file:bg-slate-100 file:px-3 file:text-xs file:font-medium file:text-slate-700 file:leading-9"
                   />
+                  {form.firma_digital && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void Swal.fire({
+                            title: "Firma digital",
+                            imageUrl: form.firma_digital,
+                            imageAlt: "Firma digital",
+                            showCloseButton: true,
+                            showConfirmButton: false,
+                            background: "#ffffff",
+                            width: 700,
+                            imageWidth: 640,
+                          });
+                        }}
+                        className="w-fit rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Ver firma
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({ ...prev, firma_digital: "" }));
+                          if (firmaInputRef.current) {
+                            firmaInputRef.current.value = "";
+                          }
+                        }}
+                        className="w-fit rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 transition hover:bg-red-100"
+                      >
+                        Quitar firma
+                      </button>
+                    </div>
+                  )}
+                  {form.firma_digital ? (
+                    <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
+                      <p className="text-[11px] font-medium text-slate-600">Vista previa</p>
+                      <img
+                        src={form.firma_digital}
+                        alt="Firma digital"
+                        className="mt-2 max-h-24 w-auto rounded bg-white p-1"
+                      />
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-slate-500">No hay firma registrada.</p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 md:col-span-2">

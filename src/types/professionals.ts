@@ -5,7 +5,7 @@ export interface ProfesionalSaludListItem {
   especialidad: string | null;
   sede: string | null;
   registro_medico: string | null;
-  telefono_contacto: string | null;
+  firma_digital: string | null;
   activo: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface ProfessionalDetail {
   email: string | null;
   activo: boolean;
   registro_medico: string | null;
-  telefono_contacto: string | null;
+  firma_digital: string | null;
   especialidad: {
     nombre: string;
     descripcion: string | null;
