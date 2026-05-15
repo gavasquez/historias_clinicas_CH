@@ -276,10 +276,24 @@ export function AtencionTab({
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Opción</label>
+            <label className="text-xs font-medium text-slate-600">Tipo de seguimiento</label>
             <select
               value={form.seguimiento_opcion}
-              onChange={(e) => setForm((prev: any) => ({ ...prev, seguimiento_opcion: e.target.value }))}
+              onChange={(e) => {
+                const next = e.target.value;
+                setForm((prev: any) => ({
+                  ...prev,
+                  seguimiento_opcion: next,
+                  seguimiento_efectivo:
+                    next === "CONDICIONES_CRONICAS" || next === "SITUACION_EN_SALUD"
+                      ? prev.seguimiento_efectivo
+                      : "",
+                  cierre_seguimiento:
+                    next === "CONDICIONES_CRONICAS" || next === "SITUACION_EN_SALUD"
+                      ? prev.cierre_seguimiento
+                      : "",
+                }));
+              }}
               className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 shadow-sm"
             >
               <option value="">Seleccione...</option>
@@ -288,6 +302,85 @@ export function AtencionTab({
               <option value="NO_APLICA">NO APLICA</option>
             </select>
           </div>
+
+          {(form.seguimiento_opcion === "CONDICIONES_CRONICAS" ||
+            form.seguimiento_opcion === "SITUACION_EN_SALUD") && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Seguimiento efectivo</label>
+                <div className="flex flex-wrap gap-4 text-xs text-slate-700">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="seguimiento_efectivo"
+                      checked={form.seguimiento_efectivo === "SI"}
+                      onChange={() =>
+                        setForm((prev: any) => ({
+                          ...prev,
+                          seguimiento_efectivo: "SI",
+                        }))
+                      }
+                      className="h-3 w-3"
+                    />
+                    <span>Sí</span>
+                  </label>
+
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="seguimiento_efectivo"
+                      checked={form.seguimiento_efectivo === "NO"}
+                      onChange={() =>
+                        setForm((prev: any) => ({
+                          ...prev,
+                          seguimiento_efectivo: "NO",
+                        }))
+                      }
+                      className="h-3 w-3"
+                    />
+                    <span>No</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Cierre seguimiento</label>
+                <div className="flex flex-wrap gap-4 text-xs text-slate-700">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="cierre_seguimiento"
+                      checked={form.cierre_seguimiento === "SI"}
+                      onChange={() =>
+                        setForm((prev: any) => ({
+                          ...prev,
+                          cierre_seguimiento: "SI",
+                        }))
+                      }
+                      className="h-3 w-3"
+                    />
+                    <span>Sí</span>
+                  </label>
+
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="cierre_seguimiento"
+                      checked={form.cierre_seguimiento === "NO"}
+                      onChange={() =>
+                        setForm((prev: any) => ({
+                          ...prev,
+                          cierre_seguimiento: "NO",
+                        }))
+                      }
+                      className="h-3 w-3"
+                    />
+                    <span>No</span>
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-600">Fecha</label>

@@ -82,6 +82,39 @@ function validateAttendForm(input: {
     }
   }
 
+  if (!form.seguimiento_opcion.trim()) {
+    return "Debe seleccionar el tipo de seguimiento.";
+  }
+
+  return null;
+}
+
+function validateIngresoTab(input: {
+  citaData: AppointmentDetail | undefined;
+  form: AttentionFormState;
+}): string | null {
+  const { citaData, form } = input;
+
+  if (!citaData?.id_tipo_cita) {
+    return "La cita no tiene tipo de cita para determinar el tipo de atención.";
+  }
+
+  if (form.llega_por_sus_medios !== "SI" && form.llega_por_sus_medios !== "NO") {
+    return "Debe indicar si el paciente llega por sus propios medios.";
+  }
+
+  if (form.llega_por_sus_medios === "NO" && !form.llega_por_sus_medios_cual.trim()) {
+    return "Debe especificar cuál cuando el paciente no llega por sus propios medios.";
+  }
+
+  if (
+    form.estado_a_la_llegada !== "CONSCIENTE" &&
+    form.estado_a_la_llegada !== "INCONSCIENTE" &&
+    form.estado_a_la_llegada !== "MUERTO"
+  ) {
+    return "Debe seleccionar el estado a la llegada.";
+  }
+
   return null;
 }
 
@@ -112,6 +145,8 @@ function buildAttendPayload(input: AttendPayloadInput) {
     form.notificacion_observaciones.trim() ||
     form.seguimiento_notificacion.trim() ||
     form.seguimiento_opcion.trim() ||
+    form.seguimiento_efectivo.trim() ||
+    form.cierre_seguimiento.trim() ||
     form.seguimiento_fecha.trim();
 
   const hasAntecedentes =
@@ -149,6 +184,18 @@ function buildAttendPayload(input: AttendPayloadInput) {
             form.notificacion_emitida === "SI" ? form.seguimiento_notificacion || undefined : undefined,
           notificacion_observaciones: form.notificacion_observaciones || undefined,
           seguimiento_opcion: form.seguimiento_opcion || undefined,
+          seguimiento_efectivo:
+            form.seguimiento_efectivo === "SI"
+              ? true
+              : form.seguimiento_efectivo === "NO"
+                ? false
+                : undefined,
+          cierre_seguimiento:
+            form.cierre_seguimiento === "SI"
+              ? true
+              : form.cierre_seguimiento === "NO"
+                ? false
+                : undefined,
           seguimiento_fecha: form.seguimiento_fecha || undefined,
         }
       : undefined,
@@ -217,7 +264,7 @@ function isTabComplete(input: {
   } = input;
 
   if (activeTab === "INGRESO") {
-    const msg = validateAttendForm({ citaData, form });
+    const msg = validateIngresoTab({ citaData, form });
     return msg ? { ok: false, message: msg } : { ok: true };
   }
 
@@ -350,6 +397,8 @@ interface AttentionFormState {
   notificacion_observaciones: string;
   seguimiento_notificacion: string;
   seguimiento_opcion: string;
+  seguimiento_efectivo: "" | "SI" | "NO";
+  cierre_seguimiento: "" | "SI" | "NO";
   seguimiento_fecha: string;
   anamnesis_motivo_consulta: string;
   anamnesis_enfermedad_actual: string;
@@ -487,6 +536,8 @@ export default function AttendAppointmentPage() {
     notificacion_observaciones: "",
     seguimiento_notificacion: "",
     seguimiento_opcion: "",
+    seguimiento_efectivo: "",
+    cierre_seguimiento: "",
     seguimiento_fecha: "",
     anamnesis_motivo_consulta: "",
     anamnesis_enfermedad_actual: "",
@@ -754,6 +805,18 @@ export default function AttendAppointmentPage() {
             atencion?.hc_atencion_cierre?.seguimiento_notificacion ?? prev.seguimiento_notificacion ?? "",
           ),
           seguimiento_opcion: String(atencion?.hc_atencion_cierre?.seguimiento_opcion ?? prev.seguimiento_opcion ?? ""),
+          seguimiento_efectivo:
+            typeof atencion?.hc_atencion_cierre?.seguimiento_efectivo === "boolean"
+              ? atencion.hc_atencion_cierre.seguimiento_efectivo
+                ? "SI"
+                : "NO"
+              : prev.seguimiento_efectivo,
+          cierre_seguimiento:
+            typeof atencion?.hc_atencion_cierre?.cierre_seguimiento === "boolean"
+              ? atencion.hc_atencion_cierre.cierre_seguimiento
+                ? "SI"
+                : "NO"
+              : prev.cierre_seguimiento,
           seguimiento_fecha: atencion?.hc_atencion_cierre?.seguimiento_fecha
             ? String(atencion.hc_atencion_cierre.seguimiento_fecha).slice(0, 10)
             : prev.seguimiento_fecha,

@@ -9,6 +9,14 @@ function normalizeOptionalInt(input: unknown): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+function normalizeOptionalDate(input: unknown): Date | null {
+  if (input === null || input === undefined) return null;
+  const raw = String(input).trim();
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
@@ -78,6 +86,7 @@ export async function POST(
     const {
       id_tipo_atencion,
       id_modalidad_atencion,
+      fecha_hora,
       nota_atencion,
       analisis,
       plan_manejo,
@@ -86,6 +95,7 @@ export async function POST(
 
     const idTipoAtencion = normalizeOptionalInt(id_tipo_atencion);
     const idModalidadAtencion = normalizeOptionalInt(id_modalidad_atencion);
+    const fechaHora = normalizeOptionalDate(fecha_hora);
 
     const notaAtencionTrim = String(nota_atencion ?? "").trim();
     const analisisTrim = String(analisis ?? "").trim();
@@ -154,6 +164,7 @@ export async function POST(
         id_historia: historyId,
         id_tipo_atencion: idTipoAtencion,
         id_modalidad_atencion: idModalidadAtencion,
+        ...(fechaHora ? { fecha_hora: fechaHora } : {}),
         nota_atencion: notaAtencionTrim,
         analisis: analisisTrim,
         plan_manejo: planManejoTrim,
@@ -162,8 +173,6 @@ export async function POST(
         },
       },
       include: {
-        tipos_atencion: true,
-        modalidades_atencion: true,
         diagnosticos: {
           orderBy: { es_principal: "desc" },
           include: { cie10: true },
@@ -177,10 +186,6 @@ export async function POST(
           id_nota_evolucion: created.id_nota_evolucion,
           id_historia: created.id_historia,
           fecha_hora: created.fecha_hora.toISOString(),
-          id_tipo_atencion: created.id_tipo_atencion,
-          tipo_atencion: created.tipos_atencion?.descripcion ?? null,
-          id_modalidad_atencion: created.id_modalidad_atencion,
-          modalidad_atencion: created.modalidades_atencion?.descripcion ?? null,
           nota_atencion: created.nota_atencion ?? null,
           analisis: created.analisis ?? null,
           plan_manejo: created.plan_manejo ?? null,

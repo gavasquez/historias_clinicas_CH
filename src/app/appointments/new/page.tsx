@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
@@ -40,6 +40,8 @@ export default function NewAppointmentPage() {
     optionText: (base: any) => ({ ...base, color: '#000' }),
   };
 
+  type SimpleSelectOption = { value: string; label: string };
+
   const [form, setForm] = useState<AppointmentFormState>({
     id_paciente: "",
     id_profesional: profesionalIdFromQuery ? String(profesionalIdFromQuery) : "",
@@ -52,8 +54,42 @@ export default function NewAppointmentPage() {
     fecha_hora_fin: "",
     seguimiento: "NO",
     tipo_seguimiento: "",
+    id_historia_vinculada: "",
     canal_recordatorio: "",
   });
+
+  const { data: followupRecordsData } = useQuery<any>({
+    queryKey: ["new-appointment-followup-records", form.id_paciente],
+    enabled: form.seguimiento === "SI" && !!form.id_paciente.trim(),
+    queryFn: async () => {
+      const res = await apiClient.get(`/patients/${form.id_paciente}/records`);
+      return res.data?.data ?? [];
+    },
+  });
+
+  const followupRecordsOptions = useMemo<SelectOption[]>(() => {
+    const rows = Array.isArray(followupRecordsData) ? followupRecordsData : [];
+    return rows
+      .filter((r: any) => String(r?.estado ?? "").trim() === "Seguimiento")
+      .map((r: any) => {
+        const fecha = String(r?.fecha_apertura ?? "");
+        const estado = String(r?.estado ?? "").trim();
+        const tipo = String(r?.tipo_historia ?? "").trim();
+
+        const label = [fecha ? fecha.slice(0, 10) : "", tipo, estado ? `Estado: ${estado}` : ""]
+          .filter(Boolean)
+          .join(" | ");
+        return { value: Number(r.id_historia), label };
+      })
+      .filter((o) => Number.isInteger(o.value) && o.value > 0);
+  }, [followupRecordsData]);
+
+  const selectedFollowupRecord = useMemo(() => {
+    const rows = Array.isArray(followupRecordsData) ? followupRecordsData : [];
+    const target = form.id_historia_vinculada ? Number(form.id_historia_vinculada) : NaN;
+    if (!Number.isInteger(target) || target <= 0) return null;
+    return rows.find((r: any) => Number(r?.id_historia) === target) ?? null;
+  }, [followupRecordsData, form.id_historia_vinculada]);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -429,7 +465,6 @@ export default function NewAppointmentPage() {
       const idProgramaSaludNum = form.id_programa_salud ? Number(form.id_programa_salud) : undefined;
 
       const seguimientoBool = form.seguimiento === "SI";
-      const tipoSeguimientoValue = seguimientoBool ? form.tipo_seguimiento : "";
 
       const sorted = Array.from(new Set(selectedSlots)).sort();
       const startSlot = sorted[0];
@@ -456,7 +491,10 @@ export default function NewAppointmentPage() {
         id_modalidad_atencion: idModalidadAtencionNum,
         id_programa_salud: idProgramaSaludNum,
         seguimiento: seguimientoBool,
-        tipo_seguimiento: tipoSeguimientoValue || undefined,
+        id_historia_vinculada:
+          seguimientoBool && form.id_historia_vinculada.trim()
+            ? Number(form.id_historia_vinculada)
+            : undefined,
         canal_recordatorio: form.canal_recordatorio || undefined,
       });
     },
@@ -496,10 +534,18 @@ export default function NewAppointmentPage() {
         setError("Debe completar programa transversal, modalidad de atención y tipo de cita.");
         return;
       }
-      if (form.seguimiento === "SI" && !form.tipo_seguimiento.trim()) {
-        setError("Seleccione el tipo de seguimiento.");
-        return;
+
+      if (form.seguimiento === "SI") {
+        if (followupRecordsOptions.length === 0) {
+          setError("El paciente no tiene historias en estado Seguimiento para vincular.");
+          return;
+        }
+        if (!form.id_historia_vinculada.trim()) {
+          setError("Debe seleccionar una historia en seguimiento para vincular.");
+          return;
+        }
       }
+
       setError(null);
       goNext();
       return;
@@ -549,11 +595,6 @@ export default function NewAppointmentPage() {
       !form.id_tipo_cita.trim()
     ) {
       setError("Verifique que todos los datos obligatorios estén completos.");
-      return;
-    }
-
-    if (form.seguimiento === "SI" && !form.tipo_seguimiento.trim()) {
-      setError("Seleccione el tipo de seguimiento.");
       return;
     }
 
@@ -911,41 +952,145 @@ export default function NewAppointmentPage() {
 
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-600">Seguimiento <span className="text-red-500">*</span></label>
-                  <select
-                    value={form.seguimiento}
-                    onChange={(e) => {
-                      const next = e.target.value === "SI" ? "SI" : "NO";
+                  <Select
+                    isClearable
+                    isSearchable={false}
+                    classNamePrefix="react-select"
+                    menuPortalTarget={selectMenuPortalTarget}
+                    menuPosition="fixed"
+                    styles={selectStyles}
+                    placeholder="Seleccione..."
+                    options={(
+                      [
+                        { value: "NO", label: "No" },
+                        { value: "SI", label: "Sí" },
+                      ] as SimpleSelectOption[]
+                    )}
+                    value={(() => {
+                      const v = String(form.seguimiento || "").trim();
+                      if (!v) return null;
+                      const opts: SimpleSelectOption[] = [
+                        { value: "NO", label: "No" },
+                        { value: "SI", label: "Sí" },
+                      ];
+                      return opts.find((o) => o.value === v) ?? null;
+                    })()}
+                    onChange={(option: any) => {
+                      const selected = option as SimpleSelectOption | null;
+                      const next = selected?.value === "SI" ? "SI" : "NO";
                       setForm((prev) => ({
                         ...prev,
                         seguimiento: next,
-                        tipo_seguimiento: next === "SI" ? prev.tipo_seguimiento : "",
+                        id_historia_vinculada: next === "SI" ? prev.id_historia_vinculada : "",
                       }));
                     }}
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  >
-                    <option value="NO">No</option>
-                    <option value="SI">Sí</option>
-                  </select>
+                  />
                 </div>
 
                 {form.seguimiento === "SI" && (
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-slate-600">Tipo de seguimiento <span className="text-red-500">*</span></label>
-                    <select
-                      value={form.tipo_seguimiento}
-                      onChange={(e) => {
-                        const v = e.target.value;
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <label className="text-xs font-medium text-slate-600">
+                      Historia en seguimiento a vincular <span className="text-red-500">*</span>
+                    </label>
+                    <Select
+                      isClearable
+                      isSearchable
+                      classNamePrefix="react-select"
+                      menuPortalTarget={selectMenuPortalTarget}
+                      menuPosition="fixed"
+                      styles={selectStyles}
+                      placeholder={
+                        followupRecordsOptions.length > 0
+                          ? "Seleccione la historia"
+                          : "No hay historias en Seguimiento"
+                      }
+                      options={followupRecordsOptions}
+                      value={(() => {
+                        if (!form.id_historia_vinculada) return null;
+                        const target = Number(form.id_historia_vinculada);
+                        if (!Number.isInteger(target) || target <= 0) return null;
+                        return (
+                          followupRecordsOptions.find((o) => o.value === target) ??
+                          null
+                        );
+                      })()}
+                      onChange={(option: any) => {
+                        const selected = option as SelectOption | null;
                         setForm((prev) => ({
                           ...prev,
-                          tipo_seguimiento: v === "CRONICAS" || v === "SALUD" ? v : "",
+                          id_historia_vinculada: selected ? String(selected.value) : "",
                         }));
                       }}
-                      className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    >
-                      <option value="">Seleccione...</option>
-                      <option value="CRONICAS">Condiciones crónicas</option>
-                      <option value="SALUD">Situaciones de salud</option>
-                    </select>
+                    />
+
+                    {selectedFollowupRecord && (
+                      <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        <div className="grid gap-1 md:grid-cols-2">
+                          <div>
+                            <span className="font-semibold">Fecha apertura:</span>{" "}
+                            {String(selectedFollowupRecord?.fecha_apertura ?? "").slice(0, 10) || "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Estado:</span>{" "}
+                            {String(selectedFollowupRecord?.estado ?? "") || "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Tipo:</span>{" "}
+                            {String(selectedFollowupRecord?.tipo_historia ?? "") || "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Profesional:</span>{" "}
+                            {String(selectedFollowupRecord?.profesional_responsable ?? "") || "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Última atención:</span>{" "}
+                            {String(selectedFollowupRecord?.last_attention_tipo ?? "") || "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Modalidad:</span>{" "}
+                            {String(selectedFollowupRecord?.last_attention_modalidad ?? "") || "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Fecha última atención:</span>{" "}
+                            {selectedFollowupRecord?.last_attention_fecha_hora
+                              ? String(selectedFollowupRecord.last_attention_fecha_hora).replace("T", " ").slice(0, 16)
+                              : "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Motivo de consulta:</span>{" "}
+                            {selectedFollowupRecord?.last_attention_motivo_consulta
+                              ? String(selectedFollowupRecord.last_attention_motivo_consulta)
+                              : "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Tipo de seguimiento:</span>{" "}
+                            {selectedFollowupRecord?.last_attention_seguimiento_opcion
+                              ? (() => {
+                                  const opcion = String(selectedFollowupRecord.last_attention_seguimiento_opcion);
+                                  switch (opcion) {
+                                    case "CONDICIONES_CRONICAS":
+                                      return "Condiciones Crónicas";
+                                    case "SITUACION_SALUD":
+                                      return "Situación de Salud";
+                                    case "SITUACION_EN_SALUD":
+                                      return "Situación en Salud";
+                                    case "NO_APLICA":
+                                      return "No Aplica";
+                                    default:
+                                      return opcion;
+                                  }
+                                })()
+                              : "-"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Dx principal:</span>{" "}
+                            {selectedFollowupRecord?.last_attention_principal_cie10_codigo
+                              ? `${String(selectedFollowupRecord.last_attention_principal_cie10_codigo)} - ${String(selectedFollowupRecord?.last_attention_principal_cie10_nombre ?? "")}`
+                              : "-"}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1281,9 +1426,6 @@ export default function NewAppointmentPage() {
                     </div>
                     <div>
                       <span className="font-semibold">Seguimiento:</span> {form.seguimiento}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Tipo seguimiento:</span> {form.seguimiento === "SI" ? (form.tipo_seguimiento || "-") : "-"}
                     </div>
                     <div className="md:col-span-2">
                       <span className="font-semibold">Canal recordatorio:</span> {form.canal_recordatorio || "-"}

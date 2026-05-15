@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * PAGE_SIZE;
 
     const where: any = {
+      // Solo mostrar citas programadas (con tipo y estado definidos)
+      id_tipo_cita: { not: null },
+      id_estado_cita: { not: null },
       ...(profesional
         ? {
             profesionales_salud: {
@@ -154,6 +157,7 @@ export async function POST(request: NextRequest) {
       id_programa_salud,
       seguimiento,
       tipo_seguimiento,
+      id_historia_vinculada,
     } = body;
 
     const prismaAny = prisma as any;
@@ -202,6 +206,37 @@ export async function POST(request: NextRequest) {
         { message: "El programa transversal es obligatorio" },
         { status: 400 },
       );
+    }
+
+    const seguimientoBool = seguimiento === true;
+    const idHistoriaVinculadaNum =
+      id_historia_vinculada === null || id_historia_vinculada === undefined || String(id_historia_vinculada).trim() === ""
+        ? null
+        : Number(id_historia_vinculada);
+
+    if (seguimientoBool) {
+      if (!Number.isInteger(idHistoriaVinculadaNum as any) || (idHistoriaVinculadaNum as number) <= 0) {
+        return NextResponse.json(
+          { message: "Debe seleccionar una historia en seguimiento para vincular" },
+          { status: 400 },
+        );
+      }
+
+      const historiaVinculada = await prisma.historias_clinicas.findFirst({
+        where: {
+          id_historia: idHistoriaVinculadaNum as number,
+          id_paciente: idPacienteNum,
+          estado: "Seguimiento",
+        },
+        select: { id_historia: true },
+      });
+
+      if (!historiaVinculada?.id_historia) {
+        return NextResponse.json(
+          { message: "La historia vinculada no existe, no pertenece al paciente o no está en estado Seguimiento" },
+          { status: 400 },
+        );
+      }
     }
 
     const idSedeValid =
@@ -321,11 +356,12 @@ export async function POST(request: NextRequest) {
         id_programa_salud: idProgramaSaludNum,
         fecha_hora_inicio: fechaInicio,
         fecha_hora_fin: fechaFin,
-        seguimiento: seguimiento === true,
+        seguimiento: seguimientoBool,
         tipo_seguimiento:
           seguimiento === true && typeof tipo_seguimiento === "string" && tipo_seguimiento.trim()
             ? tipo_seguimiento.trim()
             : null,
+        id_historia_vinculada: seguimientoBool ? (idHistoriaVinculadaNum as number) : null,
         canal_recordatorio: canal_recordatorio ?? null,
       },
     });

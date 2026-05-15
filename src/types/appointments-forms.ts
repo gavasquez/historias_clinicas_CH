@@ -10,6 +10,7 @@ export interface AppointmentFormState {
   fecha_hora_fin: string;
   seguimiento: "SI" | "NO";
   tipo_seguimiento: "CRONICAS" | "SALUD" | "";
+  id_historia_vinculada: string;
   canal_recordatorio: string;
 }
 

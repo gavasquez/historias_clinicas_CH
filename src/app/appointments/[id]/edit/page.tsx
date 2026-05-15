@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
@@ -32,6 +32,9 @@ export default function EditAppointmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAttentionSection, setShowAttentionSection] = useState(true);
 
+  const clearedScheduleBackupRef = useRef<{ start: string; end: string } | null>(null);
+  const wasScheduleClearedRef = useRef(false);
+
   const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
   const DEFAULT_AVAILABILITY_LOOKAHEAD_DAYS = 7;
   const MAX_AVAILABILITY_LOOKAHEAD_DAYS = 31;
@@ -53,24 +56,44 @@ export default function EditAppointmentPage() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
 
+  const closeAvailabilityModal = () => {
+    setShowAvailabilityModal(false);
+    if (!wasScheduleClearedRef.current) return;
+    const backup = clearedScheduleBackupRef.current;
+    if (!backup) return;
+
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            fecha_hora_inicio: backup.start,
+            fecha_hora_fin: backup.end,
+          }
+        : prev,
+    );
+
+    wasScheduleClearedRef.current = false;
+    clearedScheduleBackupRef.current = null;
+  };
+
   const computedStartDateTime = (() => {
-    if (!availabilityDate || selectedSlots.length === 0) return "";
+    if (!availabilitySelectedDate || selectedSlots.length === 0) return "";
     const sorted = Array.from(new Set(selectedSlots)).sort();
-    return `${availabilityDate}T${sorted[0]}`;
+    return `${availabilitySelectedDate}T${sorted[0]}`;
   })();
 
   const computedEndDateTime = (() => {
-    if (!availabilityDate || selectedSlots.length === 0) return "";
+    if (!availabilitySelectedDate || selectedSlots.length === 0) return "";
     const sorted = Array.from(new Set(selectedSlots)).sort();
     const startSlot = sorted[0];
-    const startDate = new Date(`${availabilityDate}T${startSlot}:00`);
+    const startDate = new Date(`${availabilitySelectedDate}T${startSlot}:00`);
     if (Number.isNaN(startDate.getTime())) return "";
     const endDate = new Date(
       startDate.getTime() + sorted.length * DEFAULT_APPOINTMENT_DURATION_MINUTES * 60_000,
     );
     const endHH = String(endDate.getHours()).padStart(2, "0");
     const endMM = String(endDate.getMinutes()).padStart(2, "0");
-    return `${availabilityDate}T${endHH}:${endMM}`;
+    return `${availabilitySelectedDate}T${endHH}:${endMM}`;
   })();
 
   const formatDateOnly = (d: Date) => {
@@ -78,6 +101,15 @@ export default function EditAppointmentPage() {
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const formatDateTimeLocalInput = (d: Date) => {
+    const yyyy = String(d.getFullYear());
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
   };
 
   const dayOfWeek1To7 = (d: Date) => {
@@ -100,6 +132,7 @@ export default function EditAppointmentPage() {
     setAvailabilityByDate([]);
     setAvailabilitySlots([]);
     setAvailabilityError(null);
+
     setSelectedSlots([]);
     setAvailabilitySelectedDate(availabilityDate);
 
@@ -278,9 +311,13 @@ export default function EditAppointmentPage() {
         return;
       }
 
-      const firstDate = nonEmpty[0].date;
-      setAvailabilitySelectedDate(firstDate);
-      setAvailabilitySlots(nonEmpty[0].slots);
+      const preferredDate = availabilitySelectedDate;
+      const selectedDate = nonEmpty.some((r) => r.date === preferredDate)
+        ? preferredDate
+        : nonEmpty[0].date;
+      const selectedRow = nonEmpty.find((r) => r.date === selectedDate) ?? nonEmpty[0];
+      setAvailabilitySelectedDate(selectedDate);
+      setAvailabilitySlots(selectedRow.slots);
     } catch {
       setAvailabilityByDate([]);
       setAvailabilitySlots([]);
@@ -310,6 +347,55 @@ export default function EditAppointmentPage() {
     enabled: !!id,
     queryFn: () => getAppointmentById(String(id)),
   });
+
+  const { data: followupRecordsData } = useQuery<any>({
+    queryKey: ["edit-appointment-followup-records", form?.id_paciente],
+    enabled: form?.seguimiento === "SI" && !!form?.id_paciente?.trim(),
+    queryFn: async () => {
+      const res = await apiClient.get(`/patients/${form?.id_paciente}/records`);
+      return res.data?.data ?? [];
+    },
+  });
+
+  const followupRecordsOptions = useMemo<SelectOption[]>(() => {
+    const rows = Array.isArray(followupRecordsData) ? followupRecordsData : [];
+    return rows
+      .filter((r: any) => String(r?.estado ?? "").trim() === "Seguimiento")
+      .map((r: any) => {
+        const fecha = String(r?.fecha_apertura ?? "");
+        const estado = String(r?.estado ?? "").trim();
+        const tipo = String(r?.tipo_historia ?? "").trim();
+        const label = [fecha ? fecha.slice(0, 10) : "", tipo, estado ? `Estado: ${estado}` : ""]
+          .filter(Boolean)
+          .join(" | ");
+        return { value: Number(r.id_historia), label };
+      })
+      .filter((o) => Number.isInteger(o.value) && o.value > 0);
+  }, [followupRecordsData]);
+
+  const selectedFollowupRecord = useMemo(() => {
+    const rows = Array.isArray(followupRecordsData) ? followupRecordsData : [];
+    const target = form?.id_historia_vinculada ? Number(form.id_historia_vinculada) : NaN;
+    if (!Number.isInteger(target) || target <= 0) return null;
+    return rows.find((r: any) => Number(r?.id_historia) === target) ?? null;
+  }, [followupRecordsData, form?.id_historia_vinculada]);
+
+  useEffect(() => {
+    if (!form) return;
+    if (form.seguimiento !== "SI") return;
+    if (form.id_historia_vinculada?.trim()) return;
+    if (followupRecordsOptions.length === 0) return;
+
+    setForm((prev) => {
+      if (!prev) return prev;
+      if (prev.seguimiento !== "SI") return prev;
+      if (prev.id_historia_vinculada?.trim()) return prev;
+      return {
+        ...prev,
+        id_historia_vinculada: String(followupRecordsOptions[0].value),
+      };
+    });
+  }, [followupRecordsOptions, form]);
 
   const estadoIdForAttend = (() => {
     const fromForm = form?.id_estado_cita ? Number(form.id_estado_cita) : null;
@@ -342,24 +428,41 @@ export default function EditAppointmentPage() {
 
   useEffect(() => {
     if (citaData && !form) {
-      setAvailabilityDate(citaData.fecha_hora_inicio.slice(0, 10));
-      setAvailabilitySelectedDate(citaData.fecha_hora_inicio.slice(0, 10));
+      const startISO = String(citaData.fecha_hora_inicio ?? "");
+      const endISO = String(citaData.fecha_hora_fin ?? "");
+
+      const startDate = startISO ? new Date(startISO) : null;
+      const endDate = endISO ? new Date(endISO) : null;
+
+      const startLocal = startDate && !Number.isNaN(startDate.getTime()) ? startDate : null;
+      const endLocal = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null;
+
+      const startDateOnly = startLocal ? formatDateOnly(startLocal) : startISO.slice(0, 10);
+      setAvailabilityDate(startDateOnly);
+      setAvailabilitySelectedDate(startDateOnly);
       setForm({
         id_paciente: String(citaData.id_paciente),
         id_profesional: String(citaData.id_profesional),
         id_sede: citaData.id_sede ? String(citaData.id_sede) : "",
         id_tipo_cita: citaData.id_tipo_cita ? String(citaData.id_tipo_cita) : "",
         id_estado_cita: citaData.id_estado_cita ? String(citaData.id_estado_cita) : "",
-        id_modalidad_atencion: citaData.id_modalidad_atencion
-          ? String(citaData.id_modalidad_atencion)
-          : "",
+        id_modalidad_atencion:
+          citaData.id_modalidad_atencion != null
+            ? String(citaData.id_modalidad_atencion)
+            : "",
         id_programa_salud: citaData.id_programa_salud ? String(citaData.id_programa_salud) : "",
-        fecha_hora_inicio: citaData.fecha_hora_inicio.slice(0, 16),
-        fecha_hora_fin: citaData.fecha_hora_fin ? citaData.fecha_hora_fin.slice(0, 16) : "",
+        fecha_hora_inicio: startLocal ? formatDateTimeLocalInput(startLocal) : startISO.slice(0, 16),
+        fecha_hora_fin: endLocal ? formatDateTimeLocalInput(endLocal) : endISO ? endISO.slice(0, 16) : "",
         seguimiento: citaData.seguimiento ? "SI" : "NO",
-        tipo_seguimiento:
-          citaData.seguimiento && citaData.tipo_seguimiento
-            ? ((citaData.tipo_seguimiento as any) as "CRONICAS" | "SALUD")
+        tipo_seguimiento: (() => {
+          if (!citaData.seguimiento || !citaData.tipo_seguimiento) return "";
+          const raw = String(citaData.tipo_seguimiento).trim().toUpperCase();
+          if (raw === "CRONICAS" || raw === "SALUD") return raw;
+          return "";
+        })(),
+        id_historia_vinculada:
+          citaData.seguimiento && (citaData as any).id_historia_vinculada
+            ? String((citaData as any).id_historia_vinculada)
             : "",
         canal_recordatorio: citaData.canal_recordatorio ?? "",
       });
@@ -395,6 +498,10 @@ export default function EditAppointmentPage() {
         id_programa_salud: idProgramaSaludNum,
         seguimiento: seguimientoBool,
         tipo_seguimiento: tipoSeguimientoValue || undefined,
+        id_historia_vinculada:
+          seguimientoBool && form.id_historia_vinculada?.trim()
+            ? Number(form.id_historia_vinculada)
+            : undefined,
         canal_recordatorio: form.canal_recordatorio || undefined,
       });
     },
@@ -428,6 +535,17 @@ export default function EditAppointmentPage() {
         "Debe completar paciente, programa transversal, profesional, sede, tipo de cita y fecha/hora de inicio.",
       );
       return;
+    }
+
+    if (form.seguimiento === "SI") {
+      if (followupRecordsOptions.length === 0) {
+        setError("El paciente no tiene historias en estado Seguimiento para vincular.");
+        return;
+      }
+      if (!form.id_historia_vinculada.trim()) {
+        setError("Debe seleccionar una historia en seguimiento para vincular.");
+        return;
+      }
     }
 
     mutation.mutate();
@@ -732,6 +850,7 @@ export default function EditAppointmentPage() {
                           ...prev,
                           seguimiento: next,
                           tipo_seguimiento: next === "SI" ? prev.tipo_seguimiento : "",
+                          id_historia_vinculada: next === "SI" ? prev.id_historia_vinculada : "",
                         }
                       : prev,
                   );
@@ -744,27 +863,82 @@ export default function EditAppointmentPage() {
             </div>
 
             {form.seguimiento === "SI" && (
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-600">Tipo de seguimiento</label>
-                <select
-                  value={form.tipo_seguimiento}
-                  onChange={(e) => {
-                    const v = e.target.value;
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <label className="text-xs font-medium text-slate-600">
+                  Historia en seguimiento a vincular <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  isClearable
+                  isSearchable
+                  classNamePrefix="react-select"
+                  placeholder={
+                    followupRecordsOptions.length > 0
+                      ? "Seleccione la historia"
+                      : "No hay historias en Seguimiento"
+                  }
+                  options={followupRecordsOptions}
+                  value={(() => {
+                    const target = form.id_historia_vinculada ? Number(form.id_historia_vinculada) : NaN;
+                    if (!Number.isInteger(target) || target <= 0) return null;
+                    return followupRecordsOptions.find((o) => o.value === target) ?? null;
+                  })()}
+                  onChange={(option: any) => {
+                    const selected = option as SelectOption | null;
                     setForm((prev) =>
                       prev
                         ? {
                             ...prev,
-                            tipo_seguimiento: v === "CRONICAS" || v === "SALUD" ? v : "",
+                            id_historia_vinculada: selected ? String(selected.value) : "",
                           }
                         : prev,
                     );
                   }}
-                  className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                >
-                  <option value="">Seleccione...</option>
-                  <option value="CRONICAS">Condiciones crónicas</option>
-                  <option value="SALUD">Situaciones de salud</option>
-                </select>
+                />
+
+                {selectedFollowupRecord && (
+                  <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    <div className="grid gap-1 md:grid-cols-2">
+                      <div>
+                        <span className="font-semibold">Fecha apertura:</span>{" "}
+                        {String(selectedFollowupRecord?.fecha_apertura ?? "").slice(0, 10) || "-"}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Estado:</span>{" "}
+                        {String(selectedFollowupRecord?.estado ?? "") || "-"}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Tipo:</span>{" "}
+                        {String(selectedFollowupRecord?.tipo_historia ?? "") || "-"}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Profesional:</span>{" "}
+                        {String(selectedFollowupRecord?.profesional_responsable ?? "") || "-"}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Última atención:</span>{" "}
+                        {String(selectedFollowupRecord?.last_attention_tipo ?? "") || "-"}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Modalidad:</span>{" "}
+                        {String(selectedFollowupRecord?.last_attention_modalidad ?? "") || "-"}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Fecha última atención:</span>{" "}
+                        {selectedFollowupRecord?.last_attention_fecha_hora
+                          ? String(selectedFollowupRecord.last_attention_fecha_hora)
+                              .replace("T", " ")
+                              .slice(0, 16)
+                          : "-"}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Dx principal:</span>{" "}
+                        {selectedFollowupRecord?.last_attention_principal_cie10_codigo
+                          ? `${String(selectedFollowupRecord.last_attention_principal_cie10_codigo)} - ${String(selectedFollowupRecord?.last_attention_principal_cie10_nombre ?? "")}`
+                          : "-"}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -832,6 +1006,13 @@ export default function EditAppointmentPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (form.fecha_hora_inicio.trim().length > 0) {
+                        clearedScheduleBackupRef.current = {
+                          start: form.fecha_hora_inicio,
+                          end: form.fecha_hora_fin,
+                        };
+                        wasScheduleClearedRef.current = true;
+                      }
                       setSelectedSlots([]);
                       setAvailabilityError(null);
                       setForm((prev) =>
@@ -849,6 +1030,16 @@ export default function EditAppointmentPage() {
                     Quitar horario
                   </button>
                 </>
+              )}
+
+              {form.fecha_hora_inicio.trim().length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAvailabilityModal(true)}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  Agregar horario
+                </button>
               )}
             </div>
 
@@ -888,7 +1079,7 @@ export default function EditAppointmentPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowAvailabilityModal(false)}
+                    onClick={closeAvailabilityModal}
                     className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
                     Cerrar
@@ -1002,6 +1193,10 @@ export default function EditAppointmentPage() {
                             return (
                               <label
                                 key={hhmm}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  toggleSlot();
+                                }}
                                 className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs shadow-sm transition ${
                                   isSelected
                                     ? "border-sky-400 bg-sky-50"
@@ -1018,7 +1213,7 @@ export default function EditAppointmentPage() {
                                   type="checkbox"
                                   name="availability_slot"
                                   checked={isSelected}
-                                  onChange={toggleSlot}
+                                  readOnly
                                   className="h-4 w-4"
                                 />
                               </label>
@@ -1031,7 +1226,7 @@ export default function EditAppointmentPage() {
                     <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
                       <button
                         type="button"
-                        onClick={() => setShowAvailabilityModal(false)}
+                        onClick={closeAvailabilityModal}
                         className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Cancelar
@@ -1051,6 +1246,8 @@ export default function EditAppointmentPage() {
                                 }
                               : prev,
                           );
+                          wasScheduleClearedRef.current = false;
+                          clearedScheduleBackupRef.current = null;
                           setShowAvailabilityModal(false);
                         }}
                         className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"

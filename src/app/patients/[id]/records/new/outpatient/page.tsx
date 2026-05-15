@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import Swal from "sweetalert2";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -27,6 +28,8 @@ import { RevisionPorSistemasTab } from "@/app/appointments/[id]/attend/component
 import { AttendTabs, type AttendTabKey } from "@/app/appointments/[id]/attend/components/Tabs";
 import type { DiagnosisDraft } from "@/app/appointments/[id]/attend/components/AttentionDiagnosesSection";
 
+const Select = dynamic(() => import("react-select"), { ssr: false });
+
 type AttentionFormState = {
   conducta_plan_estudio_manejo: string;
   atencion_recomendaciones: string;
@@ -37,6 +40,8 @@ type AttentionFormState = {
   notificacion_observaciones: string;
   seguimiento_notificacion: string;
   seguimiento_opcion: string;
+  seguimiento_efectivo: "" | "SI" | "NO";
+  cierre_seguimiento: "" | "SI" | "NO";
   seguimiento_fecha: string;
   anamnesis_motivo_consulta: string;
   anamnesis_enfermedad_actual: string;
@@ -52,6 +57,11 @@ type AttentionFormState = {
   fecha_ocurrencia_evento: string;
   lugar_ocurrencia_evento: string;
   notificacion_otro_cual: string;
+};
+
+type SelectOption = {
+  value: number;
+  label: string;
 };
 
 type AntecedentesTraumaticosState = {
@@ -127,6 +137,8 @@ const DEFAULT_TAMIZAJES: TamizajeRowState[] = [
     resultado: "",
   },
 ];
+
+const defaultTamizajesSerialized = JSON.stringify(DEFAULT_TAMIZAJES);
 
 function safeJsonParse(input: string | null | undefined): unknown {
   if (!input) return null;
@@ -272,6 +284,9 @@ function isTabComplete(input: {
     if (!form.conducta_plan_estudio_manejo.trim()) {
       return { ok: false, message: "Debe diligenciar la conducta / plan de manejo." };
     }
+    if (!form.seguimiento_opcion.trim()) {
+      return { ok: false, message: "Debe seleccionar el tipo de seguimiento." };
+    }
     return { ok: true };
   }
 
@@ -283,6 +298,33 @@ export default function OutpatientAttendPage() {
   const params = useParams<{ id: string }>();
   const idPaciente = params?.id;
 
+  const didAttemptPrefillRef = useRef(false);
+
+  const selectMenuPortalTarget = typeof document !== "undefined" ? document.body : null;
+  const selectStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      minHeight: 36,
+      height: 36,
+      borderColor: state.isFocused ? "#94a3b8" : "#cbd5e1",
+      boxShadow: state.isFocused ? "0 0 0 1px #94a3b8" : "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      borderRadius: 6,
+      backgroundColor: "#fff",
+      fontSize: 12,
+    }),
+    valueContainer: (base: any) => ({ ...base, padding: "0 8px", height: 36 }),
+    input: (base: any) => ({ ...base, margin: 0, padding: 0, fontSize: 12 }),
+    placeholder: (base: any) => ({ ...base, color: "#64748b", fontSize: 12 }),
+    singleValue: (base: any) => ({ ...base, color: "#0f172a", fontSize: 12 }),
+    indicatorsContainer: (base: any) => ({ ...base, height: 36 }),
+    dropdownIndicator: (base: any) => ({ ...base, padding: 6 }),
+    clearIndicator: (base: any) => ({ ...base, padding: 6 }),
+    indicatorSeparator: () => ({ display: "none" }),
+    menuPortal: (base: any) => ({ ...base, zIndex: 60 }),
+    menu: (base: any) => ({ ...base, zIndex: 60, fontSize: 12 }),
+    option: (base: any) => ({ ...base, color: "#000", fontSize: 12 }),
+  };
+
   const [attentionId, setAttentionId] = useState<number | null>(null);
 
   const [idTipoAtencion, setIdTipoAtencion] = useState<string>("");
@@ -290,6 +332,8 @@ export default function OutpatientAttendPage() {
   const [idSede, setIdSede] = useState<string>("");
   const [seguimiento, setSeguimiento] = useState<"SI" | "NO">("NO");
   const [canalRecordatorio, setCanalRecordatorio] = useState<string>("");
+
+  const [idHistoriaVinculada, setIdHistoriaVinculada] = useState<string>("");
 
   const [form, setForm] = useState<AttentionFormState>({
     conducta_plan_estudio_manejo: "",
@@ -301,6 +345,8 @@ export default function OutpatientAttendPage() {
     notificacion_observaciones: "",
     seguimiento_notificacion: "",
     seguimiento_opcion: "",
+    seguimiento_efectivo: "",
+    cierre_seguimiento: "",
     seguimiento_fecha: "",
     anamnesis_motivo_consulta: "",
     anamnesis_enfermedad_actual: "",
@@ -387,6 +433,64 @@ export default function OutpatientAttendPage() {
     },
   });
 
+  const shouldRequireHistoriaVinculada = seguimiento === "SI";
+
+  useEffect(() => {
+    if (!shouldRequireHistoriaVinculada) {
+      setIdHistoriaVinculada("");
+    }
+  }, [shouldRequireHistoriaVinculada]);
+
+  const { data: followupRecordsData } = useQuery<any[]>({
+    queryKey: ["outpatient-followup-records", idPaciente],
+    enabled: !!idPaciente && shouldRequireHistoriaVinculada,
+    queryFn: async () => {
+      const res = await apiClient.get(`/patients/${idPaciente}/records`);
+      return (res.data?.data ?? []) as any[];
+    },
+  });
+
+  const followupRecordsOptions = useMemo<SelectOption[]>(() => {
+    const rows = Array.isArray(followupRecordsData) ? followupRecordsData : [];
+    return rows
+      .filter((r: any) => {
+        const estadoOk = String(r?.estado ?? "").trim() === "Seguimiento";
+        const tipoCodigo = String(r?.tipo_historia_codigo ?? "").trim();
+        const tipoOk = tipoCodigo === "HC_CONSULTA_EXTERNA" || tipoCodigo === "REG_ATENCION_SALUD";
+        return estadoOk && tipoOk;
+      })
+      .map((r: any) => {
+        const fecha = String(r?.fecha_apertura ?? "");
+        const estado = String(r?.estado ?? "").trim();
+        const tipo = String(r?.tipo_historia ?? "").trim();
+        const label = [
+          fecha ? fecha.slice(0, 10) : "",
+          tipo ? `Tipo: ${tipo}` : "",
+          String(r?.profesional_responsable ?? "").trim()
+            ? `Prof: ${String(r?.profesional_responsable ?? "").trim()}`
+            : "",
+          String(r?.last_attention_tipo ?? "").trim()
+            ? `Atn: ${String(r?.last_attention_tipo ?? "").trim()}`
+            : "Atn: (sin atenciones)",
+          String(r?.last_attention_modalidad ?? "").trim()
+            ? `Mod: ${String(r?.last_attention_modalidad ?? "").trim()}`
+            : "",
+          estado ? `Estado: ${estado}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        return { value: Number(r.id_historia), label };
+      })
+      .filter((o) => Number.isInteger(o.value) && o.value > 0);
+  }, [followupRecordsData]);
+
+  const selectedFollowupRecord = useMemo(() => {
+    const rows = Array.isArray(followupRecordsData) ? followupRecordsData : [];
+    const target = idHistoriaVinculada ? Number(idHistoriaVinculada) : NaN;
+    if (!Number.isInteger(target) || target <= 0) return null;
+    return rows.find((r: any) => Number(r?.id_historia) === target) ?? null;
+  }, [followupRecordsData, idHistoriaVinculada]);
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!idPaciente) return;
@@ -410,8 +514,24 @@ export default function OutpatientAttendPage() {
           seguimiento_notificacion: form.seguimiento_notificacion || undefined,
           notificacion_observaciones: form.notificacion_observaciones || undefined,
           seguimiento_opcion: form.seguimiento_opcion || undefined,
+          seguimiento_efectivo:
+            form.seguimiento_efectivo === "SI"
+              ? true
+              : form.seguimiento_efectivo === "NO"
+                ? false
+                : undefined,
+          cierre_seguimiento:
+            form.cierre_seguimiento === "SI"
+              ? true
+              : form.cierre_seguimiento === "NO"
+                ? false
+                : undefined,
           seguimiento_fecha: form.seguimiento_fecha || undefined,
         },
+        id_historia_vinculada:
+          shouldRequireHistoriaVinculada && idHistoriaVinculada.trim()
+            ? Number(idHistoriaVinculada)
+            : undefined,
         antecedentes: [
           {
             diagnostico: null,
@@ -527,6 +647,17 @@ export default function OutpatientAttendPage() {
     if (!targetTab) return;
 
     if (direction === "next") {
+      if (activeTab === "ATENCION" && shouldRequireHistoriaVinculada) {
+        if (followupRecordsOptions.length === 0) {
+          setError("El paciente no tiene historias en estado Seguimiento para vincular.");
+          return;
+        }
+        if (!idHistoriaVinculada.trim()) {
+          setError("Debe seleccionar una historia en seguimiento para vincular.");
+          return;
+        }
+      }
+
       const completion = isTabComplete({
         activeTab,
         form,
@@ -576,6 +707,17 @@ export default function OutpatientAttendPage() {
     if (!completion.ok) {
       setError(completion.message ?? "Debes completar la sección antes de finalizar.");
       return;
+    }
+
+    if (activeTab === "ATENCION" && shouldRequireHistoriaVinculada) {
+      if (followupRecordsOptions.length === 0) {
+        setError("El paciente no tiene historias en estado Seguimiento para vincular.");
+        return;
+      }
+      if (!idHistoriaVinculada.trim()) {
+        setError("Debe seleccionar una historia en seguimiento para vincular.");
+        return;
+      }
     }
 
     setError(null);
@@ -628,6 +770,152 @@ export default function OutpatientAttendPage() {
       setForm((p) => ({ ...p, hc_tamizajes_contenido: nextSerialized }));
     }
   }, [form.hc_tamizajes_contenido]);
+
+  useEffect(() => {
+    if (!idPaciente) return;
+    if (attentionId) return;
+    if (mutation.isPending) return;
+
+    const tamizajesHasMeaningfulValue =
+      form.hc_tamizajes_contenido.trim() && form.hc_tamizajes_contenido !== defaultTamizajesSerialized;
+
+    const hasAnyTargetValue =
+      form.analisis.trim() ||
+      form.hc_ssr_contenido.trim() ||
+      tamizajesHasMeaningfulValue ||
+      form.hc_examen_fisico_contenido.trim() ||
+      form.hc_valoracion_sistemas_contenido.trim();
+
+    if (hasAnyTargetValue) return;
+
+    (async () => {
+      try {
+        const resRecords = await apiClient.get<{ data: any[] }>(`/patients/${idPaciente}/records`);
+        const records = Array.isArray(resRecords.data?.data) ? resRecords.data.data : [];
+        const targetHistory =
+          records.find(
+            (r) =>
+              Number(r?.attention_count) > 0 &&
+              String(r?.tipo_historia_codigo ?? "").trim() === "HC_CONSULTA_EXTERNA",
+          ) ?? null;
+        const idHistoria = targetHistory?.id_historia ? Number(targetHistory.id_historia) : null;
+        if (!idHistoria || !Number.isInteger(idHistoria) || idHistoria <= 0) return;
+
+        const modalResult = await Swal.fire({
+          title: "Precargar información clínica",
+          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (anamnesis, antecedentes, análisis, plan de manejo, SSR, tamizajes, examen físico y revisión por sistemas)?",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Sí, precargar",
+          cancelButtonText: "No, continuar",
+          confirmButtonColor: "#2563eb",
+          cancelButtonColor: "#64748b",
+          reverseButtons: true,
+          allowOutsideClick: false,
+        });
+
+        if (!modalResult.isConfirmed) return;
+
+        const resHistory = await apiClient.get<{ data: any }>(`/histories/${idHistoria}`);
+        const historia = resHistory.data?.data;
+        const atenciones = Array.isArray(historia?.atenciones_salud) ? historia.atenciones_salud : [];
+        const lastAttention = atenciones[0] ?? null;
+        if (!lastAttention) return;
+
+        const nextAnalisis = String(lastAttention?.analisis ?? "");
+        const nextMotivoConsulta = String(lastAttention?.hc_anamnesis_atencion?.motivo_consulta ?? "");
+        const nextEnfermedadActual = String(lastAttention?.hc_anamnesis_atencion?.enfermedad_actual ?? "");
+
+        const antecedentesRows = Array.isArray(lastAttention?.hc_antecedentes_atencion)
+          ? lastAttention.hc_antecedentes_atencion
+          : [];
+
+        const nextAntecedentePersonal = String(
+          (antecedentesRows.find(
+            (r: any) => String(r?.tipo_antecedente ?? "").trim().toUpperCase() === "PERSONAL",
+          ) as any)?.observacion ?? "",
+        );
+
+        const nextAntecedenteFamiliar = String(
+          (antecedentesRows.find(
+            (r: any) => String(r?.tipo_antecedente ?? "").trim().toUpperCase() === "FAMILIAR",
+          ) as any)?.observacion ?? "",
+        );
+
+        const nextTraumaticos = lastAttention?.hc_antecedentes_traumaticos_atencion;
+        const nextNaturalezaLesion = String(nextTraumaticos?.naturaleza_lesion ?? "");
+        const nextFechaOcurrencia = nextTraumaticos?.fecha_ocurrencia
+          ? String(nextTraumaticos.fecha_ocurrencia).slice(0, 10)
+          : "";
+        const nextSecuelas = String(nextTraumaticos?.secuelas ?? "");
+
+        const nextConductaPlan = String(lastAttention?.hc_atencion_cierre?.conducta_plan_estudio_manejo ?? "");
+        const nextRecomendaciones = String(lastAttention?.hc_atencion_cierre?.recomendaciones ?? "");
+        const nextSsr = String(lastAttention?.hc_ssr_atencion?.contenido ?? "");
+        const nextTamizajes = String(lastAttention?.hc_tamizajes_atencion?.contenido ?? "");
+        const nextExamenFisico = String(lastAttention?.hc_examen_fisico_atencion?.contenido ?? "");
+        const nextValoracion = String(lastAttention?.hc_valoracion_sistemas_atencion?.contenido ?? "");
+
+        setForm((prev) => ({
+          ...prev,
+          anamnesis_motivo_consulta: prev.anamnesis_motivo_consulta.trim()
+            ? prev.anamnesis_motivo_consulta
+            : nextMotivoConsulta,
+          anamnesis_enfermedad_actual: prev.anamnesis_enfermedad_actual.trim()
+            ? prev.anamnesis_enfermedad_actual
+            : nextEnfermedadActual,
+          // No precargar análisis para HC_CONSULTA_EXTERNA
+          analisis: prev.analisis.trim() ? prev.analisis : "",
+          conducta_plan_estudio_manejo: prev.conducta_plan_estudio_manejo.trim()
+            ? prev.conducta_plan_estudio_manejo
+            : nextConductaPlan,
+          atencion_recomendaciones: prev.atencion_recomendaciones.trim()
+            ? prev.atencion_recomendaciones
+            : nextRecomendaciones,
+          hc_ssr_contenido: prev.hc_ssr_contenido.trim() ? prev.hc_ssr_contenido : nextSsr,
+          hc_tamizajes_contenido: prev.hc_tamizajes_contenido.trim()
+            ? prev.hc_tamizajes_contenido
+            : nextTamizajes,
+          hc_examen_fisico_contenido: prev.hc_examen_fisico_contenido.trim()
+            ? prev.hc_examen_fisico_contenido
+            : nextExamenFisico,
+          hc_valoracion_sistemas_contenido: prev.hc_valoracion_sistemas_contenido.trim()
+            ? prev.hc_valoracion_sistemas_contenido
+            : nextValoracion,
+        }));
+
+        if (!observacionAntecedentesPersonal.trim() && nextAntecedentePersonal.trim()) {
+          setObservacionAntecedentesPersonal(nextAntecedentePersonal);
+        }
+        if (!observacionAntecedentesFamiliar.trim() && nextAntecedenteFamiliar.trim()) {
+          setObservacionAntecedentesFamiliar(nextAntecedenteFamiliar);
+        }
+
+        setAntecedentesTraumaticos((prevTra) => ({
+          naturaleza_lesion: prevTra.naturaleza_lesion.trim() ? prevTra.naturaleza_lesion : nextNaturalezaLesion,
+          fecha_ocurrencia: prevTra.fecha_ocurrencia.trim() ? prevTra.fecha_ocurrencia : nextFechaOcurrencia,
+          secuelas: prevTra.secuelas.trim() ? prevTra.secuelas : nextSecuelas,
+        }));
+      } catch {
+        // ignore
+      }
+    })();
+  }, [
+    attentionId,
+    form.analisis,
+    form.anamnesis_enfermedad_actual,
+    form.anamnesis_motivo_consulta,
+    form.atencion_recomendaciones,
+    form.conducta_plan_estudio_manejo,
+    form.hc_examen_fisico_contenido,
+    form.hc_ssr_contenido,
+    form.hc_tamizajes_contenido,
+    form.hc_valoracion_sistemas_contenido,
+    idPaciente,
+    mutation.isPending,
+    observacionAntecedentesFamiliar,
+    observacionAntecedentesPersonal,
+  ]);
 
   const headerCitaLikeData = useMemo(() => {
     return {
@@ -893,6 +1181,112 @@ export default function OutpatientAttendPage() {
                   <option value="SI">Sí</option>
                 </select>
               </div>
+
+              {shouldRequireHistoriaVinculada && (
+                <div className="md:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-700">
+                    Historia en seguimiento a vincular <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    isClearable
+                    isSearchable
+                    classNamePrefix="react-select"
+                    menuPortalTarget={selectMenuPortalTarget}
+                    menuPosition="fixed"
+                    styles={selectStyles}
+                    placeholder={
+                      followupRecordsOptions.length > 0
+                        ? "Seleccione la historia"
+                        : "No hay historias en Seguimiento"
+                    }
+                    options={followupRecordsOptions}
+                    value={(() => {
+                      if (!idHistoriaVinculada) return null;
+                      const target = Number(idHistoriaVinculada);
+                      if (!Number.isInteger(target) || target <= 0) return null;
+                      return (
+                        followupRecordsOptions.find((o: SelectOption) => o.value === target) ??
+                        null
+                      );
+                    })()}
+                    onChange={(option: any) => {
+                      const selected = option as SelectOption | null;
+                      setIdHistoriaVinculada(selected ? String(selected.value) : "");
+                    }}
+                  />
+
+                  {selectedFollowupRecord && (
+                    <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                      <div className="grid gap-1 md:grid-cols-2">
+                        <div>
+                          <span className="font-semibold">Fecha apertura:</span>{" "}
+                          {String(selectedFollowupRecord?.fecha_apertura ?? "").slice(0, 10) || "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Estado:</span>{" "}
+                          {String(selectedFollowupRecord?.estado ?? "") || "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Tipo:</span>{" "}
+                          {String(selectedFollowupRecord?.tipo_historia ?? "") || "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Profesional:</span>{" "}
+                          {String(selectedFollowupRecord?.profesional_responsable ?? "") || "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Última atención:</span>{" "}
+                          {String(selectedFollowupRecord?.last_attention_tipo ?? "") || "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Modalidad:</span>{" "}
+                          {String(selectedFollowupRecord?.last_attention_modalidad ?? "") || "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Fecha última atención:</span>{" "}
+                          {selectedFollowupRecord?.last_attention_fecha_hora
+                            ? String(selectedFollowupRecord.last_attention_fecha_hora)
+                                .replace("T", " ")
+                                .slice(0, 16)
+                            : "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Motivo de consulta:</span>{" "}
+                          {selectedFollowupRecord?.last_attention_motivo_consulta
+                            ? String(selectedFollowupRecord.last_attention_motivo_consulta)
+                            : "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Tipo de seguimiento:</span>{" "}
+                          {selectedFollowupRecord?.last_attention_seguimiento_opcion
+                            ? (() => {
+                                const opcion = String(selectedFollowupRecord.last_attention_seguimiento_opcion);
+                                switch (opcion) {
+                                  case "CONDICIONES_CRONICAS":
+                                    return "Condiciones Crónicas";
+                                  case "SITUACION_SALUD":
+                                    return "Situación de Salud";
+                                  case "SITUACION_EN_SALUD":
+                                    return "Situación en Salud";
+                                  case "NO_APLICA":
+                                    return "No Aplica";
+                                  default:
+                                    return opcion;
+                                }
+                              })()
+                            : "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Dx principal:</span>{" "}
+                          {selectedFollowupRecord?.last_attention_principal_cie10_codigo
+                            ? `${String(selectedFollowupRecord.last_attention_principal_cie10_codigo)} - ${String(selectedFollowupRecord?.last_attention_principal_cie10_nombre ?? "")}`
+                            : "-"}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="md:col-span-2">
                 <label className="text-[11px] font-semibold text-slate-700">Canal de recordatorio</label>

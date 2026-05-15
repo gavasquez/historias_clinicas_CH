@@ -125,6 +125,8 @@ model hc_atencion_cierre {
   seguimiento_notificacion     String?          @db.VarChar(50)
   notificacion_observaciones   String?
   seguimiento_opcion           String?          @db.VarChar(50)
+  seguimiento_efectivo         Boolean?
+  cierre_seguimiento           Boolean?
   seguimiento_fecha            DateTime?        @db.Date
   fecha_creacion               DateTime         @default(now()) @db.Timestamp(6)
   atenciones_salud             atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
@@ -256,6 +258,7 @@ model citas {
   seguimiento                    Boolean               @default(false)
   tipo_seguimiento               String?               @db.VarChar(30)
   canal_recordatorio             String?               @db.VarChar(50)
+  id_historia_vinculada          Int?
   atenciones_salud               atenciones_salud[]
   estados_cita                   estados_cita?         @relation(fields: [id_estado_cita], references: [id_estado_cita])
   pacientes                      pacientes             @relation(fields: [id_paciente], references: [id_paciente])
@@ -266,9 +269,11 @@ model citas {
   programas_salud                programas_salud?      @relation(fields: [id_programa_salud], references: [id_programa_salud])
   tipos_atencion                 tipos_atencion?       @relation(fields: [tipos_atencionId_tipo_atencion], references: [id_tipo_atencion])
   tipos_atencionId_tipo_atencion Int?
+  historia_vinculada             historias_clinicas?   @relation("citas_historia_vinculada", fields: [id_historia_vinculada], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([id_paciente], map: "idx_citas_paciente")
   @@index([id_profesional, fecha_hora_inicio], map: "idx_citas_profesional")
+  @@index([id_historia_vinculada], map: "idx_citas_historia_vinculada")
 }
 
 model consentimientos_paciente {
@@ -444,18 +449,23 @@ model historias_clinicas {
   id_tipo_historia           Int
   id_profesional_responsable Int?
   fecha_apertura             DateTime                   @default(now()) @db.Timestamp(6)
-  estado                     String?                    @default("activa") @db.VarChar(50)
+  estado                     String?                    @default("Finalizado") @db.VarChar(50)
+  id_historia_vinculada      Int?
   motivo_consulta            String?
   enfermedad_actual          String?
   antecedentes_personales    String?
   antecedentes_familiares    String?
   atenciones_salud           atenciones_salud[]
   notas_evolucion_historia   notas_evolucion_historia[]
+  historia_vinculada         historias_clinicas?         @relation("historias_vinculo", fields: [id_historia_vinculada], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
+  historias_vinculadas       historias_clinicas[]        @relation("historias_vinculo")
+  citas_vinculadas           citas[]                     @relation("citas_historia_vinculada")
   pacientes                  pacientes                  @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
   profesionales_salud        profesionales_salud?       @relation(fields: [id_profesional_responsable], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
   tipos_historia_clinica     tipos_historia_clinica     @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([id_paciente], map: "idx_historia_paciente")
+  @@index([id_historia_vinculada], map: "idx_historia_vinculada")
 }
 
 model notas_evolucion_historia {

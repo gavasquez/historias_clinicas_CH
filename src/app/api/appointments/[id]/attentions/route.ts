@@ -14,11 +14,34 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
+function normalizeOptionalBoolean(input: unknown): boolean | null {
+  if (input === true) return true;
+  if (input === false) return false;
+  return null;
+}
+
+function resolveHistoriaEstadoFromSeguimiento(input: {
+  seguimientoOpcion: string;
+  seguimientoEfectivo: boolean | null;
+  cierreSeguimiento: boolean | null;
+}): "Finalizado" | "Seguimiento" | null {
+  const opt = String(input.seguimientoOpcion ?? "").trim().toUpperCase();
+  if (!opt) return null;
+
+  if (opt === "NO_APLICA") return "Finalizado";
+  if (input.cierreSeguimiento === true) return "Finalizado";
+  if (input.cierreSeguimiento === false) {
+    return "Seguimiento";
+  }
+  return null;
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
+    const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
     const idCita = Number(resolvedParams.id);
 
@@ -86,23 +109,36 @@ export async function POST(
       );
     }
 
-    let historia = await prisma.historias_clinicas.findFirst({
-      where: {
-        id_paciente: cita.id_paciente,
-        id_tipo_historia: tipoHistoria.id_tipo_historia,
-        estado: "activa",
-      },
+    const existingAttention = await prisma.atenciones_salud.findFirst({
+      where: { id_cita: cita.id_cita },
+      orderBy: { id_atencion: "desc" },
+      select: { id_atencion: true, id_historia: true },
     });
 
+    let historia = existingAttention?.id_historia
+      ? await prisma.historias_clinicas.findUnique({
+          where: { id_historia: existingAttention.id_historia },
+        })
+      : null;
+
     if (!historia) {
-      historia = await prisma.historias_clinicas.create({
+      historia = await prismaAny.historias_clinicas.create({
         data: {
           id_paciente: cita.id_paciente,
           id_tipo_historia: tipoHistoria.id_tipo_historia,
           id_profesional_responsable: cita.id_profesional,
+          estado: "Finalizado",
+          id_historia_vinculada: (cita as any)?.id_historia_vinculada ?? null,
           motivo_consulta: anamnesisMotivoTrimEarly || null,
         },
       });
+    }
+
+    if (!historia?.id_historia) {
+      return NextResponse.json(
+        { message: "No se pudo resolver la historia clínica para registrar la atención." },
+        { status: 500 },
+      );
     }
 
     const tipoAtencion = await prisma.tipos_atencion.findUnique({
@@ -376,11 +412,54 @@ export async function POST(
         historiaUpdateData.antecedentes_familiares = antecedentesFamiliarObsTrim;
       }
 
+      const cierreRawForEstado =
+        hc_atencion_cierre && typeof hc_atencion_cierre === "object" ? hc_atencion_cierre : null;
+      const cierreSegOpcionTrimForEstado = String(
+        (cierreRawForEstado as any)?.seguimiento_opcion ?? "",
+      ).trim();
+      const cierreSegEfectivoForEstado = normalizeOptionalBoolean(
+        (cierreRawForEstado as any)?.seguimiento_efectivo,
+      );
+      const cierreSegCierreForEstado = normalizeOptionalBoolean(
+        (cierreRawForEstado as any)?.cierre_seguimiento,
+      );
+
+      const resolvedEstado = resolveHistoriaEstadoFromSeguimiento({
+        seguimientoOpcion: cierreSegOpcionTrimForEstado,
+        seguimientoEfectivo: cierreSegEfectivoForEstado,
+        cierreSeguimiento: cierreSegCierreForEstado,
+      });
+      if (resolvedEstado) {
+        historiaUpdateData.estado = resolvedEstado;
+      }
+
       if (Object.keys(historiaUpdateData).length > 0) {
         historia = await prisma.historias_clinicas.update({
           where: { id_historia: historia.id_historia },
           data: historiaUpdateData,
         });
+
+        // Si la historia actual está vinculada a otra, actualizamos ambas
+        if (historia.id_historia_vinculada) {
+          const idHistoriaVinculada = Number(historia.id_historia_vinculada);
+          if (Number.isInteger(idHistoriaVinculada) && idHistoriaVinculada > 0) {
+            try {
+              // La historia actual queda en seguimiento (porque ahora es la activa)
+              await prisma.historias_clinicas.update({
+                where: { id_historia: historia.id_historia },
+                data: { estado: "Seguimiento" },
+              });
+              
+              // La historia vinculada (madre) se finaliza
+              await prisma.historias_clinicas.update({
+                where: { id_historia: idHistoriaVinculada },
+                data: { estado: "Finalizado" },
+              });
+            } catch {
+              // ignore
+            }
+          }
+        }
       }
     } catch (e) {
       console.error("Error actualizando resumen de historia clinica", e);
@@ -472,21 +551,18 @@ export async function POST(
     const cierreSegNotifTrim = String((cierreRaw as any)?.seguimiento_notificacion ?? "").trim();
     const cierreNotifObsTrim = String((cierreRaw as any)?.notificacion_observaciones ?? "").trim();
     const cierreSegOpcionTrim = String(cierreRaw?.seguimiento_opcion ?? "").trim();
+    const cierreSegEfectivo = normalizeOptionalBoolean((cierreRaw as any)?.seguimiento_efectivo);
+    const cierreSegCierre = normalizeOptionalBoolean((cierreRaw as any)?.cierre_seguimiento);
     const cierreSegFechaRaw = (cierreRaw as any)?.seguimiento_fecha;
-    const cierreSegFecha = (() => {
-      if (cierreSegFechaRaw === null || cierreSegFechaRaw === undefined) return null;
+    const cierreSegFecha = cierreSegFechaRaw ? normalizeDateOnly(cierreSegFechaRaw) : null;
 
-      if (cierreSegFechaRaw instanceof Date) {
-        return Number.isNaN(cierreSegFechaRaw.getTime()) ? null : cierreSegFechaRaw;
-      }
+    if (!cierreSegOpcionTrim) {
+      return NextResponse.json(
+        { message: "El tipo de seguimiento es obligatorio" },
+        { status: 400 },
+      );
+    }
 
-      const rawTrim = String(cierreSegFechaRaw).trim();
-      if (!rawTrim || rawTrim === "undefined" || rawTrim === "null") return null;
-
-      const parsed = new Date(rawTrim);
-      if (!(parsed instanceof Date) || typeof (parsed as any).getTime !== "function") return null;
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    })();
     const hasCierre = !!(
       cierreConductaTrim ||
       cierreRecomendacionesTrim ||
@@ -497,6 +573,8 @@ export async function POST(
       cierreSegNotifTrim ||
       cierreNotifObsTrim ||
       cierreSegOpcionTrim ||
+      cierreSegEfectivo !== null ||
+      cierreSegCierre !== null ||
       cierreSegFecha
     );
 
@@ -516,95 +594,179 @@ export async function POST(
       );
     }
 
-    const atencion = await prisma.atenciones_salud.create({
-      data: {
-        id_historia: historia.id_historia,
-        id_cita: cita.id_cita,
-        id_profesional: cita.id_profesional,
-        id_tipo_atencion: idTipoAtencionNum,
-        id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
-        analisis: analisisTrim || null,
-        llega_por_sus_medios: llega_por_sus_medios,
-        llega_por_sus_medios_cual:
-          llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
-        estado_a_la_llegada: estadoLlegada,
-        caso_accidente_intoxicacion_violencia: caso_accidente_intoxicacion_violencia,
-        fecha_ocurrencia_evento:
-          caso_accidente_intoxicacion_violencia === true ? fechaOcurrencia : null,
-        lugar_ocurrencia_evento:
-          caso_accidente_intoxicacion_violencia === true ? lugarOcurrenciaTrim : null,
-        notificacion_policia:
-          caso_accidente_intoxicacion_violencia === true ? notificacion_policia === true : null,
-        notificacion_cti:
-          caso_accidente_intoxicacion_violencia === true ? notificacion_cti === true : null,
-        notificacion_acudiente:
-          caso_accidente_intoxicacion_violencia === true ? notificacion_acudiente === true : null,
-        notificacion_otro:
-          caso_accidente_intoxicacion_violencia === true ? notificacion_otro === true : null,
-        notificacion_otro_cual:
-          caso_accidente_intoxicacion_violencia === true && notificacion_otro === true
-            ? notificacionOtroCualTrim
-            : null,
-        hc_anamnesis_atencion:
-          anamnesisMotivoTrim || anamnesisEnfActualTrim
-            ? {
-                create: {
-                  motivo_consulta: anamnesisMotivoTrim || null,
-                  enfermedad_actual: anamnesisEnfActualTrim || null,
-                },
-              }
-            : undefined,
-        hc_antecedentes_atencion:
-          antecedentesCreate.length > 0
-            ? {
-                create: antecedentesCreate as any,
-              }
-            : undefined,
-        hc_antecedentes_traumaticos_atencion:
-          hasAntecedentesTraumaticos
-            ? {
-                create: {
-                  naturaleza_lesion: naturalezaLesionTrim || null,
-                  fecha_ocurrencia: fechaOcurrenciaTrauma,
-                  secuelas: secuelasTrim || null,
-                },
-              }
-            : undefined,
-        hc_atencion_cierre:
-          hasCierre
-            ? {
-                create: {
-                  conducta_plan_estudio_manejo: cierreConductaTrim || null,
-                  recomendaciones: cierreRecomendacionesTrim || null,
-                  certificado_recomendaciones: cierreCertRecomTrim || null,
-                  certificado_emitido: cierreCertEmitido,
-                  certificado_opcion: cierreCertEmitido === true ? cierreCertOpcionTrim || null : null,
-                  notificacion_emitida: cierreNotifEmitida,
-                  seguimiento_notificacion:
-                    cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
-                  notificacion_observaciones: cierreNotifObsTrim || null,
-                  seguimiento_opcion: cierreSegOpcionTrim || null,
-                  seguimiento_fecha: cierreSegFecha,
-                },
-              }
-            : undefined,
-        diagnosticos_atencion:
-          diagnosticosCreate.length > 0
-            ? {
-                create: diagnosticosCreate,
-              }
-            : undefined,
-        hc_ssr_atencion: hcSsrTrim ? { create: { contenido: hcSsrTrim } } : undefined,
-        hc_habitos_atencion: habitosData ? { create: habitosData } : undefined,
-        hc_tamizajes_atencion: hcTamizajesTrim ? { create: { contenido: hcTamizajesTrim } } : undefined,
-        hc_examen_fisico_atencion: hcExamenFisicoTrim
-          ? { create: { contenido: hcExamenFisicoTrim } }
-          : undefined,
-        hc_valoracion_sistemas_atencion: hcValoracionSistemasTrim
-          ? { create: { contenido: hcValoracionSistemasTrim } }
-          : undefined,
+    const atencion = existingAttention?.id_atencion
+      ? await prisma.atenciones_salud.update({
+          where: { id_atencion: existingAttention.id_atencion },
+          data: {
+            id_historia: historia.id_historia,
+            id_cita: cita.id_cita,
+            id_profesional: cita.id_profesional,
+            id_tipo_atencion: idTipoAtencionNum,
+            id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
+            analisis: analisisTrim || null,
+            llega_por_sus_medios: llega_por_sus_medios,
+            llega_por_sus_medios_cual:
+              llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
+            estado_a_la_llegada: estadoLlegada,
+            caso_accidente_intoxicacion_violencia: caso_accidente_intoxicacion_violencia,
+            fecha_ocurrencia_evento:
+              caso_accidente_intoxicacion_violencia === true ? fechaOcurrencia : null,
+            lugar_ocurrencia_evento:
+              caso_accidente_intoxicacion_violencia === true ? lugarOcurrenciaTrim : null,
+            notificacion_policia:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_policia === true : null,
+            notificacion_cti:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_cti === true : null,
+            notificacion_acudiente:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_acudiente === true : null,
+            notificacion_otro:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_otro === true : null,
+            notificacion_otro_cual:
+              caso_accidente_intoxicacion_violencia === true && notificacion_otro === true
+                ? notificacionOtroCualTrim
+                : null,
+          } as any,
+        })
+      : await prisma.atenciones_salud.create({
+          data: {
+            id_historia: historia.id_historia,
+            id_cita: cita.id_cita,
+            id_profesional: cita.id_profesional,
+            id_tipo_atencion: idTipoAtencionNum,
+            id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
+            analisis: analisisTrim || null,
+            llega_por_sus_medios: llega_por_sus_medios,
+            llega_por_sus_medios_cual:
+              llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
+            estado_a_la_llegada: estadoLlegada,
+            caso_accidente_intoxicacion_violencia: caso_accidente_intoxicacion_violencia,
+            fecha_ocurrencia_evento:
+              caso_accidente_intoxicacion_violencia === true ? fechaOcurrencia : null,
+            lugar_ocurrencia_evento:
+              caso_accidente_intoxicacion_violencia === true ? lugarOcurrenciaTrim : null,
+            notificacion_policia:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_policia === true : null,
+            notificacion_cti:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_cti === true : null,
+            notificacion_acudiente:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_acudiente === true : null,
+            notificacion_otro:
+              caso_accidente_intoxicacion_violencia === true ? notificacion_otro === true : null,
+            notificacion_otro_cual:
+              caso_accidente_intoxicacion_violencia === true && notificacion_otro === true
+                ? notificacionOtroCualTrim
+                : null,
+          } as any,
+        });
+
+    const idAtencion = atencion.id_atencion;
+
+    await prisma.hc_anamnesis_atencion.upsert({
+      where: { id_atencion: idAtencion },
+      create: {
+        id_atencion: idAtencion,
+        motivo_consulta: anamnesisMotivoTrim || null,
+        enfermedad_actual: anamnesisEnfActualTrim || null,
+      },
+      update: {
+        motivo_consulta: anamnesisMotivoTrim || null,
+        enfermedad_actual: anamnesisEnfActualTrim || null,
+      },
+    });
+
+    await prisma.hc_ssr_atencion.upsert({
+      where: { id_atencion: idAtencion },
+      create: { id_atencion: idAtencion, contenido: hcSsrTrim },
+      update: { contenido: hcSsrTrim },
+    });
+
+    await prisma.hc_tamizajes_atencion.upsert({
+      where: { id_atencion: idAtencion },
+      create: { id_atencion: idAtencion, contenido: hcTamizajesTrim },
+      update: { contenido: hcTamizajesTrim },
+    });
+
+    await prisma.hc_examen_fisico_atencion.upsert({
+      where: { id_atencion: idAtencion },
+      create: { id_atencion: idAtencion, contenido: hcExamenFisicoTrim },
+      update: { contenido: hcExamenFisicoTrim },
+    });
+
+    await prisma.hc_valoracion_sistemas_atencion.upsert({
+      where: { id_atencion: idAtencion },
+      create: { id_atencion: idAtencion, contenido: hcValoracionSistemasTrim },
+      update: { contenido: hcValoracionSistemasTrim },
+    });
+
+    if (habitosData) {
+      await prisma.hc_habitos_atencion.upsert({
+        where: { id_atencion: idAtencion },
+        create: { id_atencion: idAtencion, ...habitosData } as any,
+        update: habitosData as any,
+      });
+    }
+
+    await prisma.hc_atencion_cierre.upsert({
+      where: { id_atencion: idAtencion },
+      create: {
+        id_atencion: idAtencion,
+        conducta_plan_estudio_manejo: cierreConductaTrim || null,
+        recomendaciones: cierreRecomendacionesTrim || null,
+        certificado_recomendaciones: cierreCertRecomTrim || null,
+        certificado_emitido: cierreCertEmitido,
+        certificado_opcion: cierreCertEmitido === true ? cierreCertOpcionTrim || null : null,
+        notificacion_emitida: cierreNotifEmitida,
+        seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
+        notificacion_observaciones: cierreNotifObsTrim || null,
+        seguimiento_opcion: cierreSegOpcionTrim || null,
+        seguimiento_efectivo: cierreSegEfectivo,
+        cierre_seguimiento: cierreSegCierre,
+        seguimiento_fecha: cierreSegFecha,
+      } as any,
+      update: {
+        conducta_plan_estudio_manejo: cierreConductaTrim || null,
+        recomendaciones: cierreRecomendacionesTrim || null,
+        certificado_recomendaciones: cierreCertRecomTrim || null,
+        certificado_emitido: cierreCertEmitido,
+        certificado_opcion: cierreCertEmitido === true ? cierreCertOpcionTrim || null : null,
+        notificacion_emitida: cierreNotifEmitida,
+        seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
+        notificacion_observaciones: cierreNotifObsTrim || null,
+        seguimiento_opcion: cierreSegOpcionTrim || null,
+        seguimiento_efectivo: cierreSegEfectivo,
+        cierre_seguimiento: cierreSegCierre,
+        seguimiento_fecha: cierreSegFecha,
       } as any,
     });
+
+    await prisma.hc_antecedentes_atencion.deleteMany({ where: { id_atencion: idAtencion } });
+    if (antecedentesCreate.length > 0) {
+      await prisma.hc_antecedentes_atencion.createMany({
+        data: (antecedentesCreate as any[]).map((row: any) => ({ ...row, id_atencion: idAtencion })),
+      });
+    }
+
+    await prisma.hc_antecedentes_traumaticos_atencion.upsert({
+      where: { id_atencion: idAtencion },
+      create: {
+        id_atencion: idAtencion,
+        naturaleza_lesion: naturalezaLesionTrim || null,
+        fecha_ocurrencia: fechaOcurrenciaTrauma,
+        secuelas: secuelasTrim || null,
+      },
+      update: {
+        naturaleza_lesion: naturalezaLesionTrim || null,
+        fecha_ocurrencia: fechaOcurrenciaTrauma,
+        secuelas: secuelasTrim || null,
+      },
+    });
+
+    await prisma.diagnosticos_atencion.deleteMany({ where: { id_atencion: idAtencion } });
+    if (diagnosticosCreate.length > 0) {
+      await prisma.diagnosticos_atencion.createMany({
+        data: (diagnosticosCreate as any[]).map((row: any) => ({ ...row, id_atencion: idAtencion })),
+      });
+    }
 
     // Actualizar estado de la cita según si se cerró la atención.
     // - Si hay cierre: REALIZADA
@@ -632,7 +794,10 @@ export async function POST(
       // No interrumpimos la creación de la atención si falla el update del estado
     }
 
-    return NextResponse.json({ historia, atencion }, { status: 201 });
+    return NextResponse.json(
+      { historia, atencion },
+      { status: existingAttention?.id_atencion ? 200 : 201 },
+    );
   } catch (error) {
     console.error("Error registrando atención de la cita", error);
 
@@ -749,6 +914,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
+    const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
     const idCita = Number(resolvedParams.id);
 
@@ -811,31 +977,40 @@ export async function PATCH(
       );
     }
 
-    let historia = await prisma.historias_clinicas.findFirst({
-      where: {
-        id_paciente: cita.id_paciente,
-        id_tipo_historia: tipoHistoria.id_tipo_historia,
-        estado: "activa",
-      },
-    });
-
-    if (!historia) {
-      const motivoTrim = String(anamnesis_motivo_consulta ?? "").trim();
-      historia = await prisma.historias_clinicas.create({
-        data: {
-          id_paciente: cita.id_paciente,
-          id_tipo_historia: tipoHistoria.id_tipo_historia,
-          id_profesional_responsable: cita.id_profesional,
-          motivo_consulta: motivoTrim || null,
-        },
-      });
-    }
-
     const existingAttention = await prisma.atenciones_salud.findFirst({
       where: { id_cita: idCita },
       orderBy: { id_atencion: "desc" },
       select: { id_atencion: true },
     });
+
+    let historia = null as any;
+
+    if (existingAttention?.id_atencion) {
+      const foundAttention = await prisma.atenciones_salud.findUnique({
+        where: { id_atencion: existingAttention.id_atencion },
+        select: { id_historia: true },
+      });
+
+      if (foundAttention?.id_historia) {
+        historia = await prisma.historias_clinicas.findUnique({
+          where: { id_historia: foundAttention.id_historia },
+        });
+      }
+    }
+
+    if (!historia) {
+      const motivoTrim = String(anamnesis_motivo_consulta ?? "").trim();
+      historia = await prismaAny.historias_clinicas.create({
+        data: {
+          id_paciente: cita.id_paciente,
+          id_tipo_historia: tipoHistoria.id_tipo_historia,
+          id_profesional_responsable: cita.id_profesional,
+          estado: "Finalizado",
+          id_historia_vinculada: (cita as any)?.id_historia_vinculada ?? null,
+          motivo_consulta: motivoTrim || null,
+        },
+      });
+    }
 
     const scalarUpdate: Prisma.atenciones_saludUncheckedUpdateInput = {};
 
@@ -946,6 +1121,8 @@ export async function PATCH(
           seguimiento_notificacion: String((cierre as any).seguimiento_notificacion ?? "").trim() || null,
           notificacion_observaciones: String((cierre as any).notificacion_observaciones ?? "").trim() || null,
           seguimiento_opcion: String((cierre as any).seguimiento_opcion ?? "").trim() || null,
+          seguimiento_efectivo: normalizeOptionalBoolean((cierre as any).seguimiento_efectivo),
+          cierre_seguimiento: normalizeOptionalBoolean((cierre as any).cierre_seguimiento),
           seguimiento_fecha: (cierre as any).seguimiento_fecha
             ? normalizeDateOnly((cierre as any).seguimiento_fecha)
             : null,
@@ -990,6 +1167,14 @@ export async function PATCH(
           seguimiento_opcion:
             (cierre as any).seguimiento_opcion !== undefined
               ? String((cierre as any).seguimiento_opcion ?? "").trim() || null
+              : undefined,
+          seguimiento_efectivo:
+            (cierre as any).seguimiento_efectivo !== undefined
+              ? normalizeOptionalBoolean((cierre as any).seguimiento_efectivo)
+              : undefined,
+          cierre_seguimiento:
+            (cierre as any).cierre_seguimiento !== undefined
+              ? normalizeOptionalBoolean((cierre as any).cierre_seguimiento)
               : undefined,
           seguimiento_fecha: (cierre as any).seguimiento_fecha
             ? normalizeDateOnly((cierre as any).seguimiento_fecha)
