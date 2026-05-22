@@ -93,17 +93,26 @@ export async function POST(
 
     const anamnesisMotivoTrimEarly = String(anamnesis_motivo_consulta ?? "").trim();
 
-    // Regla de negocio: toda atención desde cita debe guardarse sobre
-    // historia clínica de consulta externa.
-    const tipoHistoria = await prisma.tipos_historia_clinica.findFirst({
-      where: { codigo: "HC_CONSULTA_EXTERNA" },
-    });
+    // Usar el tipo de historia clínica configurado en la cita
+    // Si la cita no tiene tipo de historia configurado, usar HC_CONSULTA_EXTERNA por defecto
+    let tipoHistoria;
+    if (cita.id_tipo_historia) {
+      tipoHistoria = await prisma.tipos_historia_clinica.findUnique({
+        where: { id_tipo_historia: cita.id_tipo_historia },
+      });
+    } else {
+      tipoHistoria = await prisma.tipos_historia_clinica.findFirst({
+        where: { codigo: "HC_CONSULTA_EXTERNA" },
+      });
+    }
 
     if (!tipoHistoria) {
       return NextResponse.json(
         {
           message:
-            "No está configurado el tipo de historia clínica HC_CONSULTA_EXTERNA.",
+            cita.id_tipo_historia
+              ? "No se encontró el tipo de historia clínica configurado en la cita."
+              : "No está configurado el tipo de historia clínica HC_CONSULTA_EXTERNA.",
         },
         { status: 500 },
       );

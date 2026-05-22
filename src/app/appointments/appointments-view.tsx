@@ -353,6 +353,7 @@ export function AppointmentsView() {
                     <th className="px-3 py-2">Documento</th>
                     <th className="px-3 py-2">Paciente</th>
                     <th className="px-3 py-2">Tipo de cita</th>
+                    <th className="px-3 py-2">Tipo de historia</th>
                     <th className="px-3 py-2">Estado</th>
                     <th className="px-3 py-2">Sede</th>
                     <th className="px-3 py-2 text-right">Acciones</th>
@@ -378,7 +379,7 @@ export function AppointmentsView() {
 
                       rows.push(
                         <tr key={`group-${dateKey}`} className="bg-slate-50">
-                          <td colSpan={8} className="px-3 py-2 text-[11px] font-semibold text-slate-700">
+                          <td colSpan={9} className="px-3 py-2 text-[11px] font-semibold text-slate-700">
                             {new Date(`${dateKey}T00:00:00`).toLocaleDateString()}
                           </td>
                         </tr>,
@@ -421,6 +422,7 @@ export function AppointmentsView() {
                             <td className="px-3 py-2">{cita.paciente_documento}</td>
                             <td className="px-3 py-2">{cita.paciente_nombre}</td>
                             <td className="px-3 py-2">{cita.tipo_cita ?? "No registrada"}</td>
+                            <td className="px-3 py-2">{cita.tipo_historia ?? "No registrada"}</td>
                             <td className="px-3 py-2">
                               <span className={getEstadoCitaBadgeClasses(cita.estado_cita)}>
                                 {cita.estado_cita ?? "No registrado"}

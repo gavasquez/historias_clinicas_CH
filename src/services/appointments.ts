@@ -89,6 +89,7 @@ export interface AppointmentDetail {
   id_estado_cita: number | null;
   id_modalidad_atencion: number | null;
   id_programa_salud: number | null;
+  id_tipo_historia: number | null;
   fecha_hora_inicio: string; // ISO string
   fecha_hora_fin: string | null; // ISO string or null
   seguimiento: boolean;

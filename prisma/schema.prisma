@@ -253,6 +253,7 @@ model citas {
   id_estado_cita                 Int?
   id_modalidad_atencion          Int?
   id_programa_salud              Int?
+  id_tipo_historia               Int?
   fecha_hora_inicio              DateTime              @db.Timestamp(6)
   fecha_hora_fin                 DateTime?             @db.Timestamp(6)
   seguimiento                    Boolean               @default(false)
@@ -265,6 +266,7 @@ model citas {
   profesionales_salud            profesionales_salud   @relation(fields: [id_profesional], references: [id_profesional])
   sedes                          sedes?                @relation(fields: [id_sede], references: [id_sede])
   tipos_cita                     tipos_cita?           @relation(fields: [id_tipo_cita], references: [id_tipo_cita])
+  tipos_historia_clinica         tipos_historia_clinica? @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
   modalidades_atencion           modalidades_atencion? @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion])
   programas_salud                programas_salud?      @relation(fields: [id_programa_salud], references: [id_programa_salud])
   tipos_atencion                 tipos_atencion?       @relation(fields: [tipos_atencionId_tipo_atencion], references: [id_tipo_atencion])
@@ -769,6 +771,7 @@ model tipos_historia_clinica {
   codigo             String               @unique @db.VarChar(50)
   descripcion        String               @db.VarChar(150)
   historias_clinicas historias_clinicas[]
+  citas              citas[]
 }
 
 model tipos_recomendacion_medica {

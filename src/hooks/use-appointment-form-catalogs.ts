@@ -12,6 +12,8 @@ import {
   type ModalidadAtencion,
   fetchProgramasSalud,
   type ProgramaSalud,
+  fetchTiposHistoriaClinica,
+  type TipoHistoriaClinica,
 } from "@/services/catalogs";
 import type { PatientsResponse } from "@/types/patients";
 import type { ProfessionalsResponse } from "@/types/professionals";
@@ -55,6 +57,12 @@ export function useAppointmentFormCatalogs() {
       queryFn: fetchProgramasSalud,
     });
 
+  const { data: tiposHistoriaData, isLoading: loadingTiposHistoria } =
+    useQuery<TipoHistoriaClinica[]>({
+      queryKey: ["tipos-historia-select"],
+      queryFn: fetchTiposHistoriaClinica,
+    });
+
   return {
     patientsData,
     professionalsData,
@@ -63,6 +71,7 @@ export function useAppointmentFormCatalogs() {
     estadosCitaData,
     modalidadesAtencionData,
     programasSaludData,
+    tiposHistoriaData,
     loadingPatients,
     loadingProfessionals,
     loadingSedes,
@@ -70,5 +79,6 @@ export function useAppointmentFormCatalogs() {
     loadingEstadosCita,
     loadingModalidadesAtencion,
     loadingProgramasSalud,
+    loadingTiposHistoria,
   };
 }

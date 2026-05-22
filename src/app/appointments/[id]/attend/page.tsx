@@ -16,6 +16,7 @@ import {
   fetchTiposCita,
   fetchEstadosCita,
   fetchProgramasSalud,
+  fetchTiposHistoriaClinica,
   type ModalidadAtencion,
 } from "@/services/catalogs";
 import { apiClient } from "@/lib/api";
@@ -34,6 +35,17 @@ import { AttendTabs } from "./components/Tabs";
 type AttendPayloadInput = {
   citaData: AppointmentDetail | undefined;
   form: AttentionFormState;
+  simpleForm: {
+    motivoAtencion: string;
+    analisis: string;
+    planManejo: string;
+    seguimiento: string;
+    seguimientoOpcion: string;
+    seguimientoEfectivo: string;
+    cierreSeguimiento: string;
+    seguimientoFecha: string;
+  };
+  isRegAtencionSalud: boolean;
   observacionAntecedentesPersonal: string;
   observacionAntecedentesFamiliar: string;
   antecedentesTraumaticos: AntecedentesTraumaticosState;
@@ -122,6 +134,8 @@ function buildAttendPayload(input: AttendPayloadInput) {
   const {
     citaData,
     form,
+    simpleForm,
+    isRegAtencionSalud,
     observacionAntecedentesPersonal,
     observacionAntecedentesFamiliar,
     antecedentesTraumaticos,
@@ -132,11 +146,19 @@ function buildAttendPayload(input: AttendPayloadInput) {
     throw new Error("La cita no tiene tipo de cita para determinar el tipo de atención.");
   }
 
+  // En el flujo simplificado, usar datos de simpleForm, si no, usar form
+  const analisisValue = isRegAtencionSalud ? simpleForm.analisis : form.analisis;
+  const planManejoValue = isRegAtencionSalud ? simpleForm.planManejo : form.conducta_plan_estudio_manejo;
+  const seguimientoOpcionValue = isRegAtencionSalud ? simpleForm.seguimientoOpcion : form.seguimiento_opcion;
+  const seguimientoEfectivoValue = isRegAtencionSalud ? simpleForm.seguimientoEfectivo : form.seguimiento_efectivo;
+  const cierreSeguimientoValue = isRegAtencionSalud ? simpleForm.cierreSeguimiento : form.cierre_seguimiento;
+  const seguimientoFechaValue = isRegAtencionSalud ? simpleForm.seguimientoFecha : form.seguimiento_fecha;
+
   const llegaPorSusMediosBool = form.llega_por_sus_medios === "SI";
   const casoBool = form.caso_accidente_intoxicacion_violencia === "SI";
 
   const hasCierre =
-    form.conducta_plan_estudio_manejo.trim() ||
+    planManejoValue.trim() ||
     form.atencion_recomendaciones.trim() ||
     form.certificado_recomendaciones.trim() ||
     form.certificado_emitido.trim() ||
@@ -144,10 +166,10 @@ function buildAttendPayload(input: AttendPayloadInput) {
     form.notificacion_emitida.trim() ||
     form.notificacion_observaciones.trim() ||
     form.seguimiento_notificacion.trim() ||
-    form.seguimiento_opcion.trim() ||
-    form.seguimiento_efectivo.trim() ||
-    form.cierre_seguimiento.trim() ||
-    form.seguimiento_fecha.trim();
+    seguimientoOpcionValue.trim() ||
+    seguimientoEfectivoValue.trim() ||
+    cierreSeguimientoValue.trim() ||
+    seguimientoFechaValue.trim();
 
   const hasAntecedentes =
     observacionAntecedentesPersonal.trim() || observacionAntecedentesFamiliar.trim();
@@ -158,12 +180,12 @@ function buildAttendPayload(input: AttendPayloadInput) {
     antecedentesTraumaticos.secuelas.trim();
 
   return {
-    anamnesis_motivo_consulta: form.anamnesis_motivo_consulta || undefined,
+    anamnesis_motivo_consulta: isRegAtencionSalud ? simpleForm.motivoAtencion : form.anamnesis_motivo_consulta || undefined,
     anamnesis_enfermedad_actual: form.anamnesis_enfermedad_actual || undefined,
-    analisis: form.analisis || undefined,
+    analisis: analisisValue || undefined,
     hc_atencion_cierre: hasCierre
       ? {
-          conducta_plan_estudio_manejo: form.conducta_plan_estudio_manejo || undefined,
+          conducta_plan_estudio_manejo: planManejoValue || undefined,
           recomendaciones: form.atencion_recomendaciones || undefined,
           certificado_recomendaciones: form.certificado_recomendaciones || undefined,
           certificado_emitido:
@@ -183,20 +205,20 @@ function buildAttendPayload(input: AttendPayloadInput) {
           seguimiento_notificacion:
             form.notificacion_emitida === "SI" ? form.seguimiento_notificacion || undefined : undefined,
           notificacion_observaciones: form.notificacion_observaciones || undefined,
-          seguimiento_opcion: form.seguimiento_opcion || undefined,
+          seguimiento_opcion: seguimientoOpcionValue || undefined,
           seguimiento_efectivo:
-            form.seguimiento_efectivo === "SI"
+            seguimientoEfectivoValue === "SI"
               ? true
-              : form.seguimiento_efectivo === "NO"
+              : seguimientoEfectivoValue === "NO"
                 ? false
                 : undefined,
           cierre_seguimiento:
-            form.cierre_seguimiento === "SI"
+            cierreSeguimientoValue === "SI"
               ? true
-              : form.cierre_seguimiento === "NO"
+              : cierreSeguimientoValue === "NO"
                 ? false
                 : undefined,
-          seguimiento_fecha: form.seguimiento_fecha || undefined,
+          seguimiento_fecha: seguimientoFechaValue || undefined,
         }
       : undefined,
     antecedentes: hasAntecedentes
@@ -243,9 +265,20 @@ function buildAttendPayload(input: AttendPayloadInput) {
 }
 
 function isTabComplete(input: {
-  activeTab: AttendTabKey;
+  activeTab: AttendTabKey | "NOTA_ATENCION";
   citaData: AppointmentDetail | undefined;
   form: AttentionFormState;
+  simpleForm: {
+    motivoAtencion: string;
+    analisis: string;
+    planManejo: string;
+    seguimiento: string;
+    seguimientoOpcion: string;
+    seguimientoEfectivo: string;
+    cierreSeguimiento: string;
+    seguimientoFecha: string;
+  };
+  isRegAtencionSalud: boolean;
   observacionAntecedentesPersonal: string;
   observacionAntecedentesFamiliar: string;
   antecedentesTraumaticos: AntecedentesTraumaticosState;
@@ -256,12 +289,43 @@ function isTabComplete(input: {
     activeTab,
     citaData,
     form,
+    simpleForm,
+    isRegAtencionSalud,
     observacionAntecedentesPersonal,
     observacionAntecedentesFamiliar,
     antecedentesTraumaticos,
     diagnosticosDraft,
     attentionId,
   } = input;
+
+  // Si es flujo simplificado, no validar pestañas del flujo completo
+  if (isRegAtencionSalud && activeTab !== "NOTA_ATENCION" && activeTab !== "DIAGNOSTICOS") {
+    return { ok: true };
+  }
+
+  // Si es flujo completo, no validar pestañas del flujo simplificado
+  if (!isRegAtencionSalud && activeTab === "NOTA_ATENCION") {
+    return { ok: true };
+  }
+
+  if (activeTab === "NOTA_ATENCION") {
+    if (!simpleForm.motivoAtencion.trim()) {
+      return { ok: false, message: "Debe diligenciar el motivo de atención." };
+    }
+    if (!simpleForm.analisis.trim()) {
+      return { ok: false, message: "Debe diligenciar la observación / análisis." };
+    }
+    if (!simpleForm.planManejo.trim()) {
+      return { ok: false, message: "Debe diligenciar el plan de manejo." };
+    }
+    if (!simpleForm.seguimiento.trim()) {
+      return { ok: false, message: "Debe seleccionar si es seguimiento." };
+    }
+    if (simpleForm.seguimiento === "SI" && !simpleForm.seguimientoOpcion.trim()) {
+      return { ok: false, message: "Debe seleccionar el tipo de seguimiento." };
+    }
+    return { ok: true };
+  }
 
   if (activeTab === "INGRESO") {
     const msg = validateIngresoTab({ citaData, form });
@@ -357,7 +421,10 @@ function isTabComplete(input: {
   }
 
   if (activeTab === "DIAGNOSTICOS") {
-    if (!form.analisis.trim()) {
+    // En el flujo simplificado (REG_ATENCION_SALUD), el análisis está en simpleForm
+    // En el flujo completo, está en form.analisis
+    const analisisValue = simpleForm.analisis.trim() || form.analisis.trim();
+    if (!analisisValue) {
       return { ok: false, message: "Debe diligenciar el análisis." };
     }
 
@@ -555,11 +622,25 @@ export default function AttendAppointmentPage() {
     notificacion_otro_cual: "",
   });
 
+  // Estados para el formulario simplificado (REG_ATENCION_SALUD)
+  const [simpleForm, setSimpleForm] = useState({
+    motivoAtencion: "",
+    analisis: "",
+    planManejo: "",
+    seguimiento: "",
+    seguimientoOpcion: "",
+    seguimientoEfectivo: "",
+    cierreSeguimiento: "",
+    seguimientoFecha: "",
+  });
+
   const saveDraftToDb = async () => {
     if (!id) return;
     const payload = buildAttendPayload({
       citaData,
       form,
+      simpleForm,
+      isRegAtencionSalud,
       observacionAntecedentesPersonal,
       observacionAntecedentesFamiliar,
       antecedentesTraumaticos,
@@ -571,16 +652,18 @@ export default function AttendAppointmentPage() {
 
   const handleWizardNav = async (direction: "back" | "next") => {
     if (savingDraft) return;
-    const idx = tabsOrder.indexOf(activeTab);
+    const idx = tabsOrder.indexOf(activeTab as any);
     const nextIdx = direction === "next" ? idx + 1 : idx - 1;
     const targetTab = tabsOrder[nextIdx];
     if (!targetTab) return;
 
     if (direction === "next") {
       const completion = isTabComplete({
-        activeTab,
+        activeTab: activeTab as any,
         citaData,
         form,
+        simpleForm,
+        isRegAtencionSalud,
         observacionAntecedentesPersonal,
         observacionAntecedentesFamiliar,
         antecedentesTraumaticos,
@@ -591,6 +674,20 @@ export default function AttendAppointmentPage() {
       if (!completion.ok) {
         setError(completion.message ?? "Debes completar la sección antes de continuar.");
         return;
+      }
+
+      // Sincronizar datos del formulario simplificado al formulario principal
+      // cuando se navega de NOTA_ATENCION a DIAGNOSTICOS en el flujo simplificado
+      if (isRegAtencionSalud && activeTab === "NOTA_ATENCION" && targetTab === "DIAGNOSTICOS") {
+        setForm((prev) => ({
+          ...prev,
+          analisis: simpleForm.analisis,
+          conducta_plan_estudio_manejo: simpleForm.planManejo,
+          seguimiento_opcion: simpleForm.seguimientoOpcion,
+          seguimiento_efectivo: (simpleForm.seguimientoEfectivo || "") as AttentionFormState["seguimiento_efectivo"],
+          cierre_seguimiento: (simpleForm.cierreSeguimiento || "") as AttentionFormState["cierre_seguimiento"],
+          seguimiento_fecha: simpleForm.seguimientoFecha,
+        } as AttentionFormState));
       }
     }
 
@@ -664,11 +761,11 @@ export default function AttendAppointmentPage() {
     habitos_otras_actividades: "",
   });
   const [tamizajesForm, setTamizajesForm] = useState<TamizajeRowState[]>(DEFAULT_TAMIZAJES);
-  const [activeTab, setActiveTab] = useState<AttendTabKey>("INGRESO");
+  const [activeTab, setActiveTab] = useState<AttendTabKey | "NOTA_ATENCION">("INGRESO");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const tabsOrder: AttendTabKey[] = [
+  const tabsOrderFull: AttendTabKey[] = [
     "INGRESO",
     "ANAMNESIS",
     "ANTECEDENTES",
@@ -678,8 +775,15 @@ export default function AttendAppointmentPage() {
     "ATENCION",
   ];
 
-  const canGoBack = tabsOrder.indexOf(activeTab) > 0;
-  const canGoNext = tabsOrder.indexOf(activeTab) >= 0 && tabsOrder.indexOf(activeTab) < tabsOrder.length - 1;
+  const tabsOrderSimple: ("NOTA_ATENCION" | "DIAGNOSTICOS")[] = [
+    "NOTA_ATENCION",
+    "DIAGNOSTICOS",
+  ];
+
+  const [tabsOrder, setTabsOrder] = useState<(AttendTabKey | "NOTA_ATENCION")[]>(tabsOrderFull);
+
+  const canGoBack = tabsOrder.indexOf(activeTab as any) > 0;
+  const canGoNext = tabsOrder.indexOf(activeTab as any) >= 0 && tabsOrder.indexOf(activeTab as any) < tabsOrder.length - 1;
 
   useEffect(() => {
     setIsClient(true);
@@ -702,17 +806,6 @@ export default function AttendAppointmentPage() {
       queryFn: () => getAppointmentById(String(id)),
     },
   );
-
-  const activeTabCompletion = isTabComplete({
-    activeTab,
-    citaData,
-    form,
-    observacionAntecedentesPersonal,
-    observacionAntecedentesFamiliar,
-    antecedentesTraumaticos,
-    diagnosticosDraft,
-    attentionId,
-  });
 
   useEffect(() => {
     if (!isClient) return;
@@ -1068,6 +1161,51 @@ export default function AttendAppointmentPage() {
     queryFn: fetchProgramasSalud,
   });
 
+  const { data: tiposHistoriaData } = useQuery<any[]>({
+    queryKey: ["tipos-historia-clinica"],
+    queryFn: fetchTiposHistoriaClinica,
+  });
+
+  // Determinar si la cita es de tipo REG_ATENCION_SALUD
+  const isRegAtencionSalud = (() => {
+    if (!citaData?.id_tipo_historia) return false;
+    const tipoHistoria = (tiposHistoriaData ?? []).find(
+      (t: any) => t.id_tipo_historia === citaData.id_tipo_historia
+    );
+    return tipoHistoria?.codigo === "REG_ATENCION_SALUD";
+  })();
+
+  // Cambiar al tab inicial según el tipo de historia
+  useEffect(() => {
+    if (isRegAtencionSalud && activeTab !== "NOTA_ATENCION" && activeTab !== "DIAGNOSTICOS") {
+      setActiveTab("NOTA_ATENCION");
+    } else if (!isRegAtencionSalud && activeTab === "NOTA_ATENCION") {
+      setActiveTab("INGRESO");
+    }
+  }, [isRegAtencionSalud]);
+
+  // Actualizar el orden de tabs según el tipo de historia
+  useEffect(() => {
+    if (isRegAtencionSalud) {
+      setTabsOrder(tabsOrderSimple);
+    } else {
+      setTabsOrder(tabsOrderFull);
+    }
+  }, [isRegAtencionSalud]);
+
+  const activeTabCompletion = isTabComplete({
+    activeTab: activeTab as any,
+    citaData,
+    form,
+    simpleForm,
+    isRegAtencionSalud,
+    observacionAntecedentesPersonal,
+    observacionAntecedentesFamiliar,
+    antecedentesTraumaticos,
+    diagnosticosDraft,
+    attentionId,
+  });
+
   const { data: pacienteData } = useQuery<any>({
     queryKey: ["appointment-attend-patient", citaData?.id_paciente],
     enabled: !!citaData?.id_paciente,
@@ -1116,6 +1254,8 @@ export default function AttendAppointmentPage() {
       const payload = buildAttendPayload({
         citaData,
         form,
+        simpleForm,
+        isRegAtencionSalud,
         observacionAntecedentesPersonal,
         observacionAntecedentesFamiliar,
         antecedentesTraumaticos,
@@ -1204,6 +1344,14 @@ export default function AttendAppointmentPage() {
   const tipoCitaDescripcion = (() => {
     if (!citaData.id_tipo_cita) return "No registrada";
     const found = (tiposCitaData ?? []).find((t: any) => t.id_tipo_cita === citaData.id_tipo_cita);
+    return found?.descripcion ?? "No registrada";
+  })();
+
+  const tipoHistoriaDescripcion = (() => {
+    if (!citaData.id_tipo_historia) return "No registrada";
+    const found = (tiposHistoriaData ?? []).find(
+      (t: any) => t.id_tipo_historia === citaData.id_tipo_historia
+    );
     return found?.descripcion ?? "No registrada";
   })();
 
@@ -1418,6 +1566,9 @@ export default function AttendAppointmentPage() {
                 <p className="text-slate-700">
                   <span className="font-semibold">Tipo de cita:</span> {tipoCitaDescripcion}
                 </p>
+                <p className="text-slate-700">
+                  <span className="font-semibold">Tipo de historia:</span> {tipoHistoriaDescripcion}
+                </p>
               </div>
             </div>
 
@@ -1472,7 +1623,7 @@ export default function AttendAppointmentPage() {
         onSubmit={handleSubmit}
         className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
       >
-        <AttendTabs activeTab={activeTab} setActiveTab={setActiveTab} allowDirectNav={false} />
+        <AttendTabs activeTab={activeTab} setActiveTab={setActiveTab} allowDirectNav={false} simpleMode={isRegAtencionSalud} />
 
         {error && (
           <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -1518,6 +1669,148 @@ export default function AttendAppointmentPage() {
 
           {activeTab === "REVISION_SISTEMAS" && (
             <RevisionPorSistemasTab form={form} setForm={setForm} />
+          )}
+
+          {activeTab === "NOTA_ATENCION" && (
+            <div className="space-y-3">
+              <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">NOTA DE ATENCIÓN</div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700">Motivo de atención</label>
+                <input
+                  type="text"
+                  value={simpleForm.motivoAtencion}
+                  onChange={(e) => setSimpleForm({ ...simpleForm, motivoAtencion: e.target.value })}
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                  placeholder="Motivo de atención"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700">Observación / Análisis</label>
+                <textarea
+                  value={simpleForm.analisis}
+                  onChange={(e) => setSimpleForm({ ...simpleForm, analisis: e.target.value })}
+                  rows={4}
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700">Plan de manejo</label>
+                <textarea
+                  value={simpleForm.planManejo}
+                  onChange={(e) => setSimpleForm({ ...simpleForm, planManejo: e.target.value })}
+                  rows={4}
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
+                />
+              </div>
+
+              <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">SEGUIMIENTO</div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700">
+                    Seguimiento <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={simpleForm.seguimiento}
+                    onChange={(e) => setSimpleForm({ ...simpleForm, seguimiento: e.target.value })}
+                    className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                  >
+                    <option value="">Seleccione...</option>
+                    <option value="SI">Sí</option>
+                    <option value="NO">No</option>
+                  </select>
+                </div>
+
+                {simpleForm.seguimiento === "SI" && (
+                  <>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Tipo de seguimiento <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={simpleForm.seguimientoOpcion}
+                        onChange={(e) => setSimpleForm({ ...simpleForm, seguimientoOpcion: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                      >
+                        <option value="">Seleccione...</option>
+                        <option value="CONDICIONES_CRONICAS">CONDICIONES CRÓNICAS</option>
+                        <option value="SITUACION_EN_SALUD">SITUACIÓN EN SALUD</option>
+                        <option value="NO_APLICA">NO APLICA</option>
+                      </select>
+                    </div>
+
+                    {(simpleForm.seguimientoOpcion === "CONDICIONES_CRONICAS" || simpleForm.seguimientoOpcion === "SITUACION_EN_SALUD") && (
+                      <>
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold text-slate-700">Seguimiento efectivo</p>
+                          <div className="flex flex-wrap gap-4 text-xs text-slate-700">
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="seguimiento_efectivo"
+                                checked={simpleForm.seguimientoEfectivo === "SI"}
+                                onChange={() => setSimpleForm({ ...simpleForm, seguimientoEfectivo: "SI" })}
+                                className="h-3 w-3"
+                              />
+                              <span>Sí</span>
+                            </label>
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="seguimiento_efectivo"
+                                checked={simpleForm.seguimientoEfectivo === "NO"}
+                                onChange={() => setSimpleForm({ ...simpleForm, seguimientoEfectivo: "NO" })}
+                                className="h-3 w-3"
+                              />
+                              <span>No</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold text-slate-700">Cierre seguimiento</p>
+                          <div className="flex flex-wrap gap-4 text-xs text-slate-700">
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="cierre_seguimiento"
+                                checked={simpleForm.cierreSeguimiento === "SI"}
+                                onChange={() => setSimpleForm({ ...simpleForm, cierreSeguimiento: "SI" })}
+                                className="h-3 w-3"
+                              />
+                              <span>Sí</span>
+                            </label>
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="cierre_seguimiento"
+                                checked={simpleForm.cierreSeguimiento === "NO"}
+                                onChange={() => setSimpleForm({ ...simpleForm, cierreSeguimiento: "NO" })}
+                                className="h-3 w-3"
+                              />
+                              <span>No</span>
+                            </label>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-700">Fecha</label>
+                      <input
+                        type="date"
+                        value={simpleForm.seguimientoFecha}
+                        onChange={(e) => setSimpleForm({ ...simpleForm, seguimientoFecha: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           )}
 
           {activeTab === "DIAGNOSTICOS" && (

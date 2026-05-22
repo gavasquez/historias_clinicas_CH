@@ -706,11 +706,24 @@ export default function PatientRecordsPage() {
                                 </div>
                               </td>
                               <td className="px-3 py-2">
-                                { typeof h.last_attention_seguimiento === "boolean"
-                                  ? (h.last_attention_seguimiento ? "SI" : "NO")
-                                : (h.estado === "Seguimiento" ? "SI" : "NO")
-                              }
-                            </td>
+                                {(() => {
+                                  const seguimientoValue = typeof h.last_attention_seguimiento === "boolean"
+                                    ? (h.last_attention_seguimiento ? "SI" : "NO")
+                                    : (h.estado === "Seguimiento" ? "SI" : "NO");
+                                  const isSeguimiento = seguimientoValue === "SI";
+                                  return (
+                                    <span
+                                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+                                        isSeguimiento
+                                          ? "bg-amber-100 text-amber-800 ring-amber-300"
+                                          : "bg-red-100 text-red-800 ring-red-300"
+                                      }`}
+                                    >
+                                      {seguimientoValue}
+                                    </span>
+                                  );
+                                })()}
+                              </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
                                 <button
@@ -739,7 +752,7 @@ export default function PatientRecordsPage() {
                           </tr>
                           
                           {/* Filas de historias hijas (solo si está expandido) */}
-                          {h.hasChildren && expandedHistories[h.id_historia] && h.children.map((child) => (
+                          {h.hasChildren && expandedHistories[h.id_historia] && h.children.map((child: any) => (
                             <tr
                               key={`child-${child.id_historia}`}
                               className="bg-slate-50/50 cursor-pointer hover:bg-slate-50/80"
@@ -814,10 +827,23 @@ export default function PatientRecordsPage() {
                                 </div>
                               </td>
                               <td className="px-3 py-2">
-                                { typeof child.last_attention_seguimiento === "boolean"
-                                  ? (child.last_attention_seguimiento ? "SI" : "NO")
-                                  : (child.estado === "Seguimiento" ? "SI" : "NO")
-                                }
+                                {(() => {
+                                  const seguimientoValue = typeof child.last_attention_seguimiento === "boolean"
+                                    ? (child.last_attention_seguimiento ? "SI" : "NO")
+                                    : (child.estado === "Seguimiento" ? "SI" : "NO");
+                                  const isSeguimiento = seguimientoValue === "SI";
+                                  return (
+                                    <span
+                                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+                                        isSeguimiento
+                                          ? "bg-amber-100 text-amber-800 ring-amber-300"
+                                          : "bg-red-100 text-red-800 ring-red-300"
+                                      }`}
+                                    >
+                                      {seguimientoValue}
+                                    </span>
+                                  );
+                                })()}
                               </td>
                               <td className="px-3 py-2">
                                 <div className="flex items-center gap-2">

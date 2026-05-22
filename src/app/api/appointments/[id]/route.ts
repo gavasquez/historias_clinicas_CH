@@ -49,6 +49,7 @@ export async function GET(
       id_estado_cita: cita.id_estado_cita,
       id_modalidad_atencion: cita.id_modalidad_atencion,
       id_programa_salud: (cita as any).id_programa_salud ?? null,
+      id_tipo_historia: (cita as any).id_tipo_historia ?? null,
       fecha_hora_inicio: cita.fecha_hora_inicio.toISOString(),
       fecha_hora_fin: cita.fecha_hora_fin ? cita.fecha_hora_fin.toISOString() : null,
       seguimiento: (cita as any).seguimiento ?? false,

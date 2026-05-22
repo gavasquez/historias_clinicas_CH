@@ -4,6 +4,7 @@ export interface ProfessionalAppointmentListItem {
   fecha_hora_fin: string | null; // ISO string or null
   tipo_cita: string | null;
   estado_cita: string | null;
+  tipo_historia: string | null;
   paciente_nombre: string;
   paciente_documento: string;
 }

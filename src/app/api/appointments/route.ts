@@ -105,6 +105,7 @@ export async function GET(request: NextRequest) {
         },
         tipos_cita: true,
         estados_cita: true,
+        tipos_historia_clinica: true,
         sedes: true,
       },
       orderBy: {
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
       fecha_hora_fin: cita.fecha_hora_fin ? cita.fecha_hora_fin.toISOString() : null,
       tipo_cita: cita.tipos_cita?.descripcion ?? null,
       estado_cita: cita.estados_cita?.descripcion ?? null,
+      tipo_historia: cita.tipos_historia_clinica?.descripcion ?? null,
       paciente_nombre: `${cita.pacientes.nombres} ${cita.pacientes.apellidos}`.trim(),
       paciente_documento: cita.pacientes.numero_documento,
       profesional_nombre: cita.profesionales_salud.usuarios.nombre_completo,
@@ -155,6 +157,7 @@ export async function POST(request: NextRequest) {
       canal_recordatorio,
       id_modalidad_atencion,
       id_programa_salud,
+      id_tipo_historia,
       seguimiento,
       tipo_seguimiento,
       id_historia_vinculada,
@@ -200,10 +203,24 @@ export async function POST(request: NextRequest) {
     const idModalidadAtencionNum =
       id_modalidad_atencion != null ? Number(id_modalidad_atencion) : null;
     const idProgramaSaludNum = Number(id_programa_salud);
+    const idTipoHistoriaNum = id_tipo_historia != null ? Number(id_tipo_historia) : null;
 
     if (!Number.isInteger(idProgramaSaludNum) || idProgramaSaludNum <= 0) {
       return NextResponse.json(
         { message: "El programa transversal es obligatorio" },
+        { status: 400 },
+      );
+    }
+
+    if (idTipoHistoriaNum === null) {
+      return NextResponse.json(
+        { message: "El tipo de historia clínica es obligatorio" },
+        { status: 400 },
+      );
+    }
+    if (!Number.isInteger(idTipoHistoriaNum) || idTipoHistoriaNum <= 0) {
+      return NextResponse.json(
+        { message: "El tipo de historia clínica es inválido" },
         { status: 400 },
       );
     }
@@ -354,6 +371,7 @@ export async function POST(request: NextRequest) {
             ? idModalidadAtencionNum
             : null,
         id_programa_salud: idProgramaSaludNum,
+        id_tipo_historia: idTipoHistoriaNum,
         fecha_hora_inicio: fechaInicio,
         fecha_hora_fin: fechaFin,
         seguimiento: seguimientoBool,

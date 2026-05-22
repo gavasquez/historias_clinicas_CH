@@ -25,6 +25,7 @@ export default function NewAppointmentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const profesionalIdFromQuery = searchParams.get("profesionalId");
+  const patientIdFromQuery = searchParams.get("patientId");
 
   const [isClient, setIsClient] = useState(false);
 
@@ -43,13 +44,14 @@ export default function NewAppointmentPage() {
   type SimpleSelectOption = { value: string; label: string };
 
   const [form, setForm] = useState<AppointmentFormState>({
-    id_paciente: "",
+    id_paciente: patientIdFromQuery ? String(patientIdFromQuery) : "",
     id_profesional: profesionalIdFromQuery ? String(profesionalIdFromQuery) : "",
     id_sede: "",
     id_tipo_cita: "",
     id_estado_cita: "",
     id_modalidad_atencion: "",
     id_programa_salud: "",
+    id_tipo_historia: "",
     fecha_hora_inicio: "",
     fecha_hora_fin: "",
     seguimiento: "NO",
@@ -420,6 +422,7 @@ export default function NewAppointmentPage() {
     estadosCitaData,
     modalidadesAtencionData,
     programasSaludData,
+    tiposHistoriaData,
   } = useAppointmentFormCatalogs();
 
   const patientsQuery = useQuery({
@@ -463,6 +466,7 @@ export default function NewAppointmentPage() {
         ? Number(form.id_modalidad_atencion)
         : undefined;
       const idProgramaSaludNum = form.id_programa_salud ? Number(form.id_programa_salud) : undefined;
+      const idTipoHistoriaNum = form.id_tipo_historia ? Number(form.id_tipo_historia) : undefined;
 
       const seguimientoBool = form.seguimiento === "SI";
 
@@ -490,6 +494,7 @@ export default function NewAppointmentPage() {
         id_estado_cita: idEstadoCitaNum,
         id_modalidad_atencion: idModalidadAtencionNum,
         id_programa_salud: idProgramaSaludNum,
+        id_tipo_historia: idTipoHistoriaNum,
         seguimiento: seguimientoBool,
         id_historia_vinculada:
           seguimientoBool && form.id_historia_vinculada.trim()
@@ -530,8 +535,8 @@ export default function NewAppointmentPage() {
     }
 
     if (step === 2) {
-      if (!form.id_programa_salud.trim() || !form.id_modalidad_atencion.trim() || !form.id_tipo_cita.trim()) {
-        setError("Debe completar programa transversal, modalidad de atención y tipo de cita.");
+      if (!form.id_programa_salud.trim() || !form.id_modalidad_atencion.trim() || !form.id_tipo_cita.trim() || !form.id_tipo_historia.trim()) {
+        setError("Debe completar programa transversal, modalidad de atención, tipo de cita y tipo de historia clínica.");
         return;
       }
 
@@ -592,7 +597,8 @@ export default function NewAppointmentPage() {
       !form.id_modalidad_atencion.trim() ||
       !form.id_profesional.trim() ||
       !form.id_sede.trim() ||
-      !form.id_tipo_cita.trim()
+      !form.id_tipo_cita.trim() ||
+      !form.id_tipo_historia.trim()
     ) {
       setError("Verifique que todos los datos obligatorios estén completos.");
       return;
@@ -706,6 +712,13 @@ export default function NewAppointmentPage() {
     const id = form.id_tipo_cita ? Number(form.id_tipo_cita) : null;
     if (!id) return "";
     const t = (tiposCitaData ?? []).find((x) => x.id_tipo_cita === id);
+    return t?.descripcion ?? "";
+  })();
+
+  const selectedTipoHistoriaLabel = (() => {
+    const id = form.id_tipo_historia ? Number(form.id_tipo_historia) : null;
+    if (!id) return "";
+    const t = (tiposHistoriaData ?? []).find((x) => x.id_tipo_historia === id);
     return t?.descripcion ?? "";
   })();
 
@@ -945,6 +958,39 @@ export default function NewAppointmentPage() {
                       setForm((prev) => ({
                         ...prev,
                         id_tipo_cita: selected ? String(selected.value) : "",
+                      }));
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-600">Tipo de historia clínica <span className="text-red-500">*</span></label>
+                  <Select
+                    isClearable
+                    isSearchable
+                    classNamePrefix="react-select"
+                    menuPortalTarget={selectMenuPortalTarget}
+                    menuPosition="fixed"
+                    styles={selectStyles}
+                    placeholder="Seleccione el tipo de historia clínica"
+                    options={(tiposHistoriaData ?? []).map((tipo) => ({
+                      value: tipo.id_tipo_historia,
+                      label: tipo.descripcion,
+                    }))}
+                    value={(() => {
+                      const id = form.id_tipo_historia ? Number(form.id_tipo_historia) : null;
+                      if (!id) return null;
+                      const opts = (tiposHistoriaData ?? []).map((tipo) => ({
+                        value: tipo.id_tipo_historia,
+                        label: tipo.descripcion,
+                      }));
+                      return opts.find((o) => o.value === id) ?? null;
+                    })()}
+                    onChange={(option: any) => {
+                      const selected = option as SelectOption | null;
+                      setForm((prev) => ({
+                        ...prev,
+                        id_tipo_historia: selected ? String(selected.value) : "",
                       }));
                     }}
                   />
@@ -1411,6 +1457,9 @@ export default function NewAppointmentPage() {
                     </div>
                     <div>
                       <span className="font-semibold">Tipo de cita:</span> {selectedTipoCitaLabel || "-"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Tipo de historia:</span> {selectedTipoHistoriaLabel || "-"}
                     </div>
                     <div>
                       <span className="font-semibold">Sede:</span> {selectedSedeName || "-"}

@@ -6,6 +6,7 @@ export interface AppointmentFormState {
   id_estado_cita: string;
   id_modalidad_atencion: string;
   id_programa_salud: string;
+  id_tipo_historia: string;
   fecha_hora_inicio: string;
   fecha_hora_fin: string;
   seguimiento: "SI" | "NO";
