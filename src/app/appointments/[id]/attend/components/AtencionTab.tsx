@@ -147,7 +147,7 @@ export function AtencionTab({
 
         <div className="space-y-2">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-slate-600">¿Requiere notificación?</p>
+            <p className="text-xs font-medium text-slate-600">¿Requiere algún tipo notificación?</p>
             <div className="flex flex-wrap gap-4 text-xs text-slate-700">
               <label className="inline-flex items-center gap-2">
                 <input

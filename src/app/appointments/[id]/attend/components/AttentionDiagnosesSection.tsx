@@ -1,20 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   fetchDiagnosisConfirmationTypes,
   searchCie10,
   type Cie10Item,
   type DiagnosisConfirmationType,
 } from "@/services/catalogs";
-import {
-  fetchAttentionDiagnoses,
-  createAttentionDiagnosis,
-  updateAttentionDiagnosis,
-  deleteAttentionDiagnosis,
-  type AttentionDiagnosis,
-} from "@/services/attentions";
 
 export interface DiagnosisDraft {
   codigo_cie10: string;
@@ -25,19 +18,13 @@ export interface DiagnosisDraft {
 }
 
 export function AttentionDiagnosesSection({
-  attentionId,
   diagnosticosDraft,
   setDiagnosticosDraft,
-  form,
-  setForm,
   setError,
   setSuccessMessage,
 }: {
-  attentionId: number | null;
   diagnosticosDraft: DiagnosisDraft[];
   setDiagnosticosDraft: (next: DiagnosisDraft[] | ((prev: DiagnosisDraft[]) => DiagnosisDraft[])) => void;
-  form: any;
-  setForm: any;
   setError: (message: string | null) => void;
   setSuccessMessage: (message: string | null) => void;
 }) {
@@ -48,44 +35,6 @@ export function AttentionDiagnosesSection({
   const { data: confirmationTypes } = useQuery<DiagnosisConfirmationType[]>({
     queryKey: ["diagnosis-confirmations"],
     queryFn: fetchDiagnosisConfirmationTypes,
-  });
-
-  const updatePrincipalMutation = useMutation({
-    mutationFn: async (input: { id_diagnostico: number; es_principal: boolean }) => {
-      if (!attentionId) throw new Error("No hay atención activa");
-      return updateAttentionDiagnosis(attentionId, input.id_diagnostico, {
-        es_principal: input.es_principal,
-      });
-    },
-    onSuccess: () => {
-      refetchDiagnoses();
-    },
-    onError: (err: any) => {
-      const backendMessage = err?.response?.data?.message;
-      setError(
-        typeof backendMessage === "string" && backendMessage.trim().length > 0
-          ? backendMessage
-          : err?.message || "No se pudo actualizar el diagnóstico principal.",
-      );
-    },
-  });
-
-  const deleteDiagnosisMutation = useMutation({
-    mutationFn: async (input: { id_diagnostico: number }) => {
-      if (!attentionId) throw new Error("No hay atención activa");
-      return deleteAttentionDiagnosis(attentionId, input.id_diagnostico);
-    },
-    onSuccess: () => {
-      refetchDiagnoses();
-    },
-    onError: (err: any) => {
-      const backendMessage = err?.response?.data?.message;
-      setError(
-        typeof backendMessage === "string" && backendMessage.trim().length > 0
-          ? backendMessage
-          : err?.message || "No se pudo eliminar el diagnóstico.",
-      );
-    },
   });
 
   const confirmationOptions =
@@ -119,60 +68,6 @@ export function AttentionDiagnosesSection({
     });
   };
 
-  const {
-    data: diagnoses,
-    isLoading: loadingDiagnoses,
-    refetch: refetchDiagnoses,
-  } = useQuery<AttentionDiagnosis[]>({
-    queryKey: ["attention-diagnoses", attentionId],
-    enabled: !!attentionId,
-    queryFn: () => (attentionId ? fetchAttentionDiagnoses(attentionId) : Promise.resolve([])),
-  });
-
-  const diagnosesMutation = useMutation({
-    mutationFn: async (payload: { codigo_cie10: string }) => {
-      if (!attentionId) throw new Error("No hay atención activa");
-      return createAttentionDiagnosis(attentionId, {
-        codigo_cie10: payload.codigo_cie10,
-        es_principal: false,
-        codigo_confirmacion: null,
-      });
-    },
-    onSuccess: () => {
-      setError(null);
-      setSuccessMessage("Diagnóstico registrado correctamente.");
-      refetchDiagnoses();
-    },
-    onError: (err: any) => {
-      const backendMessage = err?.response?.data?.message;
-      setError(
-        typeof backendMessage === "string" && backendMessage.trim().length > 0
-          ? backendMessage
-          : err?.message || "No se pudo registrar el diagnóstico. Intente de nuevo.",
-      );
-    },
-  });
-
-  const updateConfirmacionMutation = useMutation({
-    mutationFn: async (input: { id_diagnostico: number; codigo_confirmacion: string | null }) => {
-      if (!attentionId) throw new Error("No hay atención activa");
-      return updateAttentionDiagnosis(attentionId, input.id_diagnostico, {
-        codigo_confirmacion: input.codigo_confirmacion,
-      });
-    },
-    onSuccess: () => {
-      refetchDiagnoses();
-    },
-    onError: (err: any) => {
-      const backendMessage = err?.response?.data?.message;
-      setError(
-        typeof backendMessage === "string" && backendMessage.trim().length > 0
-          ? backendMessage
-          : err?.message || "No se pudo actualizar el tipo de confirmación del diagnóstico.",
-      );
-    },
-  });
-
   const handleSearchCie10 = async () => {
     try {
       setCie10Loading(true);
@@ -195,7 +90,7 @@ export function AttentionDiagnosesSection({
     <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 text-[11px]">
       <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">DIAGNÓSTICOS (CIE-10)</div>
 
-      {!attentionId && diagnosticosDraft.length > 0 && (
+      {diagnosticosDraft.length > 0 && (
         <div className="space-y-2">
           <div className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-700">
             <div className="flex flex-wrap items-center gap-2">
@@ -344,23 +239,14 @@ export function AttentionDiagnosesSection({
                       <button
                         type="button"
                         onClick={() => {
-                          if (!attentionId) {
-                            addDraftDiagnosis(item, { esPrincipal: false });
-                            setError(null);
-                            setSuccessMessage("Diagnóstico agregado (pendiente de guardar la atención). ");
-                            return;
-                          }
-
-                          diagnosesMutation.mutate({ codigo_cie10: item.codigo });
+                          addDraftDiagnosis(item, { esPrincipal: false });
+                          setError(null);
+                          setSuccessMessage("Diagnóstico agregado (pendiente de guardar la atención). ");
                         }}
-                        disabled={attentionId ? diagnosesMutation.isPending : false}
+                        disabled={false}
                         className="rounded border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {attentionId
-                          ? diagnosesMutation.isPending
-                            ? "Guardando..."
-                            : "Agregar"
-                          : "Agregar"}
+                        Agregar
                       </button>
                     </td>
                   </tr>
@@ -370,133 +256,6 @@ export function AttentionDiagnosesSection({
           </div>
         )}
       </div>
-
-      {attentionId && (
-        <>
-          {diagnoses && diagnoses.length > 0 && (
-            <>
-              <div className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-700">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">Resumen de diagnósticos:</span>
-                  {(() => {
-                    const principal = diagnoses.find((d) => d.es_principal);
-                    const secundarios = diagnoses.filter((d) => !d.es_principal).length;
-                    return (
-                      <>
-                        {principal ? (
-                          <span>
-                            Dx principal:
-                            <span className="ml-1 rounded bg-white px-1.5 py-0.5 font-mono text-[11px] text-slate-900 shadow-sm">
-                              {principal.codigo_cie10}
-                            </span>
-                            {principal.cie10_nombre ? ` · ${principal.cie10_nombre}` : ""}
-                          </span>
-                        ) : (
-                          <span className="text-slate-500">Sin diagnóstico principal marcado.</span>
-                        )}
-                        <span className="ml-3 text-slate-500">Secundarios: {secundarios}</span>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {diagnoses.every((d) => !d.es_principal) && (
-                <p className="mb-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-                  Sugerencia: registre al menos un diagnóstico marcado como principal para esta atención.
-                </p>
-              )}
-            </>
-          )}
-
-          <div className="mt-3">
-            <h3 className="mb-1 text-[11px] font-semibold text-slate-700">Diagnósticos registrados</h3>
-            {loadingDiagnoses ? (
-              <p className="text-[11px] text-slate-500">Cargando diagnósticos...</p>
-            ) : !diagnoses || diagnoses.length === 0 ? (
-              <p className="text-[11px] text-slate-500">Aún no hay diagnósticos registrados para esta atención.</p>
-            ) : (
-              <div className="max-h-56 overflow-auto rounded-md border border-slate-200 bg-white">
-                <table className="min-w-full border-collapse text-left text-[11px]">
-                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-2 py-1.5">Principal</th>
-                      <th className="px-2 py-1.5">CIE-10</th>
-                      <th className="px-2 py-1.5">Nombre</th>
-                      <th className="px-2 py-1.5">Tipo</th>
-                      <th className="px-2 py-1.5">Descripción</th>
-                      <th className="px-2 py-1.5 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {diagnoses.map((d) => (
-                      <tr key={d.id_diagnostico} className="border-t border-slate-100">
-                        <td className="px-2 py-1.5 text-center">
-                          <input
-                            type="checkbox"
-                            checked={d.es_principal}
-                            onChange={(e) => {
-                              updatePrincipalMutation.mutate({
-                                id_diagnostico: d.id_diagnostico,
-                                es_principal: e.target.checked,
-                              });
-                            }}
-                            disabled={updatePrincipalMutation.isPending}
-                            className="h-3 w-3 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                            title="Marcar como principal"
-                          />
-                        </td>
-                        <td className="px-2 py-1.5 font-mono text-[11px] text-slate-800">{d.codigo_cie10}</td>
-                        <td className="px-2 py-1.5 text-slate-800">{d.cie10_nombre}</td>
-                        <td className="px-2 py-1.5 text-slate-700">
-                          <div className="flex flex-wrap items-center gap-3">
-                            {confirmationOptions.map((opt) => (
-                              <label key={opt.codigo} className="inline-flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    (d.id_tipo_confirmacion ?? null) ===
-                                    (opt.id_tipo_confirmacion ? opt.id_tipo_confirmacion : null)
-                                  }
-                                  onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    updateConfirmacionMutation.mutate({
-                                      id_diagnostico: d.id_diagnostico,
-                                      codigo_confirmacion: checked ? String(opt.codigo) : null,
-                                    });
-                                  }}
-                                  disabled={updateConfirmacionMutation.isPending}
-                                  className="h-3 w-3 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                />
-                                <span title={opt.descripcion}>
-                                  {opt.codigo} - {opt.descripcion}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1.5 text-slate-600">{d.cie10_descripcion}</td>
-                        <td className="px-2 py-1.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              deleteDiagnosisMutation.mutate({ id_diagnostico: d.id_diagnostico });
-                            }}
-                            disabled={deleteDiagnosisMutation.isPending}
-                            className="rounded border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Eliminar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </>
-      )}
     </div>
   );
 }

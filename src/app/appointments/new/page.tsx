@@ -72,13 +72,30 @@ export default function NewAppointmentPage() {
   const followupRecordsOptions = useMemo<SelectOption[]>(() => {
     const rows = Array.isArray(followupRecordsData) ? followupRecordsData : [];
     return rows
-      .filter((r: any) => String(r?.estado ?? "").trim() === "Seguimiento")
+      .filter((r: any) => {
+        const estado = String(r?.estado ?? "").trim();
+        const tipoCodigo = String(r?.tipo_historia_codigo ?? "").trim();
+        const estadoOk = estado === "Seguimiento";
+        const tipoOk = tipoCodigo === "REG_ATENCION_SALUD";
+        return estadoOk && tipoOk;
+      })
       .map((r: any) => {
         const fecha = String(r?.fecha_apertura ?? "");
-        const estado = String(r?.estado ?? "").trim();
-        const tipo = String(r?.tipo_historia ?? "").trim();
-
-        const label = [fecha ? fecha.slice(0, 10) : "", tipo, estado ? `Estado: ${estado}` : ""]
+        const label = [
+          fecha ? fecha.slice(0, 10) : "",
+          String(r?.profesional_responsable ?? "").trim()
+            ? `Prof: ${String(r?.profesional_responsable ?? "").trim()}`
+            : "",
+          String(r?.last_attention_tipo ?? "").trim()
+            ? `Atn: ${String(r?.last_attention_tipo ?? "").trim()}`
+            : "Atn: (sin atenciones)",
+          String(r?.last_attention_modalidad ?? "").trim()
+            ? `Mod: ${String(r?.last_attention_modalidad ?? "").trim()}`
+            : "",
+          String(r?.last_attention_sede ?? "").trim()
+            ? `Sede: ${String(r?.last_attention_sede ?? "").trim()}`
+            : "",
+        ]
           .filter(Boolean)
           .join(" | ");
         return { value: Number(r.id_historia), label };
@@ -997,7 +1014,7 @@ export default function NewAppointmentPage() {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-600">Seguimiento <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-medium text-slate-600">Hace parte de un seguimiento? <span className="text-red-500">*</span></label>
                   <Select
                     isClearable
                     isSearchable={false}

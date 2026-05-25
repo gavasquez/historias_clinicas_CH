@@ -21,7 +21,8 @@ type ExamenFisicoVitals = {
   fr: string;
   temp_c: string;
   glasgow: string;
-  ta_sentado: string;
+  ta_sistolica: string;
+  ta_diastolica: string;
   sat_o2: string;
   otros: string;
 };
@@ -65,7 +66,8 @@ const DEFAULT_CONTENIDO: ExamenFisicoContenido = {
     fr: "",
     temp_c: "",
     glasgow: "15",
-    ta_sentado: "",
+    ta_sistolica: "",
+    ta_diastolica: "",
     sat_o2: "",
     otros: "",
   },
@@ -152,6 +154,19 @@ function safeParseContenido(raw: unknown): ExamenFisicoContenido | null {
     };
   });
 
+  // Parse ta_sentado from legacy format (120/80) to new format (sistolica/diastolica)
+  const taSentadoRaw = String(vitals.ta_sentado ?? "");
+  let taSistolica = "";
+  let taDiastolica = "";
+  if (taSentadoRaw.includes("/")) {
+    const parts = taSentadoRaw.split("/");
+    taSistolica = parts[0]?.trim() || "";
+    taDiastolica = parts[1]?.trim() || "";
+  } else {
+    // If no slash, treat as systolic only (legacy compatibility)
+    taSistolica = taSentadoRaw.trim();
+  }
+
   const next: ExamenFisicoContenido = {
     vitals: {
       estatura_cm: String(vitals.estatura_cm ?? ""),
@@ -161,7 +176,8 @@ function safeParseContenido(raw: unknown): ExamenFisicoContenido | null {
       fr: String(vitals.fr ?? ""),
       temp_c: String(vitals.temp_c ?? ""),
       glasgow: String(vitals.glasgow ?? "15"),
-      ta_sentado: String(vitals.ta_sentado ?? ""),
+      ta_sistolica: taSistolica,
+      ta_diastolica: taDiastolica,
       sat_o2: String(vitals.sat_o2 ?? ""),
       otros: String(vitals.otros ?? ""),
     },
@@ -201,7 +217,25 @@ export function ExamenFisicoTab({
   const persist = React.useCallback(
     (next: ExamenFisicoContenido) => {
       setContenido(next);
-      setForm((prev: any) => ({ ...prev, hc_examen_fisico_contenido: JSON.stringify(next) }));
+      // Combine ta_sistolica and ta_diastolica into ta_sentado for backend compatibility
+      const serialized = {
+        ...next,
+        vitals: {
+          ...next.vitals,
+          ta_sentado: (() => {
+            const sistolica = next.vitals.ta_sistolica?.trim() || "";
+            const diastolica = next.vitals.ta_diastolica?.trim() || "";
+            if (sistolica && diastolica) {
+              return `${sistolica}/${diastolica}`;
+            }
+            if (sistolica) {
+              return sistolica;
+            }
+            return "";
+          })(),
+        },
+      };
+      setForm((prev: any) => ({ ...prev, hc_examen_fisico_contenido: JSON.stringify(serialized) }));
     },
     [setForm],
   );
@@ -358,13 +392,23 @@ export function ExamenFisicoTab({
 
           <div>
             <label className="text-[11px] font-medium text-slate-600">T.A. (MMHG)</label>
-            <input
-              type="number"
-              value={contenido.vitals.ta_sentado}
-              onChange={(e) => setVital("ta_sentado", e.target.value)}
-              className="mt-1 h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] shadow-sm"
-              placeholder="Ej: 120"
-            />
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="number"
+                value={contenido.vitals.ta_sistolica}
+                onChange={(e) => setVital("ta_sistolica", e.target.value)}
+                className="h-8 w-24 rounded-md border border-slate-300 bg-white px-2 text-[11px] shadow-sm"
+                placeholder="120"
+              />
+              <span className="text-xs text-slate-500">/</span>
+              <input
+                type="number"
+                value={contenido.vitals.ta_diastolica}
+                onChange={(e) => setVital("ta_diastolica", e.target.value)}
+                className="h-8 w-24 rounded-md border border-slate-300 bg-white px-2 text-[11px] shadow-sm"
+                placeholder="80"
+              />
+            </div>
           </div>
 
           <div>
@@ -393,7 +437,7 @@ export function ExamenFisicoTab({
 
       <div className="rounded-lg border border-slate-200 bg-white p-3">
         <div className="mb-2 flex items-center justify-between rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">
-          <span>VALORACIÓN POR SISTEMAS</span>
+          <span>VALORACIÓN POR SISTEMA</span>
           <span
             className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-100"
             title="Puedes marcar todas las filas haciendo clic en N/A, N o A del encabezado."

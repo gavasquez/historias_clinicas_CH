@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
@@ -25,7 +25,7 @@ import { AntecedentesSsrTab } from "@/app/appointments/[id]/attend/components/An
 import { AtencionTab } from "@/app/appointments/[id]/attend/components/AtencionTab";
 import { ExamenFisicoTab } from "@/app/appointments/[id]/attend/components/ExamenFisicoTab";
 import { RevisionPorSistemasTab } from "@/app/appointments/[id]/attend/components/RevisionPorSistemasTab";
-import { AttendTabs, type AttendTabKey } from "@/app/appointments/[id]/attend/components/Tabs";
+import { AttendTabs, type AttendTabKey, type SimpleAttendTabKey } from "@/app/appointments/[id]/attend/components/Tabs";
 import type { DiagnosisDraft } from "@/app/appointments/[id]/attend/components/AttentionDiagnosesSection";
 
 const Select = dynamic(() => import("react-select"), { ssr: false });
@@ -258,7 +258,7 @@ function isTabComplete(input: {
 
   if (activeTab === "REVISION_SISTEMAS") {
     if (!form.hc_valoracion_sistemas_contenido.trim()) {
-      return { ok: false, message: "Debe diligenciar la revisión por sistemas." };
+      return { ok: false, message: "Debe diligenciar el examen por sistema." };
     }
     return { ok: true };
   }
@@ -775,6 +775,9 @@ export default function OutpatientAttendPage() {
     if (!idPaciente) return;
     if (attentionId) return;
     if (mutation.isPending) return;
+    if (didAttemptPrefillRef.current) return;
+
+    didAttemptPrefillRef.current = true;
 
     const tamizajesHasMeaningfulValue =
       form.hc_tamizajes_contenido.trim() && form.hc_tamizajes_contenido !== defaultTamizajesSerialized;
@@ -803,7 +806,7 @@ export default function OutpatientAttendPage() {
 
         const modalResult = await Swal.fire({
           title: "Precargar información clínica",
-          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (anamnesis, antecedentes, análisis, plan de manejo, SSR, tamizajes, examen físico y revisión por sistemas)?",
+          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (anamnesis, antecedentes, análisis, plan de manejo, SSR, tamizajes, examen físico y examen por sistema)?",
           icon: "question",
           showCancelButton: true,
           confirmButtonText: "Sí, precargar",
@@ -1324,7 +1327,11 @@ export default function OutpatientAttendPage() {
           className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
           onSubmit={(e) => e.preventDefault()}
         >
-          <AttendTabs activeTab={activeTab} setActiveTab={setActiveTab} allowDirectNav={false} />
+          <AttendTabs
+            activeTab={activeTab}
+            setActiveTab={setActiveTab as Dispatch<SetStateAction<AttendTabKey | SimpleAttendTabKey>>}
+            allowDirectNav={false}
+          />
 
           {error && (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
@@ -1366,7 +1373,6 @@ export default function OutpatientAttendPage() {
 
             {activeTab === "DIAGNOSTICOS" && (
               <DiagnosticosTab
-                attentionId={attentionId}
                 diagnosticosDraft={diagnosticosDraft}
                 setDiagnosticosDraft={setDiagnosticosDraft}
                 form={form}

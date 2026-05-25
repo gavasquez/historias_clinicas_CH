@@ -112,9 +112,14 @@ export async function GET(
           last_attention_sede:
             lastAttention?.citas?.sedes?.nombre ?? h.profesionales_salud?.sedes?.nombre ?? null,
           last_attention_seguimiento:
-            typeof (lastAttention as any)?.citas?.seguimiento === "boolean"
-              ? (lastAttention as any).citas.seguimiento
-              : null,
+            (lastAttention as any)?.hc_atencion_cierre?.cierre_seguimiento === false
+              ? true
+              : (lastAttention as any)?.hc_atencion_cierre?.cierre_seguimiento === true &&
+                (lastAttention as any)?.hc_atencion_cierre?.seguimiento_efectivo === true
+                ? true
+                : (lastAttention as any)?.hc_atencion_cierre?.cierre_seguimiento === true
+                  ? false
+                  : null,
           last_attention_seguimiento_opcion: lastAttention?.hc_atencion_cierre?.seguimiento_opcion ?? null,
           last_attention_motivo_consulta: lastAttention?.hc_anamnesis_atencion?.motivo_consulta ?? null,
           last_attention_principal_cie10_codigo: lastAttentionPrincipalCie10Codigo,

@@ -41,6 +41,7 @@ model atenciones_salud {
   id_cita                               Int?
   fecha_hora                            DateTime                              @default(now()) @db.Timestamp(6)
   analisis                              String?
+  observacion_analisis                  String?
   llega_por_sus_medios                  Boolean?
   llega_por_sus_medios_cual             String?                               @db.VarChar(120)
   estado_a_la_llegada                   String?                               @db.VarChar(20)
@@ -124,6 +125,7 @@ model hc_atencion_cierre {
   notificacion_emitida         Boolean?
   seguimiento_notificacion     String?          @db.VarChar(50)
   notificacion_observaciones   String?
+  seguimiento_observaciones    String?
   seguimiento_opcion           String?          @db.VarChar(50)
   seguimiento_efectivo         Boolean?
   cierre_seguimiento           Boolean?

@@ -179,24 +179,108 @@ export default function PatientRecordsPage() {
   // Agrupar historias para el acordeón: principales (sin vinculación) y sus hijas
   const groupedRecords = useMemo(() => {
     const rows = filteredRecords;
-    const mainHistories = rows.filter(h => !h.id_historia_vinculada);
-    const childHistories = rows.filter(h => h.id_historia_vinculada);
-    
-    // Agrupar hijas por su historia madre
-    const childrenByParent = new Map<number, typeof rows>();
-    childHistories.forEach(child => {
-      const parentId = Number(child.id_historia_vinculada);
-      if (!childrenByParent.has(parentId)) {
-        childrenByParent.set(parentId, []);
+
+    // Función para obtener la fecha de ordenamiento (prioriza última atención, luego fecha apertura)
+    const getSortDate = (h: any) => {
+      return h.last_attention_fecha_hora || h.fecha_apertura;
+    };
+
+    // Función para determinar prioridad (seguimiento tiene prioridad)
+    const getSortPriority = (h: any) => {
+      const estado = String(h.estado ?? "").trim().toLowerCase();
+      return estado === "seguimiento" ? 1 : 0;
+    };
+
+    // Identificar grupos de historias vinculadas
+    // Cada grupo consiste en una historia principal y todas sus hijas
+    const groups = new Map<number, Set<number>>();
+    const processed = new Set<number>();
+
+    rows.forEach(h => {
+      const historyId = h.id_historia;
+      const linkedId = h.id_historia_vinculada ? Number(h.id_historia_vinculada) : null;
+
+      if (!processed.has(historyId)) {
+        // Crear un nuevo grupo con esta historia
+        const group = new Set<number>();
+        group.add(historyId);
+        processed.add(historyId);
+        groups.set(historyId, group);
+
+        // Si tiene una historia vinculada, agregarla al mismo grupo
+        if (linkedId && !processed.has(linkedId)) {
+          group.add(linkedId);
+          processed.add(linkedId);
+
+          // También buscar si la historia vinculada tiene otras hijas
+          rows.forEach(other => {
+            const otherLinkedId = other.id_historia_vinculada ? Number(other.id_historia_vinculada) : null;
+            if (otherLinkedId === linkedId && !processed.has(other.id_historia)) {
+              group.add(other.id_historia);
+              processed.add(other.id_historia);
+            }
+          });
+        }
+
+        // Buscar hijas directas de esta historia
+        rows.forEach(other => {
+          const otherLinkedId = other.id_historia_vinculada ? Number(other.id_historia_vinculada) : null;
+          if (otherLinkedId === historyId && !processed.has(other.id_historia)) {
+            group.add(other.id_historia);
+            processed.add(other.id_historia);
+          }
+        });
       }
-      childrenByParent.get(parentId)!.push(child);
     });
-    
-    // Estructura para el acordeón
-    return mainHistories.map(main => ({
-      ...main,
-      children: childrenByParent.get(main.id_historia) || [],
-      hasChildren: (childrenByParent.get(main.id_historia) || []).length > 0
+
+    // Para cada grupo, determinar cuál es el registro más reciente para ser el encabezado
+    const groupArray = Array.from(groups.entries()).map(([rootId, memberIds]) => {
+      const members = rows.filter(h => memberIds.has(h.id_historia));
+      
+      // Ordenar miembros del grupo por fecha (más reciente primero), luego por estado
+      members.sort((a, b) => {
+        const dateA = new Date(getSortDate(a)).getTime();
+        const dateB = new Date(getSortDate(b)).getTime();
+        
+        if (dateA !== dateB) {
+          return dateB - dateA;
+        }
+        
+        const priorityA = getSortPriority(a);
+        const priorityB = getSortPriority(b);
+        return priorityB - priorityA;
+      });
+
+      // El más reciente será el encabezado del acordeón
+      const header = members[0];
+      const children = members.slice(1);
+
+      return {
+        header,
+        children,
+        hasChildren: children.length > 0
+      };
+    });
+
+    // Ordenar los grupos por fecha del encabezado (más reciente primero)
+    groupArray.sort((a, b) => {
+      const dateA = new Date(getSortDate(a.header)).getTime();
+      const dateB = new Date(getSortDate(b.header)).getTime();
+      
+      if (dateA !== dateB) {
+        return dateB - dateA;
+      }
+      
+      const priorityA = getSortPriority(a.header);
+      const priorityB = getSortPriority(b.header);
+      return priorityB - priorityA;
+    });
+
+    // Retornar estructura para el acordeón
+    return groupArray.map(g => ({
+      ...g.header,
+      children: g.children,
+      hasChildren: g.hasChildren
     }));
   }, [filteredRecords]);
 
@@ -1221,11 +1305,8 @@ export default function PatientRecordsPage() {
                       </div>
 
                       <AttentionDiagnosesSection
-                        attentionId={null}
                         diagnosticosDraft={diagnosticosDraft}
                         setDiagnosticosDraft={setDiagnosticosDraft}
-                        form={evolutionForm}
-                        setForm={setEvolutionForm}
                         setError={setEvolutionError}
                         setSuccessMessage={setEvolutionSuccess}
                       />

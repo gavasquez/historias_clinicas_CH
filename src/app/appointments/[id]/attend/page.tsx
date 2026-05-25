@@ -37,13 +37,14 @@ type AttendPayloadInput = {
   form: AttentionFormState;
   simpleForm: {
     motivoAtencion: string;
-    analisis: string;
+    observacionAnalisis: string;
     planManejo: string;
     seguimiento: string;
     seguimientoOpcion: string;
     seguimientoEfectivo: string;
     cierreSeguimiento: string;
     seguimientoFecha: string;
+    seguimientoObservaciones: string;
   };
   isRegAtencionSalud: boolean;
   observacionAntecedentesPersonal: string;
@@ -55,13 +56,20 @@ type AttendPayloadInput = {
 function validateAttendForm(input: {
   citaData: AppointmentDetail | undefined;
   form: AttentionFormState;
+  isRegAtencionSalud: boolean;
 }): string | null {
-  const { citaData, form } = input;
+  const { citaData, form, isRegAtencionSalud } = input;
 
   if (!citaData?.id_tipo_cita) {
     return "La cita no tiene tipo de cita para determinar el tipo de atención.";
   }
 
+  // En modo REG_ATENCION_SALUD (flujo simplificado), no validar campos del flujo completo
+  if (isRegAtencionSalud) {
+    return null;
+  }
+
+  // Validaciones solo para flujo completo
   if (form.llega_por_sus_medios !== "SI" && form.llega_por_sus_medios !== "NO") {
     return "Debe indicar si el paciente llega por sus propios medios.";
   }
@@ -147,7 +155,7 @@ function buildAttendPayload(input: AttendPayloadInput) {
   }
 
   // En el flujo simplificado, usar datos de simpleForm, si no, usar form
-  const analisisValue = isRegAtencionSalud ? simpleForm.analisis : form.analisis;
+  const analisisValue = form.analisis;
   const planManejoValue = isRegAtencionSalud ? simpleForm.planManejo : form.conducta_plan_estudio_manejo;
   const seguimientoOpcionValue = isRegAtencionSalud ? simpleForm.seguimientoOpcion : form.seguimiento_opcion;
   const seguimientoEfectivoValue = isRegAtencionSalud ? simpleForm.seguimientoEfectivo : form.seguimiento_efectivo;
@@ -183,6 +191,7 @@ function buildAttendPayload(input: AttendPayloadInput) {
     anamnesis_motivo_consulta: isRegAtencionSalud ? simpleForm.motivoAtencion : form.anamnesis_motivo_consulta || undefined,
     anamnesis_enfermedad_actual: form.anamnesis_enfermedad_actual || undefined,
     analisis: analisisValue || undefined,
+    observacion_analisis: isRegAtencionSalud ? simpleForm.observacionAnalisis || undefined : undefined,
     hc_atencion_cierre: hasCierre
       ? {
           conducta_plan_estudio_manejo: planManejoValue || undefined,
@@ -204,7 +213,7 @@ function buildAttendPayload(input: AttendPayloadInput) {
                 : undefined,
           seguimiento_notificacion:
             form.notificacion_emitida === "SI" ? form.seguimiento_notificacion || undefined : undefined,
-          notificacion_observaciones: form.notificacion_observaciones || undefined,
+          notificacion_observaciones: isRegAtencionSalud ? simpleForm.seguimientoObservaciones || undefined : form.notificacion_observaciones || undefined,
           seguimiento_opcion: seguimientoOpcionValue || undefined,
           seguimiento_efectivo:
             seguimientoEfectivoValue === "SI"
@@ -270,20 +279,20 @@ function isTabComplete(input: {
   form: AttentionFormState;
   simpleForm: {
     motivoAtencion: string;
-    analisis: string;
+    observacionAnalisis: string;
     planManejo: string;
     seguimiento: string;
     seguimientoOpcion: string;
     seguimientoEfectivo: string;
     cierreSeguimiento: string;
     seguimientoFecha: string;
+    seguimientoObservaciones: string;
   };
   isRegAtencionSalud: boolean;
   observacionAntecedentesPersonal: string;
   observacionAntecedentesFamiliar: string;
   antecedentesTraumaticos: AntecedentesTraumaticosState;
   diagnosticosDraft: DiagnosisDraft[];
-  attentionId: number | null;
 }): { ok: boolean; message?: string } {
   const {
     activeTab,
@@ -295,7 +304,6 @@ function isTabComplete(input: {
     observacionAntecedentesFamiliar,
     antecedentesTraumaticos,
     diagnosticosDraft,
-    attentionId,
   } = input;
 
   // Si es flujo simplificado, no validar pestañas del flujo completo
@@ -312,7 +320,7 @@ function isTabComplete(input: {
     if (!simpleForm.motivoAtencion.trim()) {
       return { ok: false, message: "Debe diligenciar el motivo de atención." };
     }
-    if (!simpleForm.analisis.trim()) {
+    if (!simpleForm.observacionAnalisis.trim()) {
       return { ok: false, message: "Debe diligenciar la observación / análisis." };
     }
     if (!simpleForm.planManejo.trim()) {
@@ -408,7 +416,7 @@ function isTabComplete(input: {
 
   if (activeTab === "REVISION_SISTEMAS") {
     if (!form.hc_valoracion_sistemas_contenido.trim()) {
-      return { ok: false, message: "Debe diligenciar la revisión por sistemas." };
+      return { ok: false, message: "Debe diligenciar el examen por sistema." };
     }
     return { ok: true };
   }
@@ -421,14 +429,11 @@ function isTabComplete(input: {
   }
 
   if (activeTab === "DIAGNOSTICOS") {
-    // En el flujo simplificado (REG_ATENCION_SALUD), el análisis está en simpleForm
-    // En el flujo completo, está en form.analisis
-    const analisisValue = simpleForm.analisis.trim() || form.analisis.trim();
-    if (!analisisValue) {
+    if (!form.analisis.trim()) {
       return { ok: false, message: "Debe diligenciar el análisis." };
     }
 
-    if (!attentionId && diagnosticosDraft.length === 0) {
+    if (diagnosticosDraft.length === 0) {
       return { ok: false, message: "Debe agregar al menos un diagnóstico." };
     }
 
@@ -588,11 +593,8 @@ export default function AttendAppointmentPage() {
   const id = params?.id;
 
   const didAttemptPrefillRef = useRef(false);
-  const didRestoreFromDbRef = useRef(false);
 
   const [isClient, setIsClient] = useState(false);
-  const [attentionId, setAttentionId] = useState<number | null>(null);
-  const [savingDraft, setSavingDraft] = useState(false);
   const [form, setForm] = useState<AttentionFormState>({
     conducta_plan_estudio_manejo: "",
     atencion_recomendaciones: "",
@@ -625,33 +627,24 @@ export default function AttendAppointmentPage() {
   // Estados para el formulario simplificado (REG_ATENCION_SALUD)
   const [simpleForm, setSimpleForm] = useState({
     motivoAtencion: "",
-    analisis: "",
+    observacionAnalisis: "",
     planManejo: "",
     seguimiento: "",
     seguimientoOpcion: "",
     seguimientoEfectivo: "",
     cierreSeguimiento: "",
     seguimientoFecha: "",
+    seguimientoObservaciones: "",
   });
 
-  const saveDraftToDb = async () => {
-    if (!id) return;
-    const payload = buildAttendPayload({
-      citaData,
-      form,
-      simpleForm,
-      isRegAtencionSalud,
-      observacionAntecedentesPersonal,
-      observacionAntecedentesFamiliar,
-      antecedentesTraumaticos,
-      diagnosticosDraft,
-    });
+  useEffect(() => {
+    if (simpleForm.seguimientoOpcion === "NO_APLICA" || simpleForm.seguimientoOpcion === "") {
+      setSimpleForm((prev) => ({ ...prev, seguimientoObservaciones: "", seguimientoFecha: "" }));
+    }
+  }, [simpleForm.seguimientoOpcion]);
 
-    await apiClient.patch(`/appointments/${id}/attentions`, payload);
-  };
-
-  const handleWizardNav = async (direction: "back" | "next") => {
-    if (savingDraft) return;
+  const handleWizardNav = (direction: "back" | "next") => {
+    if (mutation.isPending) return;
     const idx = tabsOrder.indexOf(activeTab as any);
     const nextIdx = direction === "next" ? idx + 1 : idx - 1;
     const targetTab = tabsOrder[nextIdx];
@@ -668,7 +661,6 @@ export default function AttendAppointmentPage() {
         observacionAntecedentesFamiliar,
         antecedentesTraumaticos,
         diagnosticosDraft,
-        attentionId,
       });
 
       if (!completion.ok) {
@@ -676,12 +668,9 @@ export default function AttendAppointmentPage() {
         return;
       }
 
-      // Sincronizar datos del formulario simplificado al formulario principal
-      // cuando se navega de NOTA_ATENCION a DIAGNOSTICOS en el flujo simplificado
       if (isRegAtencionSalud && activeTab === "NOTA_ATENCION" && targetTab === "DIAGNOSTICOS") {
         setForm((prev) => ({
           ...prev,
-          analisis: simpleForm.analisis,
           conducta_plan_estudio_manejo: simpleForm.planManejo,
           seguimiento_opcion: simpleForm.seguimientoOpcion,
           seguimiento_efectivo: (simpleForm.seguimientoEfectivo || "") as AttentionFormState["seguimiento_efectivo"],
@@ -691,42 +680,18 @@ export default function AttendAppointmentPage() {
       }
     }
 
-    try {
-      setSavingDraft(true);
-      setError(null);
-      await saveDraftToDb();
-      setActiveTab(targetTab);
-    } catch {
-      await Swal.fire({
-        title: "No se pudo guardar",
-        text: "No se pudo guardar el borrador en la base de datos. Verifica tu conexión e intenta de nuevo.",
-        icon: "error",
-        confirmButtonText: "Aceptar",
-        confirmButtonColor: "#2563eb",
-      });
-    } finally {
-      setSavingDraft(false);
-    }
+    setError(null);
+    setActiveTab(targetTab);
   };
 
-  const handleFinalize = async () => {
-    if (savingDraft || mutation.isPending) return;
-    try {
-      setSavingDraft(true);
-      setError(null);
-      await saveDraftToDb();
-      mutation.mutate();
-    } catch {
-      await Swal.fire({
-        title: "No se pudo guardar",
-        text: "No se pudo guardar el borrador en la base de datos. Verifica tu conexión e intenta de nuevo.",
-        icon: "error",
-        confirmButtonText: "Aceptar",
-        confirmButtonColor: "#2563eb",
-      });
-    } finally {
-      setSavingDraft(false);
+  const handleFinalize = () => {
+    if (mutation.isPending) return;
+    if (!activeTabCompletion.ok) {
+      setError(activeTabCompletion.message ?? "Debes completar la sección antes de finalizar.");
+      return;
     }
+    setError(null);
+    mutation.mutate();
   };
 
   const [observacionAntecedentesPersonal, setObservacionAntecedentesPersonal] = useState("");
@@ -809,145 +774,7 @@ export default function AttendAppointmentPage() {
 
   useEffect(() => {
     if (!isClient) return;
-    if (!id) return;
-    if (!citaData) return;
-    if (didRestoreFromDbRef.current) return;
-
-    didRestoreFromDbRef.current = true;
-
-    (async () => {
-      try {
-        const res = await apiClient.get<{ data: any }>(`/appointments/${id}/attentions`);
-        const atencion = res.data?.data;
-        if (!atencion || !atencion.id_atencion) return;
-
-        const restoredCertificadoOpcionRaw = String(
-          atencion?.hc_atencion_cierre?.certificado_opcion ?? "",
-        ).trim();
-        const restoredCertificadoOpcion =
-          restoredCertificadoOpcionRaw === "CON_RESTRICCIONES" ||
-          restoredCertificadoOpcionRaw === "CON_RECOMENDACIONES" ||
-          restoredCertificadoOpcionRaw === "SIN_RESTRICCIONES"
-            ? (restoredCertificadoOpcionRaw as AttentionFormState["certificado_opcion"])
-            : "";
-
-        const restoredEstadoLlegadaRaw = String(atencion?.estado_a_la_llegada ?? "").trim();
-        const restoredEstadoLlegada =
-          restoredEstadoLlegadaRaw === "CONSCIENTE" ||
-          restoredEstadoLlegadaRaw === "INCONSCIENTE" ||
-          restoredEstadoLlegadaRaw === "MUERTO"
-            ? (restoredEstadoLlegadaRaw as AttentionFormState["estado_a_la_llegada"])
-            : "CONSCIENTE";
-
-        setAttentionId(Number(atencion.id_atencion));
-
-        setForm((prev) => ({
-          ...prev,
-          anamnesis_motivo_consulta: String(atencion?.hc_anamnesis_atencion?.motivo_consulta ?? prev.anamnesis_motivo_consulta ?? ""),
-          anamnesis_enfermedad_actual: String(atencion?.hc_anamnesis_atencion?.enfermedad_actual ?? prev.anamnesis_enfermedad_actual ?? ""),
-          analisis: String(atencion?.analisis ?? prev.analisis ?? ""),
-          hc_ssr_contenido: String(atencion?.hc_ssr_atencion?.contenido ?? prev.hc_ssr_contenido ?? ""),
-          hc_tamizajes_contenido: String(atencion?.hc_tamizajes_atencion?.contenido ?? prev.hc_tamizajes_contenido ?? ""),
-          hc_examen_fisico_contenido: String(atencion?.hc_examen_fisico_atencion?.contenido ?? prev.hc_examen_fisico_contenido ?? ""),
-          hc_valoracion_sistemas_contenido: String(atencion?.hc_valoracion_sistemas_atencion?.contenido ?? prev.hc_valoracion_sistemas_contenido ?? ""),
-          llega_por_sus_medios:
-            typeof atencion?.llega_por_sus_medios === "boolean"
-              ? atencion.llega_por_sus_medios
-                ? "SI"
-                : "NO"
-              : prev.llega_por_sus_medios,
-          llega_por_sus_medios_cual: String(atencion?.llega_por_sus_medios_cual ?? prev.llega_por_sus_medios_cual ?? ""),
-          estado_a_la_llegada: restoredEstadoLlegada,
-          caso_accidente_intoxicacion_violencia:
-            typeof atencion?.caso_accidente_intoxicacion_violencia === "boolean"
-              ? atencion.caso_accidente_intoxicacion_violencia
-                ? "SI"
-                : "NO"
-              : prev.caso_accidente_intoxicacion_violencia,
-          fecha_ocurrencia_evento: atencion?.fecha_ocurrencia_evento
-            ? String(atencion.fecha_ocurrencia_evento).slice(0, 10)
-            : prev.fecha_ocurrencia_evento,
-          lugar_ocurrencia_evento: String(atencion?.lugar_ocurrencia_evento ?? prev.lugar_ocurrencia_evento ?? ""),
-          notificacion_otro_cual: String(atencion?.notificacion_otro_cual ?? prev.notificacion_otro_cual ?? ""),
-          conducta_plan_estudio_manejo: String(
-            atencion?.hc_atencion_cierre?.conducta_plan_estudio_manejo ?? prev.conducta_plan_estudio_manejo ?? "",
-          ),
-          atencion_recomendaciones: String(
-            atencion?.hc_atencion_cierre?.recomendaciones ?? prev.atencion_recomendaciones ?? "",
-          ),
-          certificado_recomendaciones: String(
-            atencion?.hc_atencion_cierre?.certificado_recomendaciones ?? prev.certificado_recomendaciones ?? "",
-          ),
-          certificado_emitido:
-            typeof atencion?.hc_atencion_cierre?.certificado_emitido === "boolean"
-              ? atencion.hc_atencion_cierre.certificado_emitido
-                ? "SI"
-                : "NO"
-              : prev.certificado_emitido,
-          certificado_opcion: restoredCertificadoOpcion || prev.certificado_opcion,
-          notificacion_emitida:
-            typeof atencion?.hc_atencion_cierre?.notificacion_emitida === "boolean"
-              ? atencion.hc_atencion_cierre.notificacion_emitida
-                ? "SI"
-                : "NO"
-              : prev.notificacion_emitida,
-          notificacion_observaciones: String(
-            atencion?.hc_atencion_cierre?.notificacion_observaciones ?? prev.notificacion_observaciones ?? "",
-          ),
-          seguimiento_notificacion: String(
-            atencion?.hc_atencion_cierre?.seguimiento_notificacion ?? prev.seguimiento_notificacion ?? "",
-          ),
-          seguimiento_opcion: String(atencion?.hc_atencion_cierre?.seguimiento_opcion ?? prev.seguimiento_opcion ?? ""),
-          seguimiento_efectivo:
-            typeof atencion?.hc_atencion_cierre?.seguimiento_efectivo === "boolean"
-              ? atencion.hc_atencion_cierre.seguimiento_efectivo
-                ? "SI"
-                : "NO"
-              : prev.seguimiento_efectivo,
-          cierre_seguimiento:
-            typeof atencion?.hc_atencion_cierre?.cierre_seguimiento === "boolean"
-              ? atencion.hc_atencion_cierre.cierre_seguimiento
-                ? "SI"
-                : "NO"
-              : prev.cierre_seguimiento,
-          seguimiento_fecha: atencion?.hc_atencion_cierre?.seguimiento_fecha
-            ? String(atencion.hc_atencion_cierre.seguimiento_fecha).slice(0, 10)
-            : prev.seguimiento_fecha,
-        }));
-
-        const antecedentesRows = Array.isArray(atencion?.hc_antecedentes_atencion)
-          ? atencion.hc_antecedentes_atencion
-          : [];
-
-        const personal = antecedentesRows.find(
-          (r: any) => String(r?.tipo_antecedente ?? "").trim().toUpperCase() === "PERSONAL",
-        );
-        const familiar = antecedentesRows.find(
-          (r: any) => String(r?.tipo_antecedente ?? "").trim().toUpperCase() === "FAMILIAR",
-        );
-
-        setObservacionAntecedentesPersonal(String(personal?.observacion ?? ""));
-        setObservacionAntecedentesFamiliar(String(familiar?.observacion ?? ""));
-
-        setAntecedentesTraumaticos({
-          naturaleza_lesion: String(atencion?.hc_antecedentes_traumaticos_atencion?.naturaleza_lesion ?? ""),
-          fecha_ocurrencia: atencion?.hc_antecedentes_traumaticos_atencion?.fecha_ocurrencia
-            ? String(atencion.hc_antecedentes_traumaticos_atencion.fecha_ocurrencia).slice(0, 10)
-            : "",
-          secuelas: String(atencion?.hc_antecedentes_traumaticos_atencion?.secuelas ?? ""),
-        });
-
-        setSuccessMessage("Se restauró un borrador guardado anteriormente.");
-      } catch {
-        // ignore
-      }
-    })();
-  }, [citaData, id, isClient]);
-
-  useEffect(() => {
-    if (!isClient) return;
     if (!citaData?.id_paciente) return;
-    if (attentionId) return;
     if (didAttemptPrefillRef.current) return;
 
     didAttemptPrefillRef.current = true;
@@ -958,6 +785,9 @@ export default function AttendAppointmentPage() {
 
     const hasAnyTargetValue =
       form.analisis.trim() ||
+      simpleForm.motivoAtencion.trim() ||
+      simpleForm.observacionAnalisis.trim() ||
+      simpleForm.planManejo.trim() ||
       form.hc_ssr_contenido.trim() ||
       tamizajesHasMeaningfulValue ||
       form.hc_examen_fisico_contenido.trim() ||
@@ -972,13 +802,21 @@ export default function AttendAppointmentPage() {
         );
 
         const records = Array.isArray(resRecords.data?.data) ? resRecords.data.data : [];
-        const targetHistory = records.find((r) => Number(r?.attention_count) > 0) ?? null;
+        const currentHistoryTypeId = citaData?.id_tipo_historia ? Number(citaData.id_tipo_historia) : NaN;
+        const targetHistory =
+          records.find(
+            (r) =>
+              Number(r?.attention_count) > 0 &&
+              Number(r?.id_tipo_historia) === currentHistoryTypeId,
+          ) ?? null;
         const idHistoria = targetHistory?.id_historia ? Number(targetHistory.id_historia) : null;
         if (!idHistoria || !Number.isInteger(idHistoria) || idHistoria <= 0) return;
+        const isRegAtencionSaludPrefill =
+          String(targetHistory?.tipo_historia_codigo ?? "").trim() === "REG_ATENCION_SALUD";
 
         const modalResult = await Swal.fire({
           title: "Precargar información clínica",
-          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (anamnesis, antecedentes, análisis, plan de manejo, SSR, tamizajes, examen físico y revisión por sistemas)?",
+          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (anamnesis, antecedentes, análisis, plan de manejo, SSR, tamizajes, examen físico y examen por sistema)?",
           icon: "question",
           showCancelButton: true,
           confirmButtonText: "Sí, precargar",
@@ -1024,6 +862,7 @@ export default function AttendAppointmentPage() {
           : "";
         const nextSecuelas = String(nextTraumaticos?.secuelas ?? "");
 
+        const nextObservacionAnalisis = String(lastAttention?.observacion_analisis ?? "");
         const nextConductaPlan = String(
           lastAttention?.hc_atencion_cierre?.conducta_plan_estudio_manejo ?? "",
         );
@@ -1033,51 +872,87 @@ export default function AttendAppointmentPage() {
         const nextExamenFisico = String(lastAttention?.hc_examen_fisico_atencion?.contenido ?? "");
         const nextValoracion = String(lastAttention?.hc_valoracion_sistemas_atencion?.contenido ?? "");
 
-        setForm((prev) => ({
-          ...prev,
-          anamnesis_motivo_consulta: prev.anamnesis_motivo_consulta.trim()
-            ? prev.anamnesis_motivo_consulta
-            : nextMotivoConsulta,
-          anamnesis_enfermedad_actual: prev.anamnesis_enfermedad_actual.trim()
-            ? prev.anamnesis_enfermedad_actual
-            : nextEnfermedadActual,
-          analisis: prev.analisis.trim() ? prev.analisis : nextAnalisis,
-          conducta_plan_estudio_manejo: prev.conducta_plan_estudio_manejo.trim()
-            ? prev.conducta_plan_estudio_manejo
-            : nextConductaPlan,
-          atencion_recomendaciones: prev.atencion_recomendaciones.trim()
-            ? prev.atencion_recomendaciones
-            : nextRecomendaciones,
-          hc_ssr_contenido: prev.hc_ssr_contenido.trim() ? prev.hc_ssr_contenido : nextSsr,
-          hc_tamizajes_contenido: prev.hc_tamizajes_contenido.trim()
-            ? prev.hc_tamizajes_contenido
-            : nextTamizajes,
-          hc_examen_fisico_contenido: prev.hc_examen_fisico_contenido.trim()
-            ? prev.hc_examen_fisico_contenido
-            : nextExamenFisico,
-          hc_valoracion_sistemas_contenido: prev.hc_valoracion_sistemas_contenido.trim()
-            ? prev.hc_valoracion_sistemas_contenido
-            : nextValoracion,
-        }));
+        if (isRegAtencionSaludPrefill) {
+          setSimpleForm((prev) => ({
+            ...prev,
+            motivoAtencion: prev.motivoAtencion.trim() ? prev.motivoAtencion : nextMotivoConsulta,
+            observacionAnalisis: prev.observacionAnalisis.trim()
+              ? prev.observacionAnalisis
+              : nextObservacionAnalisis,
+            planManejo: prev.planManejo.trim() ? prev.planManejo : nextConductaPlan,
+            seguimientoOpcion: prev.seguimientoOpcion.trim()
+              ? prev.seguimientoOpcion
+              : String(lastAttention?.hc_atencion_cierre?.seguimiento_opcion ?? ""),
+            seguimientoEfectivo: prev.seguimientoEfectivo || (
+              lastAttention?.hc_atencion_cierre?.seguimiento_efectivo === true
+                ? "SI"
+                : lastAttention?.hc_atencion_cierre?.seguimiento_efectivo === false
+                  ? "NO"
+                  : ""
+            ),
+            cierreSeguimiento: prev.cierreSeguimiento || (
+              lastAttention?.hc_atencion_cierre?.cierre_seguimiento === true
+                ? "SI"
+                : lastAttention?.hc_atencion_cierre?.cierre_seguimiento === false
+                  ? "NO"
+                  : ""
+            ),
+            seguimientoFecha: prev.seguimientoFecha.trim()
+              ? prev.seguimientoFecha
+              : lastAttention?.hc_atencion_cierre?.seguimiento_fecha
+                ? String(lastAttention.hc_atencion_cierre.seguimiento_fecha).slice(0, 10)
+                : "",
+            seguimientoObservaciones: prev.seguimientoObservaciones.trim()
+              ? prev.seguimientoObservaciones
+              : String(lastAttention?.hc_atencion_cierre?.seguimiento_observaciones ?? ""),
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            anamnesis_motivo_consulta: prev.anamnesis_motivo_consulta.trim()
+              ? prev.anamnesis_motivo_consulta
+              : nextMotivoConsulta,
+            anamnesis_enfermedad_actual: prev.anamnesis_enfermedad_actual.trim()
+              ? prev.anamnesis_enfermedad_actual
+              : nextEnfermedadActual,
+            // analisis no se precarga - el profesional debe ingresarlo manualmente
+            conducta_plan_estudio_manejo: prev.conducta_plan_estudio_manejo.trim()
+              ? prev.conducta_plan_estudio_manejo
+              : nextConductaPlan,
+            atencion_recomendaciones: prev.atencion_recomendaciones.trim()
+              ? prev.atencion_recomendaciones
+              : nextRecomendaciones,
+            hc_ssr_contenido: prev.hc_ssr_contenido.trim() ? prev.hc_ssr_contenido : nextSsr,
+            hc_tamizajes_contenido: prev.hc_tamizajes_contenido.trim()
+              ? prev.hc_tamizajes_contenido
+              : nextTamizajes,
+            hc_examen_fisico_contenido: prev.hc_examen_fisico_contenido.trim()
+              ? prev.hc_examen_fisico_contenido
+              : nextExamenFisico,
+            hc_valoracion_sistemas_contenido: prev.hc_valoracion_sistemas_contenido.trim()
+              ? prev.hc_valoracion_sistemas_contenido
+              : nextValoracion,
+          }));
 
-        if (!observacionAntecedentesPersonal.trim() && nextAntecedentePersonal.trim()) {
-          setObservacionAntecedentesPersonal(nextAntecedentePersonal);
-        }
-        if (!observacionAntecedentesFamiliar.trim() && nextAntecedenteFamiliar.trim()) {
-          setObservacionAntecedentesFamiliar(nextAntecedenteFamiliar);
-        }
+          if (!observacionAntecedentesPersonal.trim() && nextAntecedentePersonal.trim()) {
+            setObservacionAntecedentesPersonal(nextAntecedentePersonal);
+          }
+          if (!observacionAntecedentesFamiliar.trim() && nextAntecedenteFamiliar.trim()) {
+            setObservacionAntecedentesFamiliar(nextAntecedenteFamiliar);
+          }
 
-        setAntecedentesTraumaticos((prevTra) => ({
-          naturaleza_lesion: prevTra.naturaleza_lesion.trim() ? prevTra.naturaleza_lesion : nextNaturalezaLesion,
-          fecha_ocurrencia: prevTra.fecha_ocurrencia.trim() ? prevTra.fecha_ocurrencia : nextFechaOcurrencia,
-          secuelas: prevTra.secuelas.trim() ? prevTra.secuelas : nextSecuelas,
-        }));
+          setAntecedentesTraumaticos((prevTra) => ({
+            naturaleza_lesion: prevTra.naturaleza_lesion.trim() ? prevTra.naturaleza_lesion : nextNaturalezaLesion,
+            fecha_ocurrencia: prevTra.fecha_ocurrencia.trim() ? prevTra.fecha_ocurrencia : nextFechaOcurrencia,
+            secuelas: prevTra.secuelas.trim() ? prevTra.secuelas : nextSecuelas,
+          }));
+        }
       } catch {
         // ignore
       }
     })();
   }, [
-    attentionId,
+    citaData?.id_tipo_historia,
     citaData?.id_paciente,
     form.analisis,
     form.anamnesis_enfermedad_actual,
@@ -1091,6 +966,9 @@ export default function AttendAppointmentPage() {
     isClient,
     observacionAntecedentesFamiliar,
     observacionAntecedentesPersonal,
+    simpleForm.observacionAnalisis,
+    simpleForm.motivoAtencion,
+    simpleForm.planManejo,
   ]);
 
   useEffect(() => {
@@ -1203,7 +1081,6 @@ export default function AttendAppointmentPage() {
     observacionAntecedentesFamiliar,
     antecedentesTraumaticos,
     diagnosticosDraft,
-    attentionId,
   });
 
   const { data: pacienteData } = useQuery<any>({
@@ -1266,11 +1143,7 @@ export default function AttendAppointmentPage() {
     },
     onSuccess: (response: any) => {
       setError(null);
-      setSuccessMessage("Atención registrada correctamente. Ahora puede registrar los diagnósticos CIE-10.");
-      const createdAttention = response?.data?.atencion;
-      if (createdAttention?.id_atencion) {
-        setAttentionId(createdAttention.id_atencion);
-      }
+      setSuccessMessage("Atención registrada correctamente.");
       setDiagnosticosDraft([]);
 
       router.push("/appointments");
@@ -1298,7 +1171,7 @@ export default function AttendAppointmentPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validationError = validateAttendForm({ citaData, form });
+    const validationError = validateAttendForm({ citaData, form, isRegAtencionSalud });
     if (validationError) {
       setError(validationError);
       return;
@@ -1687,10 +1560,10 @@ export default function AttendAppointmentPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Observación / Análisis</label>
+                <label className="text-[11px] font-semibold text-slate-700">Observación</label>
                 <textarea
-                  value={simpleForm.analisis}
-                  onChange={(e) => setSimpleForm({ ...simpleForm, analisis: e.target.value })}
+                  value={simpleForm.observacionAnalisis}
+                  onChange={(e) => setSimpleForm({ ...simpleForm, observacionAnalisis: e.target.value })}
                   rows={4}
                   className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
                 />
@@ -1708,10 +1581,10 @@ export default function AttendAppointmentPage() {
 
               <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">SEGUIMIENTO</div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-3">
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700">
-                    Seguimiento <span className="text-red-500">*</span>
+                    Va a iniciar o hace parte de un seguimiento <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={simpleForm.seguimiento}
@@ -1743,7 +1616,7 @@ export default function AttendAppointmentPage() {
                     </div>
 
                     {(simpleForm.seguimientoOpcion === "CONDICIONES_CRONICAS" || simpleForm.seguimientoOpcion === "SITUACION_EN_SALUD") && (
-                      <>
+                      <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-1">
                           <p className="text-[11px] font-semibold text-slate-700">Seguimiento efectivo</p>
                           <div className="flex flex-wrap gap-4 text-xs text-slate-700">
@@ -1795,18 +1668,28 @@ export default function AttendAppointmentPage() {
                             </label>
                           </div>
                         </div>
-                      </>
-                    )}
 
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-700">Fecha</label>
-                      <input
-                        type="date"
-                        value={simpleForm.seguimientoFecha}
-                        onChange={(e) => setSimpleForm({ ...simpleForm, seguimientoFecha: e.target.value })}
-                        className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
-                      />
-                    </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-700">Fecha</label>
+                          <input
+                            type="date"
+                            value={simpleForm.seguimientoFecha}
+                            onChange={(e) => setSimpleForm({ ...simpleForm, seguimientoFecha: e.target.value })}
+                            className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-700">Observación</label>
+                          <textarea
+                            value={simpleForm.seguimientoObservaciones || ""}
+                            onChange={(e) => setSimpleForm({ ...simpleForm, seguimientoObservaciones: e.target.value })}
+                            rows={3}
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -1815,7 +1698,6 @@ export default function AttendAppointmentPage() {
 
           {activeTab === "DIAGNOSTICOS" && (
             <DiagnosticosTab
-              attentionId={attentionId}
               diagnosticosDraft={diagnosticosDraft}
               setDiagnosticosDraft={setDiagnosticosDraft}
               form={form}
@@ -1832,22 +1714,21 @@ export default function AttendAppointmentPage() {
           <button
             type="button"
             onClick={() => handleWizardNav("back")}
-            disabled={!canGoBack || savingDraft}
+            disabled={!canGoBack || mutation.isPending}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {savingDraft ? "Guardando..." : "Atrás"}
+            Atrás
           </button>
           <button
             type="button"
             onClick={() => (canGoNext ? handleWizardNav("next") : handleFinalize())}
             disabled={
-              savingDraft ||
               mutation.isPending ||
               (canGoNext ? !activeTabCompletion.ok : false)
             }
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {savingDraft || mutation.isPending
+            {mutation.isPending
               ? "Guardando..."
               : canGoNext
                 ? "Siguiente"

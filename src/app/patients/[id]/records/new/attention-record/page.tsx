@@ -75,15 +75,18 @@ export default function NewAttentionRecordDirectPage() {
   const [idSede, setIdSede] = useState<string>("");
 
   const [motivoAtencion, setMotivoAtencion] = useState<string>("");
+  const [observacionAnalisis, setObservacionAnalisis] = useState<string>("");
   const [analisis, setAnalisis] = useState<string>("");
   const [planManejo, setPlanManejo] = useState<string>("");
 
+  const [haceParteSeguimiento, setHaceParteSeguimiento] = useState<"" | "SI" | "NO">("");
   const [seguimiento, setSeguimiento] = useState<"" | "SI" | "NO">("");
 
   const [seguimientoOpcion, setSeguimientoOpcion] = useState<string>("");
   const [seguimientoEfectivo, setSeguimientoEfectivo] = useState<"" | "SI" | "NO">("");
   const [cierreSeguimiento, setCierreSeguimiento] = useState<"" | "SI" | "NO">("");
   const [seguimientoFecha, setSeguimientoFecha] = useState<string>("");
+  const [seguimientoObservaciones, setSeguimientoObservaciones] = useState<string>("");
   const [idHistoriaVinculada, setIdHistoriaVinculada] = useState<string>("");
 
   const [diagnosticosDraft, setDiagnosticosDraft] = useState<DiagnosisDraft[]>([]);
@@ -122,13 +125,20 @@ export default function NewAttentionRecordDirectPage() {
     },
   });
 
-  const shouldRequireHistoriaVinculada = seguimiento === "SI";
+  const shouldRequireHistoriaVinculada = haceParteSeguimiento === "SI";
 
   useEffect(() => {
     if (!shouldRequireHistoriaVinculada && idHistoriaVinculada) {
       setIdHistoriaVinculada("");
     }
   }, [shouldRequireHistoriaVinculada, idHistoriaVinculada]);
+
+  useEffect(() => {
+    if (seguimientoOpcion === "NO_APLICA" || seguimientoOpcion === "") {
+      setSeguimientoObservaciones("");
+      setSeguimientoFecha("");
+    }
+  }, [seguimientoOpcion]);
 
   const { data: followupRecordsData } = useQuery<any[]>({
     queryKey: ["new-attention-record-followup-records", idPaciente],
@@ -194,11 +204,13 @@ export default function NewAttentionRecordDirectPage() {
     idSede.trim().length > 0 &&
     idTipoAtencion.trim().length > 0 &&
     idModalidadAtencion.trim().length > 0 &&
+    haceParteSeguimiento.trim().length > 0 &&
     seguimiento.trim().length > 0 &&
     motivoAtencion.trim().length > 0 &&
+    observacionAnalisis.trim().length > 0 &&
     analisis.trim().length > 0 &&
     planManejo.trim().length > 0 &&
-    seguimientoOpcion.trim().length > 0 &&
+    (seguimiento !== "SI" || seguimientoOpcion.trim().length > 0) &&
     (!shouldRequireHistoriaVinculada || idHistoriaVinculada.trim().length > 0) &&
     diagnosticosDraft.length > 0;
 
@@ -231,8 +243,8 @@ export default function NewAttentionRecordDirectPage() {
       return;
     }
 
-    if (!analisis.trim()) {
-      setError("Debe diligenciar la observación / análisis.");
+    if (!observacionAnalisis.trim()) {
+      setError("Debe diligenciar la observación.");
       return;
     }
 
@@ -241,7 +253,7 @@ export default function NewAttentionRecordDirectPage() {
       return;
     }
 
-    if (!seguimientoOpcion.trim()) {
+    if (seguimiento === "SI" && !seguimientoOpcion.trim()) {
       setError("Debe seleccionar el tipo de seguimiento.");
       return;
     }
@@ -308,14 +320,16 @@ export default function NewAttentionRecordDirectPage() {
         id_modalidad_atencion: Number(idModalidadAtencion),
         id_sede: idSede ? Number(idSede) : null,
         motivo_atencion: motivoAtencion,
+        observacion_analisis: observacionAnalisis,
         analisis,
         plan_manejo: planManejo,
-        seguimiento_opcion: seguimientoOpcion || null,
+        seguimiento_opcion: seguimiento === "SI" ? seguimientoOpcion || null : "NO_APLICA",
         seguimiento_efectivo:
-          seguimientoEfectivo === "SI" ? true : seguimientoEfectivo === "NO" ? false : null,
+          seguimiento === "SI" && seguimientoEfectivo === "SI" ? true : seguimiento === "SI" && seguimientoEfectivo === "NO" ? false : null,
         cierre_seguimiento:
-          cierreSeguimiento === "SI" ? true : cierreSeguimiento === "NO" ? false : null,
-        seguimiento_fecha: seguimientoFecha || null,
+          seguimiento === "SI" && cierreSeguimiento === "SI" ? true : seguimiento === "SI" && cierreSeguimiento === "NO" ? false : null,
+        seguimiento_fecha: seguimiento === "SI" ? seguimientoFecha || null : null,
+        seguimiento_observaciones: seguimientoObservaciones || null,
         diagnosticos: diagnosticosDraft.map((d) => ({
           codigo_cie10: d.codigo_cie10,
           es_principal: d.es_principal,
@@ -342,20 +356,25 @@ export default function NewAttentionRecordDirectPage() {
 
     didAttemptPrefillRef.current = true;
 
-    const hasAnyTargetValue = motivoAtencion.trim() || analisis.trim() || planManejo.trim();
+    const hasAnyTargetValue = motivoAtencion.trim() || observacionAnalisis.trim() || analisis.trim() || planManejo.trim();
     if (hasAnyTargetValue) return;
 
     (async () => {
       try {
         const resRecords = await apiClient.get<{ data: any[] }>(`/patients/${idPaciente}/records`);
         const records = Array.isArray(resRecords.data?.data) ? resRecords.data.data : [];
-        const targetHistory = records.find((r) => Number(r?.attention_count) > 0) ?? null;
+        const targetHistory =
+          records.find(
+            (r) =>
+              Number(r?.attention_count) > 0 &&
+              String(r?.tipo_historia_codigo ?? "").trim() === "REG_ATENCION_SALUD",
+          ) ?? null;
         const idHistoria = targetHistory?.id_historia ? Number(targetHistory.id_historia) : null;
         if (!idHistoria || !Number.isInteger(idHistoria) || idHistoria <= 0) return;
 
         const modalResult = await Swal.fire({
           title: "Precargar información clínica",
-          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (motivo, análisis y plan de manejo)?",
+          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (motivo, observación, análisis y plan de manejo)?",
           icon: "question",
           showCancelButton: true,
           confirmButtonText: "Sí, precargar",
@@ -375,17 +394,59 @@ export default function NewAttentionRecordDirectPage() {
         if (!lastAttention) return;
 
         const nextMotivo = String(lastAttention?.hc_anamnesis_atencion?.motivo_consulta ?? "");
-        const nextAnalisis = String(lastAttention?.analisis ?? "");
+        const nextObservacionAnalisis = String(lastAttention?.observacion_analisis ?? "");
+        // nextAnalisis no se usa - el análisis no debe precargarse desde atenciones anteriores
         const nextPlan = String(lastAttention?.hc_atencion_cierre?.conducta_plan_estudio_manejo ?? "");
+        const nextSeguimientoOpcion = String(lastAttention?.hc_atencion_cierre?.seguimiento_opcion ?? "");
+        const nextSeguimientoObservaciones = String(lastAttention?.hc_atencion_cierre?.seguimiento_observaciones ?? "");
+        const nextIdHistoriaVinculada = lastAttention?.historia?.id_historia_vinculada;
 
         setMotivoAtencion((prev) => (prev.trim() ? prev : nextMotivo));
-        setAnalisis((prev) => (prev.trim() ? prev : nextAnalisis));
+        setObservacionAnalisis((prev) => (prev.trim() ? prev : nextObservacionAnalisis));
+        // analisis no se precarga - el profesional debe ingresarlo manualmente
         setPlanManejo((prev) => (prev.trim() ? prev : nextPlan));
+        setHaceParteSeguimiento((prev) => {
+          if (prev.trim()) return prev;
+          if (nextIdHistoriaVinculada) return "SI";
+          return "";
+        });
+        setSeguimiento((prev) => {
+          if (prev.trim()) return prev;
+          if (nextSeguimientoOpcion && nextSeguimientoOpcion !== "NO_APLICA") return "SI";
+          return "";
+        });
+        setSeguimientoOpcion((prev) => (prev.trim() ? prev : nextSeguimientoOpcion === "NO_APLICA" ? "" : nextSeguimientoOpcion));
+        setSeguimientoObservaciones((prev) => (prev.trim() ? prev : nextSeguimientoObservaciones));
+        setSeguimientoEfectivo((prev) =>
+          prev || (
+            lastAttention?.hc_atencion_cierre?.seguimiento_efectivo === true
+              ? "SI"
+              : lastAttention?.hc_atencion_cierre?.seguimiento_efectivo === false
+                ? "NO"
+                : ""
+          ),
+        );
+        setCierreSeguimiento((prev) =>
+          prev || (
+            lastAttention?.hc_atencion_cierre?.cierre_seguimiento === true
+              ? "SI"
+              : lastAttention?.hc_atencion_cierre?.cierre_seguimiento === false
+                ? "NO"
+                : ""
+          ),
+        );
+        setSeguimientoFecha((prev) =>
+          prev.trim()
+            ? prev
+            : lastAttention?.hc_atencion_cierre?.seguimiento_fecha
+              ? String(lastAttention.hc_atencion_cierre.seguimiento_fecha).slice(0, 10)
+              : "",
+        );
       } catch {
         // ignore
       }
     })();
-  }, [analisis, createMutation.isPending, idPaciente, motivoAtencion, planManejo]);
+  }, [observacionAnalisis, analisis, createMutation.isPending, idPaciente, motivoAtencion, planManejo]);
 
   const pacienteNombreCompleto = useMemo(() => {
     const nombres = pacienteData?.nombres ?? "";
@@ -671,7 +732,7 @@ export default function NewAttentionRecordDirectPage() {
 
               <div>
                 <label className="text-[11px] font-semibold text-slate-700">
-                  Seguimiento <span className="text-red-500">*</span>
+                  Hace parte de un seguimiento? <span className="text-red-500">*</span>
                 </label>
                 <div className="mt-1">
                   <Select
@@ -687,14 +748,18 @@ export default function NewAttentionRecordDirectPage() {
                       { value: "NO", label: "No" },
                     ]}
                     value={(() => {
-                      if (!seguimiento) return null;
-                      return seguimiento === "SI"
+                      if (!haceParteSeguimiento) return null;
+                      return haceParteSeguimiento === "SI"
                         ? ({ value: "SI", label: "Sí" } as SimpleSelectOption)
                         : ({ value: "NO", label: "No" } as SimpleSelectOption);
                     })()}
                     onChange={(opt: any) => {
                       const selected = opt as SimpleSelectOption | null;
-                      setSeguimiento((selected ? selected.value : "") as any);
+                      const next = (selected ? selected.value : "") as "" | "SI" | "NO";
+                      setHaceParteSeguimiento(next);
+                      if (next !== "SI") {
+                        setIdHistoriaVinculada("");
+                      }
                     }}
                   />
                 </div>
@@ -876,10 +941,10 @@ export default function NewAttentionRecordDirectPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Observación / Análisis</label>
+                <label className="text-[11px] font-semibold text-slate-700">Observación</label>
                 <textarea
-                  value={analisis}
-                  onChange={(e) => setAnalisis(e.target.value)}
+                  value={observacionAnalisis}
+                  onChange={(e) => setObservacionAnalisis(e.target.value)}
                   rows={4}
                   className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
                 />
@@ -897,128 +962,152 @@ export default function NewAttentionRecordDirectPage() {
 
               <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">SEGUIMIENTO</div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-3">
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700">
-                    Tipo de seguimiento <span className="text-red-500">*</span>
+                    Va a iniciar o hace parte de un seguimiento <span className="text-red-500">*</span>
                   </label>
-                  <div className="mt-1">
-                    <Select
-                      isClearable
-                      isSearchable
-                      classNamePrefix="react-select"
-                      menuPortalTarget={selectMenuPortalTarget}
-                      menuPosition="fixed"
-                      styles={selectStyles}
-                      placeholder="Seleccione..."
-                      options={(
-                        [
-                          { value: "CONDICIONES_CRONICAS", label: "CONDICIONES CRÓNICAS" },
-                          { value: "SITUACION_EN_SALUD", label: "SITUACIÓN EN SALUD" },
-                          { value: "NO_APLICA", label: "NO APLICA" },
-                        ] as SimpleSelectOption[]
-                      )}
-                      value={(() => {
-                        const v = String(seguimientoOpcion || "").trim();
-                        if (!v) return null;
-                        const opts: SimpleSelectOption[] = [
-                          { value: "CONDICIONES_CRONICAS", label: "CONDICIONES CRÓNICAS" },
-                          { value: "SITUACION_EN_SALUD", label: "SITUACIÓN EN SALUD" },
-                          { value: "NO_APLICA", label: "NO APLICA" },
-                        ];
-                        return opts.find((o) => o.value === v) ?? null;
-                      })()}
-                      onChange={(option: any) => {
-                        const selected = option as SimpleSelectOption | null;
-                        const next = selected ? String(selected.value) : "";
-                        setSeguimientoOpcion(next);
-                        if (next !== "CONDICIONES_CRONICAS" && next !== "SITUACION_EN_SALUD") {
-                          setSeguimientoEfectivo("");
-                          setCierreSeguimiento("");
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-700">Fecha</label>
-                  <input
-                    type="date"
-                    value={seguimientoFecha}
-                    onChange={(e) => setSeguimientoFecha(e.target.value)}
+                  <select
+                    value={seguimiento}
+                    onChange={(e) => {
+                      const next = e.target.value as "" | "SI" | "NO";
+                      setSeguimiento(next);
+                      if (next !== "SI") {
+                        setSeguimientoOpcion("");
+                        setSeguimientoEfectivo("");
+                        setCierreSeguimiento("");
+                        setSeguimientoFecha("");
+                      }
+                    }}
                     className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
-                  />
+                  >
+                    <option value="">Seleccione...</option>
+                    <option value="SI">Sí</option>
+                    <option value="NO">No</option>
+                  </select>
                 </div>
+
+                {seguimiento === "SI" && (
+                  <>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Tipo de seguimiento <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={seguimientoOpcion}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setSeguimientoOpcion(next);
+                          if (next !== "CONDICIONES_CRONICAS" && next !== "SITUACION_EN_SALUD") {
+                            setSeguimientoEfectivo("");
+                            setCierreSeguimiento("");
+                          }
+                        }}
+                        className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                      >
+                        <option value="">Seleccione...</option>
+                        <option value="CONDICIONES_CRONICAS">CONDICIONES CRÓNICAS</option>
+                        <option value="SITUACION_EN_SALUD">SITUACIÓN EN SALUD</option>
+                        <option value="NO_APLICA">NO APLICA</option>
+                      </select>
+                    </div>
+
+                    {(seguimientoOpcion === "CONDICIONES_CRONICAS" || seguimientoOpcion === "SITUACION_EN_SALUD") && (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold text-slate-700">Seguimiento efectivo</p>
+                          <div className="flex flex-wrap gap-4 text-xs text-slate-700">
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="seguimiento_efectivo_direct"
+                                checked={seguimientoEfectivo === "SI"}
+                                onChange={() => setSeguimientoEfectivo("SI")}
+                                className="h-3 w-3"
+                              />
+                              <span>Sí</span>
+                            </label>
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="seguimiento_efectivo_direct"
+                                checked={seguimientoEfectivo === "NO"}
+                                onChange={() => setSeguimientoEfectivo("NO")}
+                                className="h-3 w-3"
+                              />
+                              <span>No</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold text-slate-700">Cierre seguimiento</p>
+                          <div className="flex flex-wrap gap-4 text-xs text-slate-700">
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="cierre_seguimiento_direct"
+                                checked={cierreSeguimiento === "SI"}
+                                onChange={() => setCierreSeguimiento("SI")}
+                                className="h-3 w-3"
+                              />
+                              <span>Sí</span>
+                            </label>
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="cierre_seguimiento_direct"
+                                checked={cierreSeguimiento === "NO"}
+                                onChange={() => setCierreSeguimiento("NO")}
+                                className="h-3 w-3"
+                              />
+                              <span>No</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-700">Fecha</label>
+                          <input
+                            type="date"
+                            value={seguimientoFecha}
+                            onChange={(e) => setSeguimientoFecha(e.target.value)}
+                            className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-700">Observación</label>
+                          <textarea
+                            value={seguimientoObservaciones}
+                            onChange={(e) => setSeguimientoObservaciones(e.target.value)}
+                            rows={3}
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-
-              {(seguimientoOpcion === "CONDICIONES_CRONICAS" || seguimientoOpcion === "SITUACION_EN_SALUD") && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-semibold text-slate-700">Seguimiento efectivo</p>
-                    <div className="flex flex-wrap gap-4 text-xs text-slate-700">
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="seguimiento_efectivo_direct"
-                          checked={seguimientoEfectivo === "SI"}
-                          onChange={() => setSeguimientoEfectivo("SI")}
-                          className="h-3 w-3"
-                        />
-                        <span>Sí</span>
-                      </label>
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="seguimiento_efectivo_direct"
-                          checked={seguimientoEfectivo === "NO"}
-                          onChange={() => setSeguimientoEfectivo("NO")}
-                          className="h-3 w-3"
-                        />
-                        <span>No</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-semibold text-slate-700">Cierre seguimiento</p>
-                    <div className="flex flex-wrap gap-4 text-xs text-slate-700">
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="cierre_seguimiento_direct"
-                          checked={cierreSeguimiento === "SI"}
-                          onChange={() => setCierreSeguimiento("SI")}
-                          className="h-3 w-3"
-                        />
-                        <span>Sí</span>
-                      </label>
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="cierre_seguimiento_direct"
-                          checked={cierreSeguimiento === "NO"}
-                          onChange={() => setCierreSeguimiento("NO")}
-                          className="h-3 w-3"
-                        />
-                        <span>No</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
             </div>
           )}
 
           {activeTab === "DIAGNOSTICOS" && (
             <div className="space-y-3">
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px]">
+                <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">ANÁLISIS</div>
+                <textarea
+                  value={analisis}
+                  onChange={(e) => setAnalisis(e.target.value)}
+                  rows={6}
+                  className="min-h-[140px] w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  placeholder="Escriba el análisis clínico"
+                />
+              </div>
               <AttentionDiagnosesSection
-                attentionId={null}
                 diagnosticosDraft={diagnosticosDraft}
                 setDiagnosticosDraft={setDiagnosticosDraft}
-                form={{}}
-                setForm={() => {}}
                 setError={setError}
                 setSuccessMessage={setSuccessMessage}
               />

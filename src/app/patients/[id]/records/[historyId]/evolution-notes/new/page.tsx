@@ -187,11 +187,8 @@ export default function NewEvolutionNotePage() {
 
           <div className="mt-4">
             <AttentionDiagnosesSection
-              attentionId={null}
               diagnosticosDraft={diagnosticosDraft}
               setDiagnosticosDraft={setDiagnosticosDraft}
-              form={form}
-              setForm={setForm}
               setError={setError}
               setSuccessMessage={setSuccessMessage}
             />

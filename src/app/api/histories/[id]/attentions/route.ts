@@ -46,6 +46,11 @@ function resolveHistoriaEstadoFromSeguimiento(input: {
   if (!opt) return null;
 
   if (opt === "NO_APLICA") return "Finalizado";
+  // Si hay seguimiento efectivo y cierre de seguimiento, la atención queda en Seguimiento
+  if (input.seguimientoEfectivo === true && input.cierreSeguimiento === true) {
+    return "Seguimiento";
+  }
+  // Si solo hay cierre de seguimiento sin seguimiento efectivo, se finaliza
   if (input.cierreSeguimiento === true) return "Finalizado";
   if (input.cierreSeguimiento === false) {
     return "Seguimiento";
@@ -112,12 +117,14 @@ export async function POST(
       id_modalidad_atencion,
       id_sede,
       motivo_atencion,
+      observacion_analisis,
       analisis,
       plan_manejo,
       seguimiento_opcion,
       seguimiento_efectivo,
       cierre_seguimiento,
       seguimiento_fecha,
+      seguimiento_observaciones,
       diagnosticos,
     } = body ?? {};
 
@@ -162,9 +169,10 @@ export async function POST(
     }
 
     const analisisTrim = String(analisis ?? "").trim();
+    const observacionAnalisisTrim = String(observacion_analisis ?? "").trim();
     if (!analisisTrim) {
       return NextResponse.json(
-        { message: "La observación / análisis es obligatoria" },
+        { message: "El análisis es obligatorio" },
         { status: 400 },
       );
     }
@@ -231,6 +239,7 @@ export async function POST(
     const seguimientoEfectivoBool = normalizeOptionalBoolean(seguimiento_efectivo);
     const cierreSeguimientoBool = normalizeOptionalBoolean(cierre_seguimiento);
     const seguimientoFechaDate = normalizeDateOnly(seguimiento_fecha);
+    const seguimientoObservacionesTrim = String(seguimiento_observaciones ?? "").trim();
 
     const resolvedEstado = resolveHistoriaEstadoFromSeguimiento({
       seguimientoOpcion: seguimientoOpcionTrim,
@@ -270,6 +279,7 @@ export async function POST(
         id_modalidad_atencion: idModalidadAtencion,
         fecha_hora: fechaHora,
         analisis: analisisTrim || null,
+        observacion_analisis: observacionAnalisisTrim || null,
         hc_anamnesis_atencion: {
           create: {
             motivo_consulta: motivoTrim,
@@ -285,7 +295,7 @@ export async function POST(
             certificado_opcion: null,
             notificacion_emitida: null,
             seguimiento_notificacion: null,
-            notificacion_observaciones: null,
+            seguimiento_observaciones: seguimientoObservacionesTrim || null,
             seguimiento_opcion: seguimientoOpcionTrim || null,
             seguimiento_efectivo: seguimientoEfectivoBool,
             cierre_seguimiento: cierreSeguimientoBool,
@@ -319,6 +329,12 @@ export async function POST(
             await prisma.historias_clinicas.update({
               where: { id_historia: idHistoriaVinculada },
               data: { estado: "Finalizado" },
+            });
+
+            // Actualizar cita asociada a la historia vinculada para que ya no esté en seguimiento
+            await prisma.citas.updateMany({
+              where: { id_historia_vinculada: idHistoriaVinculada },
+              data: { seguimiento: false },
             });
           }
         } else {

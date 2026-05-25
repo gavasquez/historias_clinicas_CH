@@ -4,7 +4,6 @@ import React from "react";
 import { AttentionDiagnosesSection, type DiagnosisDraft } from "./AttentionDiagnosesSection";
 
 export function DiagnosticosTab({
-  attentionId,
   diagnosticosDraft,
   setDiagnosticosDraft,
   form,
@@ -12,7 +11,6 @@ export function DiagnosticosTab({
   setError,
   setSuccessMessage,
 }: {
-  attentionId: number | null;
   diagnosticosDraft: DiagnosisDraft[];
   setDiagnosticosDraft: (next: DiagnosisDraft[] | ((prev: DiagnosisDraft[]) => DiagnosisDraft[])) => void;
   form: any;
@@ -34,11 +32,8 @@ export function DiagnosticosTab({
       </div>
 
       <AttentionDiagnosesSection
-        attentionId={attentionId}
         diagnosticosDraft={diagnosticosDraft}
         setDiagnosticosDraft={setDiagnosticosDraft}
-        form={form}
-        setForm={setForm}
         setError={setError}
         setSuccessMessage={setSuccessMessage}
       />

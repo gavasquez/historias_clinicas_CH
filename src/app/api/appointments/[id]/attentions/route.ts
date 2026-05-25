@@ -29,6 +29,11 @@ function resolveHistoriaEstadoFromSeguimiento(input: {
   if (!opt) return null;
 
   if (opt === "NO_APLICA") return "Finalizado";
+  // Si hay seguimiento efectivo y cierre de seguimiento, la atención queda en Seguimiento
+  if (input.seguimientoEfectivo === true && input.cierreSeguimiento === true) {
+    return "Seguimiento";
+  }
+  // Si solo hay cierre de seguimiento sin seguimiento efectivo, se finaliza
   if (input.cierreSeguimiento === true) return "Finalizado";
   if (input.cierreSeguimiento === false) {
     return "Seguimiento";
@@ -54,6 +59,7 @@ export async function POST(
       anamnesis_motivo_consulta,
       anamnesis_enfermedad_actual,
       analisis,
+      observacion_analisis,
       hc_atencion_cierre,
       antecedentes,
       antecedentes_traumaticos,
@@ -158,68 +164,76 @@ export async function POST(
       return NextResponse.json({ message: "Tipo de atención inválido" }, { status: 400 });
     }
 
-    if (typeof llega_por_sus_medios !== "boolean") {
-      return NextResponse.json(
-        { message: "El campo llega_por_sus_medios es obligatorio" },
-        { status: 400 },
-      );
-    }
+    // Validaciones específicas según tipo de historia clínica
+    const isRegAtencionSalud = tipoHistoria.codigo === "REG_ATENCION_SALUD";
 
+    // Variables que se usan más adelante (inicializar con valores por defecto)
     const llegaPorSusMediosCualTrim = String(llega_por_sus_medios_cual ?? "").trim();
-    if (llega_por_sus_medios === false && !llegaPorSusMediosCualTrim) {
-      return NextResponse.json(
-        { message: "Debe especificar cuál cuando llega_por_sus_medios es No" },
-        { status: 400 },
-      );
-    }
-
     const estadoLlegada = String(estado_a_la_llegada ?? "").trim().toUpperCase();
-    const estadosPermitidos = new Set(["CONSCIENTE", "INCONSCIENTE", "MUERTO"]);
-    if (!estadoLlegada || !estadosPermitidos.has(estadoLlegada)) {
-      return NextResponse.json(
-        { message: "El estado_a_la_llegada es obligatorio" },
-        { status: 400 },
-      );
-    }
-
-    if (typeof caso_accidente_intoxicacion_violencia !== "boolean") {
-      return NextResponse.json(
-        { message: "El campo caso_accidente_intoxicacion_violencia es obligatorio" },
-        { status: 400 },
-      );
-    }
-
     let fechaOcurrencia: Date | null = null;
     const lugarOcurrenciaTrim = String(lugar_ocurrencia_evento ?? "").trim();
-    if (caso_accidente_intoxicacion_violencia === true) {
-      if (fecha_ocurrencia_evento) {
-        const parsed = new Date(fecha_ocurrencia_evento);
-        if (!Number.isNaN(parsed.getTime())) {
-          fechaOcurrencia = parsed;
+    const notificacionOtroCualTrim = String(notificacion_otro_cual ?? "").trim();
+
+    if (!isRegAtencionSalud) {
+      // Validaciones solo para flujo completo (HC_CONSULTA_EXTERNA)
+      if (typeof llega_por_sus_medios !== "boolean") {
+        return NextResponse.json(
+          { message: "El campo llega_por_sus_medios es obligatorio" },
+          { status: 400 },
+        );
+      }
+
+      if (llega_por_sus_medios === false && !llegaPorSusMediosCualTrim) {
+        return NextResponse.json(
+          { message: "Debe especificar cuál cuando llega_por_sus_medios es No" },
+          { status: 400 },
+        );
+      }
+
+      const estadosPermitidos = new Set(["CONSCIENTE", "INCONSCIENTE", "MUERTO"]);
+      if (!estadoLlegada || !estadosPermitidos.has(estadoLlegada)) {
+        return NextResponse.json(
+          { message: "El estado_a_la_llegada es obligatorio" },
+          { status: 400 },
+        );
+      }
+
+      if (typeof caso_accidente_intoxicacion_violencia !== "boolean") {
+        return NextResponse.json(
+          { message: "El campo caso_accidente_intoxicacion_violencia es obligatorio" },
+          { status: 400 },
+        );
+      }
+
+      if (caso_accidente_intoxicacion_violencia === true) {
+        if (fecha_ocurrencia_evento) {
+          const parsed = new Date(fecha_ocurrencia_evento);
+          if (!Number.isNaN(parsed.getTime())) {
+            fechaOcurrencia = parsed;
+          }
+        }
+
+        if (!fechaOcurrencia) {
+          return NextResponse.json(
+            { message: "La fecha_ocurrencia_evento es obligatoria cuando el caso es Sí" },
+            { status: 400 },
+          );
+        }
+
+        if (!lugarOcurrenciaTrim) {
+          return NextResponse.json(
+            { message: "El lugar_ocurrencia_evento es obligatorio cuando el caso es Sí" },
+            { status: 400 },
+          );
         }
       }
 
-      if (!fechaOcurrencia) {
+      if (notificacion_otro === true && !notificacionOtroCualTrim) {
         return NextResponse.json(
-          { message: "La fecha_ocurrencia_evento es obligatoria cuando el caso es Sí" },
+          { message: "Debe especificar notificacion_otro_cual cuando notificacion_otro está marcado" },
           { status: 400 },
         );
       }
-
-      if (!lugarOcurrenciaTrim) {
-        return NextResponse.json(
-          { message: "El lugar_ocurrencia_evento es obligatorio cuando el caso es Sí" },
-          { status: 400 },
-        );
-      }
-    }
-
-    const notificacionOtroCualTrim = String(notificacion_otro_cual ?? "").trim();
-    if (notificacion_otro === true && !notificacionOtroCualTrim) {
-      return NextResponse.json(
-        { message: "Debe especificar notificacion_otro_cual cuando notificacion_otro está marcado" },
-        { status: 400 },
-      );
     }
 
     const anamnesisMotivoTrim = anamnesisMotivoTrimEarly;
@@ -233,11 +247,14 @@ export async function POST(
       );
     }
 
-    if (!anamnesisEnfActualTrim) {
-      return NextResponse.json(
-        { message: "La enfermedad actual es obligatoria" },
-        { status: 400 },
-      );
+    if (!isRegAtencionSalud) {
+      // Solo validar enfermedad actual para historias clínicas completas (no REG_ATENCION_SALUD)
+      if (!anamnesisEnfActualTrim) {
+        return NextResponse.json(
+          { message: "La enfermedad actual es obligatoria" },
+          { status: 400 },
+        );
+      }
     }
 
     const antecedentesPersonalObsTrim = (() => {
@@ -254,11 +271,14 @@ export async function POST(
       return String(found?.observacion ?? "").trim();
     })();
 
-    if (!antecedentesPersonalObsTrim && !antecedentesFamiliarObsTrim) {
-      return NextResponse.json(
-        { message: "Debe diligenciar antecedentes personales o familiares" },
-        { status: 400 },
-      );
+    if (!isRegAtencionSalud) {
+      // Solo validar antecedentes para flujo completo
+      if (!antecedentesPersonalObsTrim && !antecedentesFamiliarObsTrim) {
+        return NextResponse.json(
+          { message: "Debe diligenciar antecedentes personales o familiares" },
+          { status: 400 },
+        );
+      }
     }
 
     const antecedentesCreate = antecedentesArray
@@ -300,11 +320,14 @@ export async function POST(
     })();
     const hasAntecedentesTraumaticos = !!(naturalezaLesionTrim || secuelasTrim || fechaOcurrenciaTrauma);
 
-    if (!hasAntecedentesTraumaticos) {
-      return NextResponse.json(
-        { message: "Debe diligenciar antecedentes traumáticos" },
-        { status: 400 },
-      );
+    if (!isRegAtencionSalud) {
+      // Solo validar antecedentes traumáticos para flujo completo
+      if (!hasAntecedentesTraumaticos) {
+        return NextResponse.json(
+          { message: "Debe diligenciar antecedentes traumáticos" },
+          { status: 400 },
+        );
+      }
     }
 
     const diagnosticosArray = Array.isArray(diagnosticos) ? diagnosticos : [];
@@ -342,7 +365,20 @@ export async function POST(
       codigo_confirmacion: "CN" | "CR" | "ID" | null;
     }>;
 
-    if (diagnosticosCreateRaw.length === 0) {
+    // Check if there are existing diagnoses on the attention
+    const existingDiagnoses = existingAttention?.id_atencion
+      ? await prisma.diagnosticos_atencion.findMany({
+          where: { id_atencion: existingAttention.id_atencion },
+        })
+      : [];
+
+    // Only require at least one diagnosis if:
+    // 1. There are new diagnoses being sent, OR
+    // 2. There are no existing diagnoses
+    const hasNewDiagnoses = diagnosticosCreateRaw.length > 0;
+    const hasExistingDiagnoses = existingDiagnoses.length > 0;
+
+    if (!hasNewDiagnoses && !hasExistingDiagnoses) {
       return NextResponse.json(
         { message: "Debe agregar al menos un diagnóstico" },
         { status: 400 },
@@ -464,6 +500,12 @@ export async function POST(
                 where: { id_historia: idHistoriaVinculada },
                 data: { estado: "Finalizado" },
               });
+
+              // Actualizar cita asociada a la historia vinculada para que ya no esté en seguimiento
+              await prisma.citas.updateMany({
+                where: { id_historia_vinculada: idHistoriaVinculada },
+                data: { seguimiento: false },
+              });
             } catch {
               // ignore
             }
@@ -480,25 +522,30 @@ export async function POST(
     const hcExamenFisicoTrim = String(hc_examen_fisico_contenido ?? "").trim();
     const hcValoracionSistemasTrim = String(hc_valoracion_sistemas_contenido ?? "").trim();
 
-    if (!hcTamizajesTrim) {
-      return NextResponse.json(
-        { message: "Debe diligenciar los tamizajes" },
-        { status: 400 },
-      );
-    }
+    if (!isRegAtencionSalud) {
+      // Solo validar tamizajes para flujo completo
+      if (!hcTamizajesTrim) {
+        return NextResponse.json(
+          { message: "Debe diligenciar los tamizajes" },
+          { status: 400 },
+        );
+      }
 
-    if (!hcExamenFisicoTrim) {
-      return NextResponse.json(
-        { message: "Debe diligenciar el examen físico" },
-        { status: 400 },
-      );
-    }
+      // Solo validar examen físico para flujo completo
+      if (!hcExamenFisicoTrim) {
+        return NextResponse.json(
+          { message: "Debe diligenciar el examen físico" },
+          { status: 400 },
+        );
+      }
 
-    if (!hcValoracionSistemasTrim) {
-      return NextResponse.json(
-        { message: "Debe diligenciar la revisión por sistemas" },
-        { status: 400 },
-      );
+      // Solo validar revisión por sistemas para flujo completo
+      if (!hcValoracionSistemasTrim) {
+        return NextResponse.json(
+          { message: "Debe diligenciar la revisión por sistemas" },
+          { status: 400 },
+        );
+      }
     }
 
     const habitosParsed = (() => {
@@ -559,17 +606,21 @@ export async function POST(
       cierreNotifEmitidaRaw === true ? true : cierreNotifEmitidaRaw === false ? false : null;
     const cierreSegNotifTrim = String((cierreRaw as any)?.seguimiento_notificacion ?? "").trim();
     const cierreNotifObsTrim = String((cierreRaw as any)?.notificacion_observaciones ?? "").trim();
+    const cierreSegObsTrim = String((cierreRaw as any)?.seguimiento_observaciones ?? "").trim();
     const cierreSegOpcionTrim = String(cierreRaw?.seguimiento_opcion ?? "").trim();
     const cierreSegEfectivo = normalizeOptionalBoolean((cierreRaw as any)?.seguimiento_efectivo);
     const cierreSegCierre = normalizeOptionalBoolean((cierreRaw as any)?.cierre_seguimiento);
     const cierreSegFechaRaw = (cierreRaw as any)?.seguimiento_fecha;
     const cierreSegFecha = cierreSegFechaRaw ? normalizeDateOnly(cierreSegFechaRaw) : null;
 
-    if (!cierreSegOpcionTrim) {
-      return NextResponse.json(
-        { message: "El tipo de seguimiento es obligatorio" },
-        { status: 400 },
-      );
+    if (!isRegAtencionSalud) {
+      // Solo validar tipo de seguimiento para flujo completo
+      if (!cierreSegOpcionTrim) {
+        return NextResponse.json(
+          { message: "El tipo de seguimiento es obligatorio" },
+          { status: 400 },
+        );
+      }
     }
 
     const hasCierre = !!(
@@ -587,16 +638,20 @@ export async function POST(
       cierreSegFecha
     );
 
-    if (!cierreConductaTrim) {
-      return NextResponse.json(
-        { message: "La conducta / plan de manejo es obligatoria" },
-        { status: 400 },
-      );
+    if (!isRegAtencionSalud) {
+      // Solo validar conducta / plan de manejo para flujo completo
+      if (!cierreConductaTrim) {
+        return NextResponse.json(
+          { message: "La conducta / plan de manejo es obligatoria" },
+          { status: 400 },
+        );
+      }
     }
 
     const analisisTrim = String(analisis ?? "").trim();
+    const observacionAnalisisTrim = String(observacion_analisis ?? "").trim();
 
-    if (!analisisTrim) {
+    if (!analisisTrim && !observacionAnalisisTrim) {
       return NextResponse.json(
         { message: "El análisis es obligatorio" },
         { status: 400 },
@@ -613,6 +668,7 @@ export async function POST(
             id_tipo_atencion: idTipoAtencionNum,
             id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
             analisis: analisisTrim || null,
+            observacion_analisis: observacionAnalisisTrim || null,
             llega_por_sus_medios: llega_por_sus_medios,
             llega_por_sus_medios_cual:
               llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
@@ -644,6 +700,7 @@ export async function POST(
             id_tipo_atencion: idTipoAtencionNum,
             id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
             analisis: analisisTrim || null,
+            observacion_analisis: observacionAnalisisTrim || null,
             llega_por_sus_medios: llega_por_sus_medios,
             llega_por_sus_medios_cual:
               llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
@@ -727,6 +784,7 @@ export async function POST(
         notificacion_emitida: cierreNotifEmitida,
         seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
         notificacion_observaciones: cierreNotifObsTrim || null,
+        seguimiento_observaciones: cierreSegObsTrim || null,
         seguimiento_opcion: cierreSegOpcionTrim || null,
         seguimiento_efectivo: cierreSegEfectivo,
         cierre_seguimiento: cierreSegCierre,
@@ -741,6 +799,7 @@ export async function POST(
         notificacion_emitida: cierreNotifEmitida,
         seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
         notificacion_observaciones: cierreNotifObsTrim || null,
+        seguimiento_observaciones: cierreSegObsTrim || null,
         seguimiento_opcion: cierreSegOpcionTrim || null,
         seguimiento_efectivo: cierreSegEfectivo,
         cierre_seguimiento: cierreSegCierre,
@@ -770,8 +829,10 @@ export async function POST(
       },
     });
 
-    await prisma.diagnosticos_atencion.deleteMany({ where: { id_atencion: idAtencion } });
+    // Only delete and recreate diagnoses if new diagnoses are being sent
+    // This prevents data loss when updating attention without sending diagnoses
     if (diagnosticosCreate.length > 0) {
+      await prisma.diagnosticos_atencion.deleteMany({ where: { id_atencion: idAtencion } });
       await prisma.diagnosticos_atencion.createMany({
         data: (diagnosticosCreate as any[]).map((row: any) => ({ ...row, id_atencion: idAtencion })),
       });
@@ -795,7 +856,16 @@ export async function POST(
       if (targetEstado?.id_estado_cita) {
         await prisma.citas.update({
           where: { id_cita: cita.id_cita },
-          data: { id_estado_cita: targetEstado.id_estado_cita },
+          data: {
+            id_estado_cita: targetEstado.id_estado_cita,
+            seguimiento: historia.estado === "Seguimiento",
+          },
+        });
+      } else {
+        // Si no hay cambio de estado, actualizar seguimiento basado en estado de historia
+        await prisma.citas.update({
+          where: { id_cita: cita.id_cita },
+          data: { seguimiento: historia.estado === "Seguimiento" },
         });
       }
     } catch (e) {
@@ -936,6 +1006,7 @@ export async function PATCH(
       anamnesis_motivo_consulta,
       anamnesis_enfermedad_actual,
       analisis,
+      observacion_analisis,
       hc_atencion_cierre,
       antecedentes,
       antecedentes_traumaticos,
@@ -966,9 +1037,11 @@ export async function PATCH(
       );
     }
 
-    let tipoHistoria = await prisma.tipos_historia_clinica.findUnique({
-      where: { id_tipo_historia: idTipoAtencionNum },
-    });
+    let tipoHistoria = cita.id_tipo_historia
+      ? await prisma.tipos_historia_clinica.findUnique({
+          where: { id_tipo_historia: cita.id_tipo_historia },
+        })
+      : null;
 
     if (!tipoHistoria) {
       tipoHistoria = await prisma.tipos_historia_clinica.findFirst({
@@ -1024,6 +1097,7 @@ export async function PATCH(
     const scalarUpdate: Prisma.atenciones_saludUncheckedUpdateInput = {};
 
     if (analisis !== undefined) scalarUpdate.analisis = String(analisis || "") || null;
+    if (observacion_analisis !== undefined) scalarUpdate.observacion_analisis = String(observacion_analisis || "").trim() || null;
     if (typeof llega_por_sus_medios === "boolean") scalarUpdate.llega_por_sus_medios = llega_por_sus_medios;
     if (typeof llega_por_sus_medios_cual === "string") {
       scalarUpdate.llega_por_sus_medios_cual = llega_por_sus_medios_cual.trim() || null;
@@ -1305,7 +1379,12 @@ export async function GET(
         hc_valoracion_sistemas_atencion: true,
         hc_antecedentes_atencion: true,
         hc_antecedentes_traumaticos_atencion: true,
-        diagnosticos_atencion: true,
+        diagnosticos_atencion: {
+          include: {
+            cie10: true,
+            tipos_confirmacion_diagnostico: true,
+          },
+        },
       },
     });
 
