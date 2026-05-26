@@ -68,3 +68,5 @@ npm run lint
 - Si tu entorno requiere variables de entorno (por ejemplo, conexión a base de datos o autenticación), crea tu archivo `.env` con los valores correspondientes antes de ejecutar la app.
 - Si vas a usar base de datos, asegúrate de tener configurada la cadena `DATABASE_URL` (según tu proveedor) y de ejecutar el seed solo cuando tenga sentido para tu ambiente.
 - Se recomienda usar PostgreSQL como base de datos, tambien se deja backup de la base de datos en la carpeta `backup`.
+
+- Comando para cargar Diagnosticos CIE-10: npx prisma db execute --file prisma/sql/load_cie10.sql

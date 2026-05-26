@@ -4,6 +4,8 @@ import React from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import Swal from "sweetalert2";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPatientDetailById } from "@/services/patients";
 import { fetchPatientRecords } from "@/services/patient-records";
@@ -26,6 +28,7 @@ export default function PatientRecordsPage() {
   const router = useRouter();
   const params = useParams<{ id: string; }>();
   const id = params?.id;
+  const { data: session } = useSession();
 
   const queryClient = useQueryClient();
 
@@ -377,6 +380,19 @@ export default function PatientRecordsPage() {
 
   const selectHistoryType = (target: "ATTENTION_RECORD" | "OUTPATIENT") => {
     const rows = (tiposHistoriaClinicaData as any[] | undefined) ?? [];
+
+    // Restrict enfermera from creating HC_CONSULTA_EXTERNA
+    const roleName = (session?.user as any)?.role as string | undefined;
+    if (roleName === "enfermera" && target === "OUTPATIENT") {
+      Swal.fire({
+        icon: "error",
+        title: "Acceso denegado",
+        text: "El rol de enfermería no puede crear historias clínicas de consulta externa. Por favor registre la atención como Registro de atención de salud.",
+        confirmButtonText: "Entendido",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
 
     const targetCodigo =
       target === "ATTENTION_RECORD" ? "REG_ATENCION_SALUD" : "HC_CONSULTA_EXTERNA";

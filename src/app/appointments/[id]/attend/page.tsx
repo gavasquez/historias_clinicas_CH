@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import Swal from "sweetalert2";
 import { AppShell } from "@/components/layout/app-shell";
 import { getAppointmentById, type AppointmentDetail } from "@/services/appointments";
@@ -591,8 +592,26 @@ export default function AttendAppointmentPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id;
+  const { data: session } = useSession();
 
   const didAttemptPrefillRef = useRef(false);
+
+  // Restrict access for enfermera role
+  // They should only register attentions directly, not attend appointments
+  useEffect(() => {
+    const roleName = (session?.user as any)?.role as string | undefined;
+    if (roleName === "enfermera") {
+      Swal.fire({
+        icon: "error",
+        title: "Acceso denegado",
+        text: "El rol de enfermería no puede atender citas. Por favor registre la atención directamente desde el expediente del paciente.",
+        confirmButtonText: "Entendido",
+        confirmButtonColor: "#2563eb",
+      }).then(() => {
+        router.push("/patients");
+      });
+    }
+  }, [session, router]);
 
   const [isClient, setIsClient] = useState(false);
   const [form, setForm] = useState<AttentionFormState>({

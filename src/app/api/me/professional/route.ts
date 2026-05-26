@@ -18,7 +18,7 @@ export async function GET() {
       return NextResponse.json({ message: "No autenticado" }, { status: 401 });
     }
 
-    const profesional = await prisma.profesionales_salud.findFirst({
+    let profesional = await prisma.profesionales_salud.findFirst({
       where: {
         id_usuario: idUsuario,
         activo: true,
@@ -45,6 +45,45 @@ export async function GET() {
         },
       },
     });
+
+    // If no professional exists, check if user is enfermera and create one
+    if (!profesional) {
+      const user = await prisma.usuarios.findUnique({
+        where: { id_usuario: idUsuario },
+        include: { roles: true },
+      });
+
+      if (user?.roles?.nombre === "enfermera") {
+        // Create professional record for enfermera
+        profesional = await prisma.profesionales_salud.create({
+          data: {
+            id_usuario: idUsuario,
+            activo: true,
+          },
+          include: {
+            usuarios: {
+              select: {
+                id_usuario: true,
+                nombre_completo: true,
+                email: true,
+              },
+            },
+            sedes: {
+              select: {
+                id_sede: true,
+                nombre: true,
+              },
+            },
+            especialidades: {
+              select: {
+                id_especialidad: true,
+                nombre: true,
+              },
+            },
+          },
+        });
+      }
+    }
 
     if (!profesional) {
       return NextResponse.json({ data: null });

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 import Swal from "sweetalert2";
 import { AppShell } from "@/components/layout/app-shell";
@@ -35,6 +36,7 @@ export default function NewAttentionRecordDirectPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const idPaciente = params?.id;
+  const { data: session } = useSession();
 
   const didAttemptPrefillRef = useRef(false);
 
@@ -501,6 +503,9 @@ export default function NewAttentionRecordDirectPage() {
   const profesionalSede = profesionalData?.sedes?.nombre ?? "";
   const profesionalEspecialidad = profesionalData?.especialidades?.nombre ?? "";
 
+  const roleName = (session?.user as any)?.role as string | undefined;
+  const profesionalTitle = roleName === "enfermera" ? "Enfermera" : "Profesional";
+
   if (loadingPaciente) {
     return (
       <AppShell>
@@ -870,7 +875,7 @@ export default function NewAttentionRecordDirectPage() {
             </div>
 
             <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold text-slate-800">Profesional</p>
+              <p className="text-xs font-semibold text-slate-800">{profesionalTitle}</p>
               <div className="grid gap-2 md:grid-cols-2">
                 <p className="text-slate-700">
                   <span className="font-semibold">Nombre:</span> {profesionalNombre || "No registrado"}

@@ -114,6 +114,14 @@ async function main() {
     ["medico", "HISTORIAS_VER"],
     ["medico", "HISTORIAS_REGISTRAR"],
 
+    // enfermera => 1,2,3,5,7,8 (similar a medico pero sin gestión de citas)
+    ["enfermera", "PACIENTES_VER"],
+    ["enfermera", "PACIENTES_CREAR"],
+    ["enfermera", "PACIENTES_EDITAR"],
+    ["enfermera", "CITAS_VER"],
+    ["enfermera", "HISTORIAS_VER"],
+    ["enfermera", "HISTORIAS_REGISTRAR"],
+
     // administrativo => 1,2,3,5,6
     ["administrativo", "PACIENTES_VER"],
     ["administrativo", "PACIENTES_CREAR"],
@@ -212,6 +220,7 @@ async function main() {
   const sedes = [
     { nombre: "Neiva", ciudad: "Neiva", departamento: "Huila" },
     { nombre: "Pitalito", ciudad: "Pitalito", departamento: "Huila" },
+    { nombre: "Prado Alto", ciudad: "Neiva", departamento: "Huila" },
   ];
 
   for (const s of sedes) {

@@ -65,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         .map((p) => (typeof p.modulo === "string" ? p.modulo.trim().toLowerCase() : ""))
         .filter(Boolean),
     );
-    
+
     if (modules.size === 0) return navItems;
 
     const navKeyToModule: Record<string, string> = {
@@ -82,6 +82,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       const moduleName = navKeyToModule[item.key] ?? item.key;
 
       if (moduleName === "dashboard") return true;
+
+      // enfermera should not see "Historias clínicas" in menu
+      // but can still register attentions from patient flow
+      if (roleName === "enfermera" && item.key === "records") {
+        return false;
+      }
 
       return modules.has(moduleName);
     });
