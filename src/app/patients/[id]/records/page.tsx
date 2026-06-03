@@ -837,16 +837,6 @@ export default function PatientRecordsPage() {
                                 >
                                   Ver detalle
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEvolutionModalForHistory(h.id_historia);
-                                  }}
-                                  className="cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                                >
-                                  Notas evolución
-                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1020,17 +1010,6 @@ export default function PatientRecordsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedHistoryId != null) {
-                        openEvolutionModalForHistory(selectedHistoryId);
-                      }
-                    }}
-                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Notas de evolución
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
                       setSelectedHistoryId(null);
                     }}
                     className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
@@ -1072,10 +1051,44 @@ export default function PatientRecordsPage() {
                           </p>
                         </div>
                         <div>
-                          <p className="text-[10px] font-semibold uppercase text-slate-500">Profesional</p>
-                          <p className="text-xs text-slate-800">
-                            {detailData.profesionales_salud?.usuarios?.nombre_completo ?? "No registrado"}
-                          </p>
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">Profesional responsable</p>
+                          <div className="text-xs text-slate-800">
+                            <p className="font-medium">
+                              {detailData.profesionales_salud?.usuarios?.nombre_completo ?? "No registrado"}
+                            </p>
+                            <div className="mt-1 space-y-0.5 text-[11px] text-slate-600">
+                              {detailData.profesionales_salud?.usuarios?.role && (
+                                <p>
+                                  <span className="font-semibold">Rol:</span> {detailData.profesionales_salud.usuarios.role}
+                                </p>
+                              )}
+                              {detailData.profesionales_salud?.titulo && (
+                                <p>
+                                  <span className="font-semibold">Título:</span> {detailData.profesionales_salud.titulo}
+                                </p>
+                              )}
+                              {detailData.profesionales_salud?.especialidades?.descripcion && (
+                                <p>
+                                  <span className="font-semibold">Especialidad:</span> {detailData.profesionales_salud.especialidades.descripcion}
+                                </p>
+                              )}
+                              {detailData.profesionales_salud?.registro_medico && (
+                                <p>
+                                  <span className="font-semibold">Registro:</span> {detailData.profesionales_salud.registro_medico}
+                                </p>
+                              )}
+                              {detailData.profesionales_salud?.usuarios?.email && (
+                                <p>
+                                  <span className="font-semibold">Email:</span> {detailData.profesionales_salud.usuarios.email}
+                                </p>
+                              )}
+                              {detailData.profesionales_salud?.usuarios?.telefono && (
+                                <p>
+                                  <span className="font-semibold">Teléfono:</span> {detailData.profesionales_salud.usuarios.telefono}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div className="md:col-span-2">
                           <p className="text-[10px] font-semibold uppercase text-slate-500">Motivo consulta</p>
@@ -1086,6 +1099,53 @@ export default function PatientRecordsPage() {
                       </div>
                     </div>
 
+                    {/* Notas de evolución (aplicable para ambos tipos) */}
+                    {(detailData.notas_evolucion_historia?.length ?? 0) > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-slate-800">Notas de evolución</p>
+                        <div className="space-y-2">
+                          {(detailData.notas_evolucion_historia ?? []).map((nota: any) => (
+                            <div key={nota.id_nota_evolucion} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              <div className="mb-2 flex items-center justify-between">
+                                <p className="text-[11px] font-semibold text-slate-900">
+                                  {nota.fecha_hora ? new Date(nota.fecha_hora).toLocaleString() : "Sin fecha"}
+                                </p>
+                                <span className="text-[10px] text-slate-600">
+                                  {nota.tipos_atencion?.descripcion ?? ""} · {nota.modalidades_atencion?.descripcion ?? ""}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-700 mb-2">
+                                <span className="font-semibold">Nota:</span> {nota.nota_atencion ?? "Sin nota"}
+                              </p>
+                              {nota.analisis && (
+                                <p className="text-[11px] text-slate-700 mb-2">
+                                  <span className="font-semibold">Análisis:</span> {nota.analisis}
+                                </p>
+                              )}
+                              {nota.plan_manejo && (
+                                <p className="text-[11px] text-slate-700 mb-2">
+                                  <span className="font-semibold">Plan de manejo:</span> {nota.plan_manejo}
+                                </p>
+                              )}
+                              {(nota.diagnosticos?.length ?? 0) > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-[10px] font-semibold uppercase text-slate-500 mb-1">Diagnósticos</p>
+                                  {nota.diagnosticos.map((dx: any) => (
+                                    <p key={dx.id_diagnostico} className="text-[11px] text-slate-700">
+                                      <span className="font-mono">{dx.codigo_cie10}</span>
+                                      {dx.cie10?.nombre ? ` · ${dx.cie10.nombre}` : ""}
+                                      {dx.es_principal && <span className="ml-1 text-[10px] font-semibold text-sky-700">(Principal)</span>}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Atenciones - renderizado condicional por tipo de historia */}
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-slate-800">Atenciones</p>
 
@@ -1096,6 +1156,9 @@ export default function PatientRecordsPage() {
                       {(detailData.atenciones_salud ?? []).map((a: any) => {
                         const isExpanded = expandedAttentions[a.id_atencion] === true;
                         const dxPrincipal = (a.diagnosticos_atencion ?? []).find((d: any) => d.es_principal);
+                        const tipoHistoriaCodigo = detailData.tipos_historia_clinica?.codigo;
+                        const isRegAtencionSalud = tipoHistoriaCodigo === "REG_ATENCION_SALUD";
+
                         return (
                           <div key={a.id_atencion} className="rounded-lg border border-slate-200">
                             <div className="flex items-start justify-between gap-3 p-3">
@@ -1110,6 +1173,22 @@ export default function PatientRecordsPage() {
                                     ? ` · ${a.modalidades_atencion.descripcion}`
                                     : ""}
                                 </p>
+                                {a.profesionales_salud && (
+                                  <p className="text-[11px] text-slate-600">
+                                    <span className="font-semibold">Profesional:</span> {a.profesionales_salud.usuarios?.nombre_completo ?? "No registrado"}
+                                    {a.profesionales_salud.usuarios?.role ? ` (${a.profesionales_salud.usuarios.role})` : ""}
+                                  </p>
+                                )}
+                                {a.citas && (a.citas.estados_cita?.descripcion || a.citas.sedes?.nombre) ? (
+                                  <p className="text-[11px] text-slate-600">
+                                    <span className="font-semibold">Cita:</span> {a.citas.estados_cita?.descripcion ?? "Sin estado"}
+                                    {a.citas.sedes?.nombre ? ` · ${a.citas.sedes.nombre}` : ""}
+                                  </p>
+                                ) : (
+                                  <p className="text-[11px] text-slate-600">
+                                    <span className="font-semibold">Cita:</span> Sin cita asociada
+                                  </p>
+                                )}
                                 {dxPrincipal?.codigo_cie10 && (
                                   <p className="text-[11px] text-slate-700">
                                     <span className="font-semibold">Dx principal:</span>{" "}
@@ -1135,43 +1214,259 @@ export default function PatientRecordsPage() {
 
                             {isExpanded && (
                               <div className="space-y-3 border-t border-slate-200 p-3 text-[11px] text-slate-700">
-                                <div>
-                                  <p className="text-[10px] font-semibold uppercase text-slate-500">Ingreso</p>
-                                  <p>
-                                    <span className="font-semibold">Llega por sus medios:</span>{" "}
-                                    {a.llega_por_sus_medios === true
-                                      ? "Sí"
-                                      : a.llega_por_sus_medios === false
-                                        ? "No"
-                                        : "Sin dato"}
-                                    {a.llega_por_sus_medios === false && a.llega_por_sus_medios_cual
-                                      ? ` · ${a.llega_por_sus_medios_cual}`
-                                      : ""}
-                                  </p>
-                                  <p>
-                                    <span className="font-semibold">Estado a la llegada:</span>{" "}
-                                    {a.estado_a_la_llegada ?? "Sin dato"}
-                                  </p>
-                                </div>
+                                {/* Campos específicos para HC_CONSULTA_EXTERNA */}
+                                {!isRegAtencionSalud && (
+                                  <>
+                                    <div>
+                                      <p className="text-[10px] font-semibold uppercase text-slate-500">Ingreso</p>
+                                      <p>
+                                        <span className="font-semibold">Llega por sus medios:</span>{" "}
+                                        {a.llega_por_sus_medios === true
+                                          ? "Sí"
+                                          : a.llega_por_sus_medios === false
+                                            ? "No"
+                                            : "Sin dato"}
+                                        {a.llega_por_sus_medios === false && a.llega_por_sus_medios_cual
+                                          ? ` · ${a.llega_por_sus_medios_cual}`
+                                          : ""}
+                                      </p>
+                                      <p>
+                                        <span className="font-semibold">Estado a la llegada:</span>{" "}
+                                        {a.estado_a_la_llegada ?? "Sin dato"}
+                                      </p>
+                                    </div>
 
-                                <div>
-                                  <p className="text-[10px] font-semibold uppercase text-slate-500">Anamnesis</p>
-                                  <p>
-                                    <span className="font-semibold">Motivo:</span>{" "}
-                                    {a.hc_anamnesis_atencion?.motivo_consulta ?? "Sin dato"}
-                                  </p>
-                                  <p>
-                                    <span className="font-semibold">Enfermedad actual:</span>{" "}
-                                    {a.hc_anamnesis_atencion?.enfermedad_actual ?? "Sin dato"}
-                                  </p>
-                                </div>
+                                    <div>
+                                      <p className="text-[10px] font-semibold uppercase text-slate-500">Anamnesis</p>
+                                      <p>
+                                        <span className="font-semibold">Motivo:</span>{" "}
+                                        {a.hc_anamnesis_atencion?.motivo_consulta ?? "Sin dato"}
+                                      </p>
+                                      <p>
+                                        <span className="font-semibold">Enfermedad actual:</span>{" "}
+                                        {a.hc_anamnesis_atencion?.enfermedad_actual ?? "Sin dato"}
+                                      </p>
+                                    </div>
 
-                                <div>
-                                  <p className="text-[10px] font-semibold uppercase text-slate-500">Cierre</p>
-                                  <p>
-                                    {a.hc_atencion_cierre?.recomendaciones ?? "Sin recomendaciones"}
-                                  </p>
-                                </div>
+                                    {/* Antecedentes */}
+                                    {(a.hc_antecedentes_atencion?.length ?? 0) > 0 && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase text-slate-500">Antecedentes</p>
+                                        {a.hc_antecedentes_atencion.map((ant: any, idx: number) => (
+                                          <div key={idx} className="mb-2 pl-2 border-l-2 border-slate-300">
+                                            <p>
+                                              <span className="font-semibold">Tipo:</span> {ant.tipo_antecedente ?? "No especificado"}
+                                            </p>
+                                            <p>
+                                              <span className="font-semibold">Descripción:</span> {ant.descripcion ?? "Sin descripción"}
+                                            </p>
+                                            {ant.diagnostico && (
+                                              <p>
+                                                <span className="font-semibold">Diagnóstico:</span> {ant.diagnostico}
+                                              </p>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Antecedentes traumáticos */}
+                                    {a.hc_antecedentes_traumaticos_atencion && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase text-slate-500">Antecedentes traumáticos</p>
+                                        <p>{a.hc_antecedentes_traumaticos_atencion.contenido ?? "Sin información"}</p>
+                                      </div>
+                                    )}
+
+                                    {/* SSR - Signos y Síntomas de Riesgo */}
+                                    {a.hc_ssr_atencion?.contenido && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase text-slate-500">Signos y Síntomas de Riesgo</p>
+                                        {(() => {
+                                          try {
+                                            const ssrData = typeof a.hc_ssr_atencion.contenido === 'string'
+                                              ? JSON.parse(a.hc_ssr_atencion.contenido)
+                                              : a.hc_ssr_atencion.contenido;
+                                            return (
+                                              <div className="space-y-1">
+                                                {ssrData.menarquia && <p><span className="font-semibold">Menarquia:</span> {ssrData.menarquia}</p>}
+                                                {ssrData.ciclos && <p><span className="font-semibold">Ciclos:</span> {ssrData.ciclos}</p>}
+                                                {ssrData.fum && <p><span className="font-semibold">FUM:</span> {ssrData.fum}</p>}
+                                                {ssrData.g && <p><span className="font-semibold">G:</span> {ssrData.g}</p>}
+                                                {ssrData.p && <p><span className="font-semibold">P:</span> {ssrData.p}</p>}
+                                                {ssrData.c && <p><span className="font-semibold">C:</span> {ssrData.c}</p>}
+                                                {ssrData.v && <p><span className="font-semibold">V:</span> {ssrData.v}</p>}
+                                                {ssrData.a && <p><span className="font-semibold">A:</span> {ssrData.a}</p>}
+                                                {ssrData.e && <p><span className="font-semibold">E:</span> {ssrData.e}</p>}
+                                                {ssrData.m && <p><span className="font-semibold">M:</span> {ssrData.m}</p>}
+                                                {ssrData.fup && <p><span className="font-semibold">FUP:</span> {ssrData.fup}</p>}
+                                                {ssrData.anticoncepcion && <p><span className="font-semibold">Anticoncepción:</span> {ssrData.anticoncepcion}</p>}
+                                                {ssrData.anticoncepcion_cual && <p><span className="font-semibold">Anticoncepción (cuál):</span> {ssrData.anticoncepcion_cual}</p>}
+                                                {ssrData.observaciones && <p><span className="font-semibold">Observaciones:</span> {ssrData.observaciones}</p>}
+                                                {ssrData.habitos_tabaco_cigarrillo && <p><span className="font-semibold">Hábito tabaco:</span> {ssrData.habitos_tabaco_cigarrillo}</p>}
+                                                {ssrData.habitos_alcohol && <p><span className="font-semibold">Hábito alcohol:</span> {ssrData.habitos_alcohol}</p>}
+                                                {ssrData.habitos_sustancias_psicoactivas && <p><span className="font-semibold">Sustancias psicoactivas:</span> {ssrData.habitos_sustancias_psicoactivas}</p>}
+                                                {ssrData.habitos_otros && <p><span className="font-semibold">Otros hábitos:</span> {ssrData.habitos_otros}</p>}
+                                                {ssrData.habitos_actividad_fisica && <p><span className="font-semibold">Actividad física:</span> {ssrData.habitos_actividad_fisica}</p>}
+                                                {ssrData.habitos_alimentacion && <p><span className="font-semibold">Alimentación:</span> {ssrData.habitos_alimentacion}</p>}
+                                                {ssrData.habitos_otras_actividades && <p><span className="font-semibold">Otras actividades:</span> {ssrData.habitos_otras_actividades}</p>}
+                                              </div>
+                                            );
+                                          } catch {
+                                            return <p>{a.hc_ssr_atencion.contenido}</p>;
+                                          }
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {/* Tamizajes */}
+                                    {a.hc_tamizajes_atencion?.contenido && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase text-slate-500">Tamizajes</p>
+                                        {(() => {
+                                          try {
+                                            const tamizajesData = typeof a.hc_tamizajes_atencion.contenido === 'string'
+                                              ? JSON.parse(a.hc_tamizajes_atencion.contenido)
+                                              : a.hc_tamizajes_atencion.contenido;
+                                            const tamizajesArray = Array.isArray(tamizajesData) ? tamizajesData : [];
+                                            return tamizajesArray.length > 0 ? (
+                                              <div className="space-y-1">
+                                                {tamizajesArray.map((tam: any, idx: number) => (
+                                                  <div key={idx} className="pl-2 border-l-2 border-slate-300">
+                                                    <p><span className="font-semibold">{tam.label}:</span> {tam.estado}</p>
+                                                    {tam.tipo && <p className="text-[10px]">Tipo: {tam.tipo}</p>}
+                                                    {tam.fecha && <p className="text-[10px]">Fecha: {tam.fecha}</p>}
+                                                    {tam.resultado && <p className="text-[10px]">Resultado: {tam.resultado}</p>}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : <p>Sin tamizajes registrados</p>;
+                                          } catch {
+                                            return <p>{a.hc_tamizajes_atencion.contenido}</p>;
+                                          }
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {/* Examen físico */}
+                                    {a.hc_examen_fisico_atencion?.contenido && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase text-slate-500">Examen físico</p>
+                                        {(() => {
+                                          try {
+                                            const examenData = typeof a.hc_examen_fisico_atencion.contenido === 'string'
+                                              ? JSON.parse(a.hc_examen_fisico_atencion.contenido)
+                                              : a.hc_examen_fisico_atencion.contenido;
+                                            return (
+                                              <div className="space-y-2">
+                                                {examenData.vitals && (
+                                                  <div className="pl-2 border-l-2 border-slate-300">
+                                                    <p className="font-semibold text-[10px] uppercase">Signos vitales</p>
+                                                    <p>Estatura: {examenData.vitals.estatura_cm} cm</p>
+                                                    <p>Peso: {examenData.vitals.peso_kg} kg</p>
+                                                    <p>IMC: {examenData.vitals.imc}</p>
+                                                    <p>FC: {examenData.vitals.fc} lpm</p>
+                                                    <p>FR: {examenData.vitals.fr} rpm</p>
+                                                    <p>Temperatura: {examenData.vitals.temp_c}°C</p>
+                                                    <p>Glasgow: {examenData.vitals.glasgow}</p>
+                                                    <p>TA: {examenData.vitals.ta_sistolica}/{examenData.vitals.ta_diastolica} mmHg</p>
+                                                    <p>Sat O2: {examenData.vitals.sat_o2}%</p>
+                                                    {examenData.vitals.ta_sentado && <p>TA sentado: {examenData.vitals.ta_sentado}</p>}
+                                                    {examenData.vitals.otros && <p>Otros: {examenData.vitals.otros}</p>}
+                                                  </div>
+                                                )}
+                                                {examenData.valoracion && Array.isArray(examenData.valoracion) && examenData.valoracion.length > 0 && (
+                                                  <div className="pl-2 border-l-2 border-slate-300">
+                                                    <p className="font-semibold text-[10px] uppercase">Valoración por sistemas</p>
+                                                    {examenData.valoracion.map((val: any, idx: number) => (
+                                                      <p key={idx} className="text-[10px]">
+                                                        {val.area} {val.subarea ? `(${val.subarea})` : ""}: {val.estado} {val.cual ? `- ${val.cual}` : ""}
+                                                      </p>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                                {examenData.observaciones && (
+                                                  <div className="pl-2 border-l-2 border-slate-300">
+                                                    <p className="font-semibold text-[10px] uppercase">Observaciones</p>
+                                                    <p>{examenData.observaciones}</p>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          } catch {
+                                            return <p>{a.hc_examen_fisico_atencion.contenido}</p>;
+                                          }
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {/* Valoración de sistemas */}
+                                    {a.hc_valoracion_sistemas_atencion?.contenido && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase text-slate-500">Valoración de sistemas</p>
+                                        <p>{a.hc_valoracion_sistemas_atencion.contenido}</p>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+
+                                {/* Campos comunes para ambos tipos */}
+                                {a.hc_anamnesis_atencion?.motivo_consulta && isRegAtencionSalud && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Motivo de atención</p>
+                                    <p>{a.hc_anamnesis_atencion.motivo_consulta}</p>
+                                  </div>
+                                )}
+
+                                {a.hc_anamnesis_atencion?.observacion && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Observación</p>
+                                    <p>{a.hc_anamnesis_atencion.observacion}</p>
+                                  </div>
+                                )}
+
+                                {/* Análisis - puede estar en hc_anamnesis_atencion o directamente en atención */}
+                                {(a.hc_anamnesis_atencion?.analisis || a.analisis) && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Análisis</p>
+                                    <p>{a.hc_anamnesis_atencion?.analisis || a.analisis}</p>
+                                  </div>
+                                )}
+
+                                {a.hc_anamnesis_atencion?.conducta_plan_estudio_manejo && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Plan de manejo</p>
+                                    <p>{a.hc_anamnesis_atencion.conducta_plan_estudio_manejo}</p>
+                                  </div>
+                                )}
+
+                                {/* Diagnósticos (común para ambos tipos) */}
+                                {(a.diagnosticos_atencion?.length ?? 0) > 0 && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Diagnósticos</p>
+                                    {a.diagnosticos_atencion.map((dx: any) => (
+                                      <p key={dx.id_diagnostico} className="text-[11px] text-slate-700">
+                                        <span className="font-mono">{dx.codigo_cie10}</span>
+                                        {dx.cie10?.nombre ? ` · ${dx.cie10.nombre}` : ""}
+                                        {dx.es_principal && <span className="ml-1 text-[10px] font-semibold text-sky-700">(Principal)</span>}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Cierre (común para ambos tipos) */}
+                                {a.hc_atencion_cierre?.recomendaciones && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Cierre</p>
+                                    <p>{a.hc_atencion_cierre.recomendaciones}</p>
+                                  </div>
+                                )}
+                                {a.hc_atencion_cierre?.seguimiento_observaciones && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Observaciones de seguimiento</p>
+                                    <p>{a.hc_atencion_cierre.seguimiento_observaciones}</p>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

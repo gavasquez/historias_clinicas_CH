@@ -27,7 +27,6 @@ function resolveHistoriaEstadoFromSeguimiento(input: {
   const opt = String(input.seguimientoOpcion ?? "").trim().toUpperCase();
   if (!opt) return null;
 
-  if (opt === "NO_APLICA") return "Finalizado";
   if (input.cierreSeguimiento === true) return "Finalizado";
   if (input.cierreSeguimiento === false) {
     return "Seguimiento";
@@ -771,7 +770,6 @@ export async function POST(
     const resolvedEstado = (() => {
       const opt = String(cierreSegOpcionTrim ?? "").trim().toUpperCase();
       if (!opt) return null;
-      if (opt === "NO_APLICA") return "Finalizado";
       if (cierreSegCierre === true) return "Finalizado";
       if (cierreSegCierre === false) return "Seguimiento";
       return null;

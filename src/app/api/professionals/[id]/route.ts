@@ -21,7 +21,11 @@ export async function GET(
         },
       },
       include: {
-        usuarios: true,
+        usuarios: {
+          include: {
+            roles: true,
+          },
+        },
         especialidades: true,
         sedes: true,
       },
@@ -35,6 +39,7 @@ export async function GET(
       id_profesional: profesional.id_profesional,
       nombre_completo: profesional.usuarios.nombre_completo,
       email: profesional.usuarios.email,
+      role: profesional.usuarios.roles?.nombre,
       activo: profesional.activo,
       registro_medico: profesional.registro_medico ?? null,
       firma_digital: (profesional as any).firma_digital ?? null,

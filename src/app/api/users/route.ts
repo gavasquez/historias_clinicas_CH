@@ -48,7 +48,10 @@ export async function GET(request: NextRequest) {
           nombre_completo: true,
           email: true,
           telefono: true,
+          id_tipo_documento: true,
+          numero_documento: true,
           activo: true,
+          password_reset_required: true,
           fecha_creacion: true,
           roles: {
             select: {
@@ -63,6 +66,13 @@ export async function GET(request: NextRequest) {
             },
             take: 1,
           },
+          tipos_documento: {
+            select: {
+              id_tipo_documento: true,
+              codigo: true,
+              descripcion: true,
+            },
+          },
         },
       }),
       prisma.usuarios.count({ where }),
@@ -74,7 +84,10 @@ export async function GET(request: NextRequest) {
       nombre_completo: u.nombre_completo,
       email: u.email,
       telefono: u.telefono,
+      id_tipo_documento: u.id_tipo_documento,
+      numero_documento: u.numero_documento,
       activo: u.activo,
+      password_reset_required: u.password_reset_required,
       fecha_creacion: u.fecha_creacion.toISOString(),
       rol: u.roles
         ? {
@@ -85,6 +98,13 @@ export async function GET(request: NextRequest) {
         : null,
       profesional: u.profesionales_salud?.[0]
         ? { id_profesional: u.profesionales_salud[0].id_profesional }
+        : null,
+      tipo_documento: u.tipos_documento
+        ? {
+            id_tipo_documento: u.tipos_documento.id_tipo_documento,
+            codigo: u.tipos_documento.codigo,
+            descripcion: u.tipos_documento.descripcion,
+          }
         : null,
     }));
 
@@ -113,6 +133,8 @@ export async function POST(request: NextRequest) {
       telefono,
       password,
       id_rol,
+      id_tipo_documento,
+      numero_documento,
       activo = true,
     } = body ?? {};
 
@@ -151,6 +173,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (numero_documento && typeof numero_documento === "string") {
+      if (!id_tipo_documento || typeof id_tipo_documento !== "number") {
+        return NextResponse.json(
+          { message: "El tipo de documento es obligatorio cuando se proporciona número de documento." },
+          { status: 400 },
+        );
+      }
+    }
+
     const password_hash = await bcrypt.hash(password, 10);
 
     const created = await prisma.usuarios.create({
@@ -161,6 +192,8 @@ export async function POST(request: NextRequest) {
         telefono: telefono.trim(),
         password_hash,
         id_rol,
+        id_tipo_documento: id_tipo_documento ?? null,
+        numero_documento: numero_documento && typeof numero_documento === "string" ? numero_documento.trim() : null,
         activo: Boolean(activo),
       },
     });

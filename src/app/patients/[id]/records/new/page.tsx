@@ -6,7 +6,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPatientDetailById } from "@/services/patients";
-import { fetchProfessionals } from "@/services/professionals";
+import { fetchMedicalProfessionals } from "@/services/professionals";
 import { fetchTiposHistoriaClinica } from "@/services/catalogs";
 import type { PacienteDetalle } from "@/types/patients";
 import type { ProfesionalSaludListItem } from "@/types/professionals";
@@ -64,7 +64,7 @@ export default function NewPatientRecordPage() {
 
   const { data: professionalsData, isLoading: loadingProfessionals } = useQuery({
     queryKey: ["professionals-for-record"],
-    queryFn: () => fetchProfessionals(1, {}),
+    queryFn: () => fetchMedicalProfessionals(1, {}),
   });
 
   const { data: tiposHistoriaData, isLoading: loadingTiposHistoria } = useQuery({

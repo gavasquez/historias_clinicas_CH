@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 function normalizeDateOnly(input: unknown): Date | null {
   if (input === null || input === undefined) return null;
@@ -28,7 +30,6 @@ function resolveHistoriaEstadoFromSeguimiento(input: {
   const opt = String(input.seguimientoOpcion ?? "").trim().toUpperCase();
   if (!opt) return null;
 
-  if (opt === "NO_APLICA") return "Finalizado";
   // Si hay seguimiento efectivo y cierre de seguimiento, la atención queda en Seguimiento
   if (input.seguimientoEfectivo === true && input.cierreSeguimiento === true) {
     return "Seguimiento";
@@ -46,6 +47,22 @@ export async function POST(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
+    }
+
+    const roleName = (session.user as any)?.role as string | undefined;
+    const idUsuario = Number((session.user as any)?.id);
+
+    // Validar que enfermera no pueda atender citas
+    if (roleName === "enfermera") {
+      return NextResponse.json(
+        { message: "Las enfermeras no tienen permiso para atender citas" },
+        { status: 403 },
+      );
+    }
+
     const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
     const idCita = Number(resolvedParams.id);
@@ -87,6 +104,24 @@ export async function POST(
 
     if (!cita) {
       return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
+    }
+
+    // Validar que médicos solo atiendan sus propias citas
+    if (roleName && roleName !== "administrador" && Number.isInteger(idUsuario) && idUsuario > 0) {
+      const profesional = await prisma.profesionales_salud.findFirst({
+        where: {
+          id_usuario: idUsuario,
+          activo: true,
+        },
+        select: { id_profesional: true },
+      });
+
+      if (profesional && profesional.id_profesional !== cita.id_profesional) {
+        return NextResponse.json(
+          { message: "Solo puede atender citas asignadas a usted" },
+          { status: 403 },
+        );
+      }
     }
 
     const idTipoAtencionNum = cita.id_tipo_cita ? Number(cita.id_tipo_cita) : NaN;

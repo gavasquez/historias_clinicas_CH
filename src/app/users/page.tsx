@@ -3,16 +3,20 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/layout/app-shell";
 import { fetchUsers, markUserAsProfessional, toggleUserActive } from "@/services/users";
 import type { UserListItem } from "@/types/users";
 import Swal from "sweetalert2";
+import axios from "axios";
+import { Edit, User, Key, Power, PowerOff } from "lucide-react";
 
 export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { data: session } = useSession();
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["users", page, { search }],
@@ -29,6 +33,16 @@ export default function UsersPage() {
 
   const markProfessionalMutation = useMutation({
     mutationFn: (id_usuario: number) => markUserAsProfessional(id_usuario),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (id_usuario: number) => {
+      const res = await axios.post(`/api/users/${id_usuario}/reset-password`);
+      return res.data;
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
     },
@@ -105,6 +119,7 @@ export default function UsersPage() {
                   <th className="px-4 py-3">Nombre completo</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Teléfono</th>
+                  <th className="px-4 py-3">Documento</th>
                   <th className="px-4 py-3">Rol</th>
                   <th className="px-4 py-3">Profesional</th>
                   <th className="px-4 py-3">Creación</th>
@@ -116,7 +131,7 @@ export default function UsersPage() {
                 {isLoading && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-4 py-6 text-center text-[11px] text-slate-500"
                     >
                       Cargando usuarios...
@@ -127,7 +142,7 @@ export default function UsersPage() {
                 {isError && !isLoading && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-4 py-6 text-center text-[11px] text-red-600"
                     >
                       Ocurrió un error al cargar los usuarios.
@@ -138,7 +153,7 @@ export default function UsersPage() {
                 {!isLoading && !isError && users.length === 0 && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-4 py-6 text-center text-[11px] text-slate-500"
                     >
                       No se encontraron usuarios.
@@ -163,6 +178,18 @@ export default function UsersPage() {
                       </td>
                       <td className="px-4 py-3">
                         {u.telefono || "-"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="space-y-0.5">
+                          <div className="font-medium text-slate-800">
+                            {u.numero_documento ?? "Sin documento"}
+                          </div>
+                          {u.tipo_documento && (
+                            <div className="text-[11px] text-slate-500">
+                              {u.tipo_documento.descripcion}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="space-y-0.5">
@@ -204,7 +231,16 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/users/${u.id_usuario}/edit`)}
+                            className="rounded-lg border border-slate-300 p-1.5 text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            title="Editar usuario"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+
                           <button
                             type="button"
                             disabled={markProfessionalMutation.isPending || toggleActiveMutation.isPending}
@@ -252,12 +288,61 @@ export default function UsersPage() {
                             }}
                             className={
                               u.profesional
-                                ? "rounded-lg border border-indigo-300 px-2 py-1 text-xs font-medium text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                : "rounded-lg border border-indigo-300 px-2 py-1 text-xs font-medium text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                ? "rounded-lg border border-indigo-300 p-1.5 text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                : "rounded-lg border border-indigo-300 p-1.5 text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
                             }
+                            title={u.profesional ? "Ver profesional" : "Crear profesional"}
                           >
-                            {u.profesional ? "Ver/Editar profesional" : "Crear profesional"}
+                            <User className="h-4 w-4" />
                           </button>
+
+                          {(session?.user as any)?.role === "super_admin" && (
+                            <button
+                              type="button"
+                              disabled={resetPasswordMutation.isPending}
+                              onClick={async () => {
+                                if (!u.numero_documento) {
+                                  await Swal.fire({
+                                    title: "Usuario sin documento",
+                                    text: "El usuario no tiene número de documento registrado. No se puede restablecer la contraseña.",
+                                    icon: "warning",
+                                    confirmButtonText: "Entendido",
+                                    confirmButtonColor: "#0ea5e9",
+                                  });
+                                  return;
+                                }
+
+                                const result = await Swal.fire({
+                                  title: "¿Restablecer contraseña?",
+                                  html: `Se restablecerá la contraseña del usuario <b>${u.nombre_completo}</b> a su número de documento: <b>${u.numero_documento}</b><br/><br/>El usuario deberá cambiar su contraseña al iniciar sesión.`,
+                                  icon: "warning",
+                                  showCancelButton: true,
+                                  confirmButtonText: "Restablecer",
+                                  cancelButtonText: "Cancelar",
+                                  confirmButtonColor: "#0ea5e9",
+                                  cancelButtonColor: "#6b7280",
+                                });
+
+                                if (!result.isConfirmed) return;
+                                try {
+                                  await resetPasswordMutation.mutateAsync(u.id_usuario);
+                                  await Swal.fire({
+                                    title: "Contraseña restablecida",
+                                    text: `La contraseña ha sido restablecida exitosamente. La nueva contraseña es: ${u.numero_documento}`,
+                                    icon: "success",
+                                    confirmButtonText: "Entendido",
+                                    confirmButtonColor: "#0ea5e9",
+                                  });
+                                } catch {
+                                  // error ya manejado por react-query
+                                }
+                              }}
+                              className="rounded-lg border border-amber-300 p-1.5 text-amber-700 shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              title="Restablecer contraseña"
+                            >
+                              <Key className="h-4 w-4" />
+                            </button>
+                          )}
 
                           <button
                             type="button"
@@ -287,11 +372,12 @@ export default function UsersPage() {
                             }}
                             className={
                               u.activo
-                                ? "rounded-lg border border-red-300 px-2 py-1 text-xs font-medium text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                : "rounded-lg border border-sky-300 px-2 py-1 text-xs font-medium text-sky-700 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                ? "rounded-lg border border-red-300 p-1.5 text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                : "rounded-lg border border-sky-300 p-1.5 text-sky-700 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
                             }
+                            title={u.activo ? "Inactivar usuario" : "Activar usuario"}
                           >
-                            {u.activo ? "Inactivar" : "Activar"}
+                            {u.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                           </button>
                         </div>
                       </td>

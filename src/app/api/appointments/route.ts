@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { validateAvailabilityOrThrow } from "@/lib/availability-validator";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 const PAGE_SIZE = 5;
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
@@ -13,6 +15,10 @@ function computeEndDate(params: { start: Date; end: Date | null }) {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const roleName = (session?.user as any)?.role as string | undefined;
+    const idUsuario = Number((session?.user as any)?.id);
+
     const { searchParams } = new URL(request.url);
     const pageParam = searchParams.get("page");
     const profesional = searchParams.get("profesional")?.trim() || "";
@@ -27,10 +33,27 @@ export async function GET(request: NextRequest) {
     const page = Math.max(Number(pageParam) || 1, 1);
     const skip = (page - 1) * PAGE_SIZE;
 
+    // Obtener el profesional del usuario autenticado si es médico/profesional
+    let idProfesionalAutenticado: number | null = null;
+    if (roleName && roleName !== "enfermera" && roleName !== "administrador" && Number.isInteger(idUsuario) && idUsuario > 0) {
+      const profesional = await prisma.profesionales_salud.findFirst({
+        where: {
+          id_usuario: idUsuario,
+          activo: true,
+        },
+        select: { id_profesional: true },
+      });
+      idProfesionalAutenticado = profesional?.id_profesional ?? null;
+    }
+
     const where: any = {
       // Solo mostrar citas programadas (con tipo y estado definidos)
       id_tipo_cita: { not: null },
       id_estado_cita: { not: null },
+      // Si es médico/profesional, filtrar solo sus citas
+      ...(idProfesionalAutenticado
+        ? { id_profesional: idProfesionalAutenticado }
+        : {}),
       ...(profesional
         ? {
             profesionales_salud: {
@@ -117,6 +140,7 @@ export async function GET(request: NextRequest) {
 
     const data = citas.map((cita: (typeof citas)[number]) => ({
       id_cita: cita.id_cita,
+      id_profesional: cita.id_profesional,
       fecha_hora_inicio: cita.fecha_hora_inicio.toISOString(),
       fecha_hora_fin: cita.fecha_hora_fin ? cita.fecha_hora_fin.toISOString() : null,
       tipo_cita: cita.tipos_cita?.descripcion ?? null,

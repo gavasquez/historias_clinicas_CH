@@ -45,7 +45,6 @@ function resolveHistoriaEstadoFromSeguimiento(input: {
   const opt = String(input.seguimientoOpcion ?? "").trim().toUpperCase();
   if (!opt) return null;
 
-  if (opt === "NO_APLICA") return "Finalizado";
   // Si hay seguimiento efectivo y cierre de seguimiento, la atención queda en Seguimiento
   if (input.seguimientoEfectivo === true && input.cierreSeguimiento === true) {
     return "Seguimiento";

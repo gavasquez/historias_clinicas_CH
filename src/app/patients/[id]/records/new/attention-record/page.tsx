@@ -136,7 +136,7 @@ export default function NewAttentionRecordDirectPage() {
   }, [shouldRequireHistoriaVinculada, idHistoriaVinculada]);
 
   useEffect(() => {
-    if (seguimientoOpcion === "NO_APLICA" || seguimientoOpcion === "") {
+    if (seguimientoOpcion === "") {
       setSeguimientoObservaciones("");
       setSeguimientoFecha("");
     }
@@ -325,7 +325,7 @@ export default function NewAttentionRecordDirectPage() {
         observacion_analisis: observacionAnalisis,
         analisis,
         plan_manejo: planManejo,
-        seguimiento_opcion: seguimiento === "SI" ? seguimientoOpcion || null : "NO_APLICA",
+        seguimiento_opcion: seguimiento === "SI" ? seguimientoOpcion || null : null,
         seguimiento_efectivo:
           seguimiento === "SI" && seguimientoEfectivo === "SI" ? true : seguimiento === "SI" && seguimientoEfectivo === "NO" ? false : null,
         cierre_seguimiento:
@@ -414,10 +414,10 @@ export default function NewAttentionRecordDirectPage() {
         });
         setSeguimiento((prev) => {
           if (prev.trim()) return prev;
-          if (nextSeguimientoOpcion && nextSeguimientoOpcion !== "NO_APLICA") return "SI";
+          if (nextSeguimientoOpcion) return "SI";
           return "";
         });
-        setSeguimientoOpcion((prev) => (prev.trim() ? prev : nextSeguimientoOpcion === "NO_APLICA" ? "" : nextSeguimientoOpcion));
+        setSeguimientoOpcion((prev) => (prev.trim() ? prev : nextSeguimientoOpcion));
         setSeguimientoObservaciones((prev) => (prev.trim() ? prev : nextSeguimientoObservaciones));
         setSeguimientoEfectivo((prev) =>
           prev || (
@@ -633,7 +633,7 @@ export default function NewAttentionRecordDirectPage() {
 
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Sede</label>
+                <label className="text-[11px] font-semibold text-slate-700">Sede <span className="text-red-500">*</span></label>
                 <select
                   value={idSede}
                   onChange={(e) => setIdSede(e.target.value)}
@@ -650,12 +650,13 @@ export default function NewAttentionRecordDirectPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Fecha y hora</label>
+                <label className="text-[11px] font-semibold text-slate-700">Fecha y hora <span className="text-red-500">*</span></label>
                 <input
                   type="datetime-local"
                   value={fechaHora}
                   onChange={(e) => setFechaHora(e.target.value)}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                  disabled
+                  className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 shadow-sm"
                 />
               </div>
 
@@ -853,8 +854,6 @@ export default function NewAttentionRecordDirectPage() {
                                     return "Situación de Salud";
                                   case "SITUACION_EN_SALUD":
                                     return "Situación en Salud";
-                                  case "NO_APLICA":
-                                    return "No Aplica";
                                   default:
                                     return opcion;
                                 }
@@ -1013,7 +1012,6 @@ export default function NewAttentionRecordDirectPage() {
                         <option value="">Seleccione...</option>
                         <option value="CONDICIONES_CRONICAS">CONDICIONES CRÓNICAS</option>
                         <option value="SITUACION_EN_SALUD">SITUACIÓN EN SALUD</option>
-                        <option value="NO_APLICA">NO APLICA</option>
                       </select>
                     </div>
 
@@ -1072,12 +1070,13 @@ export default function NewAttentionRecordDirectPage() {
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-semibold text-slate-700">Fecha</label>
+                          <label className="text-[11px] font-semibold text-slate-700">Próximo seguimiento</label>
                           <input
-                            type="date"
+                            type="text"
                             value={seguimientoFecha}
                             onChange={(e) => setSeguimientoFecha(e.target.value)}
                             className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                            placeholder="Formato personalizado"
                           />
                         </div>
 
@@ -1088,6 +1087,7 @@ export default function NewAttentionRecordDirectPage() {
                             onChange={(e) => setSeguimientoObservaciones(e.target.value)}
                             rows={3}
                             className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
+                            placeholder="Observaciones del seguimiento"
                           />
                         </div>
                       </div>

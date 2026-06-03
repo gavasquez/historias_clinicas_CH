@@ -1,5 +1,6 @@
 export interface ProfessionalAppointmentListItem {
   id_cita: number;
+  id_profesional: number;
   fecha_hora_inicio: string; // ISO string
   fecha_hora_fin: string | null; // ISO string or null
   tipo_cita: string | null;

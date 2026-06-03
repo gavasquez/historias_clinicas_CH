@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
@@ -111,6 +111,15 @@ export default function ProfessionalDetailPage() {
   });
 
   const hasData = !!data;
+
+  const isMedico = data?.role === "medico";
+
+  // Redirigir a pestaña "datos" si el usuario está en una pestaña no permitida
+  useEffect(() => {
+    if (!isMedico && (activeTab === "disponibilidad" || activeTab === "citas")) {
+      setActiveTab("datos");
+    }
+  }, [isMedico, activeTab]);
 
   const {
     data: appointments,
@@ -266,20 +275,24 @@ export default function ProfessionalDetailPage() {
             >
               Datos
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("disponibilidad")}
-              className={tabButtonClasses("disponibilidad")}
-            >
-              Disponibilidad
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("citas")}
-              className={tabButtonClasses("citas")}
-            >
-              Citas
-            </button>
+            {isMedico && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("disponibilidad")}
+                className={tabButtonClasses("disponibilidad")}
+              >
+                Disponibilidad
+              </button>
+            )}
+            {isMedico && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("citas")}
+                className={tabButtonClasses("citas")}
+              >
+                Citas
+              </button>
+            )}
           </div>
         </div>
 

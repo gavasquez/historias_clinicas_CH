@@ -20,6 +20,7 @@ export async function GET(
         profesionales_salud: {
           include: {
             usuarios: true,
+            especialidades: true,
           },
         },
         notas_evolucion_historia: {
@@ -41,6 +42,13 @@ export async function GET(
             citas: {
               include: {
                 estados_cita: true,
+                sedes: true,
+              },
+            },
+            profesionales_salud: {
+              include: {
+                usuarios: true,
+                especialidades: true,
               },
             },
             hc_anamnesis_atencion: true,

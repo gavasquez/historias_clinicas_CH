@@ -40,6 +40,21 @@ export async function fetchProfessionals(
   return res.data;
 }
 
+export async function fetchMedicalProfessionals(
+  page: number,
+  filters: ProfessionalFilters = {},
+): Promise<ProfessionalsResponse> {
+  const res = await apiClient.get<ProfessionalsResponse>("/professionals/medical", {
+    params: {
+      page,
+      nombre: filters.nombre || undefined,
+      especialidad: filters.especialidad || undefined,
+      sede: filters.sede || undefined,
+    },
+  });
+  return res.data;
+}
+
 export async function getProfessionalById(
   id: number | string,
 ): Promise<ProfessionalDetail | null> {

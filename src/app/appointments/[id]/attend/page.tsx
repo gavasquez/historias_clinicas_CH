@@ -229,6 +229,7 @@ function buildAttendPayload(input: AttendPayloadInput) {
                 ? false
                 : undefined,
           seguimiento_fecha: seguimientoFechaValue || undefined,
+          seguimiento_observaciones: isRegAtencionSalud ? simpleForm.seguimientoObservaciones : form.seguimiento_observaciones || undefined,
         }
       : undefined,
     antecedentes: hasAntecedentes
@@ -473,6 +474,7 @@ interface AttentionFormState {
   seguimiento_efectivo: "" | "SI" | "NO";
   cierre_seguimiento: "" | "SI" | "NO";
   seguimiento_fecha: string;
+  seguimiento_observaciones: string;
   anamnesis_motivo_consulta: string;
   anamnesis_enfermedad_actual: string;
   analisis: string;
@@ -627,6 +629,7 @@ export default function AttendAppointmentPage() {
     seguimiento_efectivo: "",
     cierre_seguimiento: "",
     seguimiento_fecha: "",
+    seguimiento_observaciones: "",
     anamnesis_motivo_consulta: "",
     anamnesis_enfermedad_actual: "",
     analisis: "",
@@ -657,7 +660,7 @@ export default function AttendAppointmentPage() {
   });
 
   useEffect(() => {
-    if (simpleForm.seguimientoOpcion === "NO_APLICA" || simpleForm.seguimientoOpcion === "") {
+    if (simpleForm.seguimientoOpcion === "") {
       setSimpleForm((prev) => ({ ...prev, seguimientoObservaciones: "", seguimientoFecha: "" }));
     }
   }, [simpleForm.seguimientoOpcion]);
@@ -695,6 +698,7 @@ export default function AttendAppointmentPage() {
           seguimiento_efectivo: (simpleForm.seguimientoEfectivo || "") as AttentionFormState["seguimiento_efectivo"],
           cierre_seguimiento: (simpleForm.cierreSeguimiento || "") as AttentionFormState["cierre_seguimiento"],
           seguimiento_fecha: simpleForm.seguimientoFecha,
+          seguimiento_observaciones: simpleForm.seguimientoObservaciones,
         } as AttentionFormState));
       }
     }
@@ -1630,7 +1634,6 @@ export default function AttendAppointmentPage() {
                         <option value="">Seleccione...</option>
                         <option value="CONDICIONES_CRONICAS">CONDICIONES CRÓNICAS</option>
                         <option value="SITUACION_EN_SALUD">SITUACIÓN EN SALUD</option>
-                        <option value="NO_APLICA">NO APLICA</option>
                       </select>
                     </div>
 
@@ -1689,12 +1692,13 @@ export default function AttendAppointmentPage() {
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-semibold text-slate-700">Fecha</label>
+                          <label className="text-[11px] font-semibold text-slate-700">Próximo seguimiento</label>
                           <input
-                            type="date"
+                            type="text"
                             value={simpleForm.seguimientoFecha}
                             onChange={(e) => setSimpleForm({ ...simpleForm, seguimientoFecha: e.target.value })}
                             className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs shadow-sm"
+                            placeholder="Formato personalizado"
                           />
                         </div>
 
@@ -1705,6 +1709,7 @@ export default function AttendAppointmentPage() {
                             onChange={(e) => setSimpleForm({ ...simpleForm, seguimientoObservaciones: e.target.value })}
                             rows={3}
                             className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
+                            placeholder="Observaciones del seguimiento"
                           />
                         </div>
                       </div>

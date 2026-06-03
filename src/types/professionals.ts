@@ -20,6 +20,7 @@ export interface ProfessionalDetail {
   id_profesional: number;
   nombre_completo: string;
   email: string | null;
+  role: string | null;
   activo: boolean;
   registro_medico: string | null;
   firma_digital: string | null;

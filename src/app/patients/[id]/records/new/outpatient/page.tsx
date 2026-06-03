@@ -30,6 +30,16 @@ import type { DiagnosisDraft } from "@/app/appointments/[id]/attend/components/A
 
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
+function toDatetimeLocalValue(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mi = pad(date.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
 type AttentionFormState = {
   conducta_plan_estudio_manejo: string;
   atencion_recomendaciones: string;
@@ -43,6 +53,7 @@ type AttentionFormState = {
   seguimiento_efectivo: "" | "SI" | "NO";
   cierre_seguimiento: "" | "SI" | "NO";
   seguimiento_fecha: string;
+  seguimiento_observaciones: string;
   anamnesis_motivo_consulta: string;
   anamnesis_enfermedad_actual: string;
   analisis: string;
@@ -330,6 +341,7 @@ export default function OutpatientAttendPage() {
   const [idTipoAtencion, setIdTipoAtencion] = useState<string>("");
   const [idModalidadAtencion, setIdModalidadAtencion] = useState<string>("");
   const [idSede, setIdSede] = useState<string>("");
+  const [fechaHora, setFechaHora] = useState<string>(() => toDatetimeLocalValue(new Date()));
   const [seguimiento, setSeguimiento] = useState<"SI" | "NO">("NO");
   const [canalRecordatorio, setCanalRecordatorio] = useState<string>("");
 
@@ -348,6 +360,7 @@ export default function OutpatientAttendPage() {
     seguimiento_efectivo: "",
     cierre_seguimiento: "",
     seguimiento_fecha: "",
+    seguimiento_observaciones: "",
     anamnesis_motivo_consulta: "",
     anamnesis_enfermedad_actual: "",
     analisis: "",
@@ -495,7 +508,13 @@ export default function OutpatientAttendPage() {
     mutationFn: async () => {
       if (!idPaciente) return;
 
+      const dt = new Date(fechaHora);
+      if (Number.isNaN(dt.getTime())) {
+        throw new Error("Fecha de atención inválida");
+      }
+
       const payload: any = {
+        fecha_hora: dt.toISOString(),
         id_tipo_atencion: Number(idTipoAtencion),
         id_modalidad_atencion: idModalidadAtencion ? Number(idModalidadAtencion) : null,
         id_sede: idSede ? Number(idSede) : null,
@@ -527,6 +546,7 @@ export default function OutpatientAttendPage() {
                 ? false
                 : undefined,
           seguimiento_fecha: form.seguimiento_fecha || undefined,
+          seguimiento_observaciones: form.seguimiento_observaciones || undefined,
         },
         id_historia_vinculada:
           shouldRequireHistoriaVinculada && idHistoriaVinculada.trim()
@@ -682,9 +702,23 @@ export default function OutpatientAttendPage() {
     if (mutation.isPending) return;
 
     const metaError = (() => {
+      const dt = new Date(fechaHora);
+      if (Number.isNaN(dt.getTime())) {
+        return "Fecha de atención inválida.";
+      }
+      if (!idSede.trim()) {
+        return "Debe seleccionar la sede.";
+      }
       const idTipoAtencionNum = Number(idTipoAtencion);
       if (!Number.isInteger(idTipoAtencionNum) || idTipoAtencionNum <= 0) {
         return "Debe seleccionar el tipo de atención.";
+      }
+      const idModalidadAtencionNum = Number(idModalidadAtencion);
+      if (!Number.isInteger(idModalidadAtencionNum) || idModalidadAtencionNum <= 0) {
+        return "Debe seleccionar la modalidad de atención.";
+      }
+      if (!seguimiento.trim()) {
+        return "Debe seleccionar si es seguimiento.";
       }
       return null;
     })();
@@ -854,6 +888,7 @@ export default function OutpatientAttendPage() {
 
         const nextConductaPlan = String(lastAttention?.hc_atencion_cierre?.conducta_plan_estudio_manejo ?? "");
         const nextRecomendaciones = String(lastAttention?.hc_atencion_cierre?.recomendaciones ?? "");
+        const nextSeguimientoObservaciones = String(lastAttention?.hc_atencion_cierre?.seguimiento_observaciones ?? "");
         const nextSsr = String(lastAttention?.hc_ssr_atencion?.contenido ?? "");
         const nextTamizajes = String(lastAttention?.hc_tamizajes_atencion?.contenido ?? "");
         const nextExamenFisico = String(lastAttention?.hc_examen_fisico_atencion?.contenido ?? "");
@@ -875,6 +910,9 @@ export default function OutpatientAttendPage() {
           atencion_recomendaciones: prev.atencion_recomendaciones.trim()
             ? prev.atencion_recomendaciones
             : nextRecomendaciones,
+          seguimiento_observaciones: prev.seguimiento_observaciones.trim()
+            ? prev.seguimiento_observaciones
+            : nextSeguimientoObservaciones,
           hc_ssr_contenido: prev.hc_ssr_contenido.trim() ? prev.hc_ssr_contenido : nextSsr,
           hc_tamizajes_contenido: prev.hc_tamizajes_contenido.trim()
             ? prev.hc_tamizajes_contenido
@@ -1123,7 +1161,7 @@ export default function OutpatientAttendPage() {
 
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Sede</label>
+                <label className="text-[11px] font-semibold text-slate-700">Sede <span className="text-red-500">*</span></label>
                 <select
                   value={idSede}
                   onChange={(e) => setIdSede(e.target.value)}
@@ -1140,7 +1178,18 @@ export default function OutpatientAttendPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Tipo de atención</label>
+                <label className="text-[11px] font-semibold text-slate-700">Fecha y hora <span className="text-red-500">*</span></label>
+                <input
+                  type="datetime-local"
+                  value={fechaHora}
+                  onChange={(e) => setFechaHora(e.target.value)}
+                  disabled
+                  className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700">Tipo de atención <span className="text-red-500">*</span></label>
                 <select
                   value={idTipoAtencion}
                   onChange={(e) => setIdTipoAtencion(e.target.value)}
@@ -1157,7 +1206,7 @@ export default function OutpatientAttendPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Modalidad de atención</label>
+                <label className="text-[11px] font-semibold text-slate-700">Modalidad de atención <span className="text-red-500">*</span></label>
                 <select
                   value={idModalidadAtencion}
                   onChange={(e) => setIdModalidadAtencion(e.target.value)}
@@ -1174,7 +1223,7 @@ export default function OutpatientAttendPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-700">Seguimiento</label>
+                <label className="text-[11px] font-semibold text-slate-700">Hace parte de un seguimiento? <span className="text-red-500">*</span></label>
                 <select
                   value={seguimiento}
                   onChange={(e) => setSeguimiento(e.target.value as any)}
@@ -1271,8 +1320,6 @@ export default function OutpatientAttendPage() {
                                     return "Situación de Salud";
                                   case "SITUACION_EN_SALUD":
                                     return "Situación en Salud";
-                                  case "NO_APLICA":
-                                    return "No Aplica";
                                   default:
                                     return opcion;
                                 }

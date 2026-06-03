@@ -394,24 +394,32 @@ export function ExamenFisicoTab({
             <label className="text-[11px] font-medium text-slate-600">T.A. (MMHG)</label>
             <div className="mt-1 flex items-center gap-2">
               <input
-                type="number"
+                type="text"
                 value={contenido.vitals.ta_sistolica}
-                onChange={(e) => setVital("ta_sistolica", e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                  setVital("ta_sistolica", value);
+                }}
+                maxLength={3}
                 className="h-8 w-24 rounded-md border border-slate-300 bg-white px-2 text-[11px] shadow-sm"
                 placeholder="120"
               />
               <span className="text-xs text-slate-500">/</span>
               <input
-                type="number"
+                type="text"
                 value={contenido.vitals.ta_diastolica}
-                onChange={(e) => setVital("ta_diastolica", e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                  setVital("ta_diastolica", value);
+                }}
+                maxLength={3}
                 className="h-8 w-24 rounded-md border border-slate-300 bg-white px-2 text-[11px] shadow-sm"
                 placeholder="80"
               />
             </div>
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label className="text-[11px] font-medium text-slate-600">Sat. O2 (%)</label>
             <input
               type="number"

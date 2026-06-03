@@ -54,7 +54,7 @@ export function AttendTabs({
                 : inactiveBaseClasses
             }
           >
-            Diagnósticos (CIE-10)
+            Analisis
           </button>
         </>
       ) : (
@@ -105,7 +105,7 @@ export function AttendTabs({
                 : inactiveBaseClasses
             }
           >
-            Examen por sistema
+            Revisión por Sistemas
           </button>
           <button
             type="button"

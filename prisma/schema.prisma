@@ -759,6 +759,7 @@ model tipos_documento {
   codigo            String      @unique @db.VarChar(10)
   descripcion       String      @db.VarChar(100)
   pacientes         pacientes[]
+  usuarios          usuarios[]
 }
 
 model tipos_examen {
@@ -804,8 +805,11 @@ model usuarios {
   nombre_completo           String                      @db.VarChar(150)
   email                     String?                     @unique @db.VarChar(150)
   telefono                  String                      @db.VarChar(50)
+  id_tipo_documento         Int?
+  numero_documento          String?                     @unique @db.VarChar(50)
   activo                    Boolean                     @default(true)
   id_rol                    Int
+  password_reset_required   Boolean                     @default(false)
   fecha_creacion            DateTime                    @default(now()) @db.Timestamp(6)
   archivos_adjuntos         archivos_adjuntos[]
   auditoria                 auditoria[]
@@ -814,6 +818,7 @@ model usuarios {
   plantillas_consentimiento plantillas_consentimiento[]
   profesionales_salud       profesionales_salud[]
   roles                     roles                       @relation(fields: [id_rol], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
+  tipos_documento           tipos_documento?            @relation(fields: [id_tipo_documento], references: [id_tipo_documento], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model permisos {

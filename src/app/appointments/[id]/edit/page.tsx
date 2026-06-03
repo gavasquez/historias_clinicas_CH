@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/lib/api";
 import { fetchPatients } from "@/services/patients";
-import { fetchProfessionals } from "@/services/professionals";
+import { fetchMedicalProfessionals } from "@/services/professionals";
 import { fetchSedes, fetchTiposCita, fetchEstadosCita, type Sede, type TipoCita, type EstadoCita } from "@/services/catalogs";
 import type { PatientsResponse } from "@/types/patients";
 import type { ProfessionalsResponse } from "@/types/professionals";

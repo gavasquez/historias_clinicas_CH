@@ -4,7 +4,10 @@ export interface UserListItem {
   nombre_completo: string;
   email: string | null;
   telefono: string;
+  id_tipo_documento: number | null;
+  numero_documento: string | null;
   activo: boolean;
+  password_reset_required: boolean;
   fecha_creacion?: string;
   rol?: {
     id_rol: number;
@@ -13,6 +16,11 @@ export interface UserListItem {
   } | null;
   profesional?: {
     id_profesional: number;
+  } | null;
+  tipo_documento?: {
+    id_tipo_documento: number;
+    codigo: string;
+    descripcion: string;
   } | null;
 }
 

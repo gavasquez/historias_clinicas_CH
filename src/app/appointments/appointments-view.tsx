@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { fetchAppointments, cancelAppointment } from "@/services/appointments";
 import {
   fetchTiposCita,
@@ -135,6 +136,7 @@ function getAttendBlockReason(input: {
 export function AppointmentsView() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
   const [page, setPage] = useState(1);
   const [profesionalFilter, setProfesionalFilter] = useState("");
   const [pacienteFilter, setPacienteFilter] = useState("");
@@ -142,6 +144,20 @@ export function AppointmentsView() {
   const [tipoCitaFilter, setTipoCitaFilter] = useState("");
   const [fechaFilter, setFechaFilter] = useState("");
   const [sedeFilter, setSedeFilter] = useState("0");
+
+  // Obtener el profesional del usuario autenticado
+  const { data: profesionalAutenticado } = useQuery({
+    queryKey: ["my-professional"],
+    queryFn: async () => {
+      const res = await fetch("/api/me/professional");
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.data;
+    },
+  });
+
+  const roleName = (session?.user as any)?.role as string | undefined;
+  const idProfesionalAutenticado = profesionalAutenticado?.id_profesional;
 
   const { data: tiposCita } = useQuery<TipoCita[]>({
     queryKey: ["tipos-cita"],
@@ -400,7 +416,20 @@ export function AppointmentsView() {
                           : false;
 
                         const canAttend = isProgramada && !isCancelled && hasValidStartDate && canAttendByTime;
-                        const shouldShowAttendButton = (isProgramada && !isCancelled) || !hasValidStartDate;
+                        
+                        // Validar permisos de rol para mostrar botón Atender
+                        const canAttendByRole = (() => {
+                          // Enfermera no puede atender citas
+                          if (roleName === "enfermera") return false;
+                          // Médico/profesional solo puede atender sus propias citas
+                          if (roleName && roleName !== "administrador" && idProfesionalAutenticado) {
+                            return cita.id_profesional === idProfesionalAutenticado;
+                          }
+                          // Administrador puede atender todas
+                          return true;
+                        })();
+                        
+                        const shouldShowAttendButton = ((isProgramada && !isCancelled) || !hasValidStartDate) && canAttendByRole;
 
                         rows.push(
                           <tr key={cita.id_cita} className="hover:bg-slate-50">

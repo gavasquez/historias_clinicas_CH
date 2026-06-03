@@ -31,6 +31,11 @@ type MyPermission = {
   modulo: string;
 };
 
+type PermissionsResponse = {
+  roleDescription: string | null;
+  data: MyPermission[];
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -44,17 +49,39 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const roleName = (session?.user as any)?.role as string | undefined;
 
-  const { data: myPermissions } = useQuery<MyPermission[]>({
+  const { data: permissionsData } = useQuery<PermissionsResponse>({
     queryKey: ["me-permissions"],
-    enabled: mounted && !!roleName && roleName !== "super_admin",
+    enabled: mounted && !!roleName,
     queryFn: async () => {
       const res = await fetch("/api/me/permissions");
-      if (!res.ok) return [];
+      if (!res.ok) return { roleDescription: null, data: [] };
       const json = await res.json();
-      return Array.isArray(json?.data) ? (json.data as MyPermission[]) : [];
+      return {
+        roleDescription: json.roleDescription ?? null,
+        data: Array.isArray(json?.data) ? (json.data as MyPermission[]) : [],
+      };
     },
     staleTime: 60_000,
   });
+
+  const { data: userData } = useQuery({
+    queryKey: ["me-user"],
+    enabled: mounted && !!session?.user,
+    queryFn: async () => {
+      const res = await fetch("/api/me/user");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (userData?.password_reset_required && pathname !== "/me/change-password") {
+      router.push("/me/change-password");
+    }
+  }, [userData?.password_reset_required, pathname, router]);
+
+  const myPermissions = permissionsData?.data ?? [];
+  const roleDescription = permissionsData?.roleDescription ?? (roleName === "super_admin" ? "Super Administrador" : "Usuario del sistema");
 
   const allowedNavItems = useMemo(() => {
     if (!roleName) return navItems;
@@ -171,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3 text-xs md:text-sm">
             <div className="flex flex-col text-right">
               <span className="font-medium text-slate-800">{userName}</span>
-              <span className="text-slate-500">Usuario del sistema</span>
+              <span className="text-slate-500">{roleDescription}</span>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-600 text-sm font-semibold text-white">
               {initials}

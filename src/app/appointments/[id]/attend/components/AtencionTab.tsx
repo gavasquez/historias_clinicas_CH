@@ -276,7 +276,7 @@ export function AtencionTab({
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Tipo de seguimiento</label>
+            <label className="text-xs font-medium text-slate-600">Tipo de seguimiento <span className="text-red-500">*</span></label>
             <select
               value={form.seguimiento_opcion}
               onChange={(e) => {
@@ -299,7 +299,6 @@ export function AtencionTab({
               <option value="">Seleccione...</option>
               <option value="CONDICIONES_CRONICAS">CONDICIONES CRÓNICAS</option>
               <option value="SITUACION_EN_SALUD">SITUACIÓN EN SALUD</option>
-              <option value="NO_APLICA">NO APLICA</option>
             </select>
           </div>
 
@@ -383,12 +382,24 @@ export function AtencionTab({
           )}
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Fecha</label>
+            <label className="text-xs font-medium text-slate-600">Próximo seguimiento</label>
             <input
-              type="date"
+              type="text"
               value={form.seguimiento_fecha}
               onChange={(e) => setForm((prev: any) => ({ ...prev, seguimiento_fecha: e.target.value }))}
               className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 shadow-sm"
+              placeholder="Formato personalizado"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="text-xs font-medium text-slate-600">Observación</label>
+            <textarea
+              value={form.seguimiento_observaciones}
+              onChange={(e) => setForm((prev: any) => ({ ...prev, seguimiento_observaciones: e.target.value }))}
+              rows={2}
+              className="mt-1 min-h-[48px] w-full rounded-md border border-slate-300 px-2 py-1 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder="Observaciones del seguimiento"
             />
           </div>
         </div>

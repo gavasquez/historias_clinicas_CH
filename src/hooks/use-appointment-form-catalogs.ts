@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchPatients } from "@/services/patients";
-import { fetchProfessionals } from "@/services/professionals";
+import { fetchMedicalProfessionals } from "@/services/professionals";
 import {
   fetchSedes,
   fetchTiposCita,
@@ -27,7 +27,7 @@ export function useAppointmentFormCatalogs() {
   const { data: professionalsData, isLoading: loadingProfessionals } =
     useQuery<ProfessionalsResponse>({
       queryKey: ["professionals-select"],
-      queryFn: () => fetchProfessionals(1),
+      queryFn: () => fetchMedicalProfessionals(1),
     });
 
   const { data: sedesData, isLoading: loadingSedes } = useQuery<Sede[]>({

@@ -19,7 +19,7 @@ export async function GET() {
 
     const role = await prisma.roles.findUnique({
       where: { nombre: roleName },
-      select: { id_rol: true },
+      select: { id_rol: true, descripcion: true },
     });
 
     if (!role) {
@@ -49,6 +49,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
+      roleDescription: role.descripcion ?? null,
       data: permisos.map((p) => p.permisos),
     });
   } catch (error) {

@@ -17,7 +17,7 @@ import { fetchProfessionalAvailability } from "@/services/professional-availabil
 import type { ProfessionalAvailability } from "@/types/professional-availability";
 import { fetchAppointmentsByProfessional } from "@/services/appointments";
 import { fetchPatients } from "@/services/patients";
-import { fetchProfessionals, getProfessionalById } from "@/services/professionals";
+import { fetchProfessionals, fetchMedicalProfessionals, getProfessionalById } from "@/services/professionals";
 
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
@@ -454,7 +454,7 @@ export default function NewAppointmentPage() {
   const professionalsQuery = useQuery({
     queryKey: ["professionals-select", debouncedProfessionalsSearch],
     queryFn: () => {
-      return fetchProfessionals(1, {
+      return fetchMedicalProfessionals(1, {
         nombre: debouncedProfessionalsSearch || undefined,
       });
     },
@@ -1137,8 +1137,6 @@ export default function NewAppointmentPage() {
                                       return "Situación de Salud";
                                     case "SITUACION_EN_SALUD":
                                       return "Situación en Salud";
-                                    case "NO_APLICA":
-                                      return "No Aplica";
                                     default:
                                       return opcion;
                                   }
