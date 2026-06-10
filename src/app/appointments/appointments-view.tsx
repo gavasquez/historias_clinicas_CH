@@ -66,6 +66,11 @@ function isEstadoCancelled(estadoCita: string | null) {
   return estadoNorm.includes("CANCEL") || estadoNorm.includes("NO ASISTE");
 }
 
+function isEstadoRealizada(estadoCita: string | null) {
+  const estadoNorm = normalizeText(estadoCita);
+  return estadoNorm.includes("REALIZ");
+}
+
 function isWithinAttendWindow(input: { inicioIso: string; finIso: string | null }) {
   const start = new Date(input.inicioIso);
   if (Number.isNaN(start.getTime())) return false;
@@ -403,6 +408,7 @@ export function AppointmentsView() {
 
                       for (const cita of dayItems) {
                         const isCancelled = isEstadoCancelled(cita.estado_cita);
+                        const isRealizada = isEstadoRealizada(cita.estado_cita);
                         const isProgramada = isEstadoProgramada(cita.estado_cita);
 
                         const startDate = new Date(cita.fecha_hora_inicio);
@@ -429,7 +435,7 @@ export function AppointmentsView() {
                           return true;
                         })();
                         
-                        const shouldShowAttendButton = ((isProgramada && !isCancelled) || !hasValidStartDate) && canAttendByRole;
+                        const shouldShowAttendButton = ((isProgramada && !isCancelled) || !hasValidStartDate) && canAttendByRole && !isRealizada;
 
                         rows.push(
                           <tr key={cita.id_cita} className="hover:bg-slate-50">
@@ -514,7 +520,7 @@ export function AppointmentsView() {
                                     Atender
                                   </button>
                                 )}
-                                {!isCancelled && (
+                                {!isCancelled && !isRealizada && (
                                   <button
                                     type="button"
                                     disabled={cancelMutation.isPending}

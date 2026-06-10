@@ -110,12 +110,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       if (moduleName === "dashboard") return true;
 
-      // enfermera should not see "Historias clínicas" in menu
-      // but can still register attentions from patient flow
-      if (roleName === "enfermera" && item.key === "records") {
-        return false;
-      }
-
       return modules.has(moduleName);
     });
   }, [roleName, myPermissions]);

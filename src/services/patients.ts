@@ -123,3 +123,28 @@ export async function fetchPatientAppointments(
 
   return res.data;
 }
+
+export interface PatientBulkUploadInput {
+  tipo_documento: string;
+  numero_documento: string;
+  nombres: string;
+  apellidos: string;
+  fecha_nacimiento: string;
+  telefono: string;
+  email?: string;
+  tipo_usuario: string;
+  sede?: string;
+  programa_academico?: string;
+  eps?: string;
+}
+
+export async function bulkUploadPatients(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await apiClient.post("/patients/bulk-upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return res.data;
+}

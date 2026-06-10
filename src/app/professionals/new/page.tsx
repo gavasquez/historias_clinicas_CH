@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Swal from "sweetalert2";
 import { AppShell } from "@/components/layout/app-shell";
@@ -10,6 +11,13 @@ import { fetchSedes, fetchEspecialidades } from "@/services/catalogs";
 import type { Sede, Especialidad } from "@/services/catalogs";
 import { fetchUsers } from "@/services/users";
 import type { UserListItem, UsersResponse } from "@/types/users";
+
+const Select = dynamic(() => import("react-select"), { ssr: false });
+
+type SelectOption = {
+  value: number;
+  label: string;
+};
 
 interface FormState {
   id_usuario: string;
@@ -35,8 +43,25 @@ export default function NewProfessionalPage() {
   });
 
   const [error, setError] = useState<string | null>(null);
-  const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
+  const [menuPortalTarget, setMenuPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setMenuPortalTarget(document.body);
+  }, []);
+
+  const selectStyles = {
+    control: (base: any) => ({ ...base, minHeight: 32, fontSize: 12 }),
+    valueContainer: (base: any) => ({ ...base, padding: "4px 8px" }),
+    singleValue: (base: any) => ({ ...base, color: "#0f172a", fontSize: 12 }),
+    indicatorsContainer: (base: any) => ({ ...base, height: 32 }),
+    dropdownIndicator: (base: any) => ({ ...base, padding: 4 }),
+    clearIndicator: (base: any) => ({ ...base, padding: 4 }),
+    indicatorSeparator: () => ({ display: "none" }),
+    menuPortal: (base: any) => ({ ...base, zIndex: 60 }),
+    menu: (base: any) => ({ ...base, zIndex: 60, fontSize: 12 }),
+    option: (base: any) => ({ ...base, color: "#000", fontSize: 12 }),
+  };
 
   const { data: sedes, isLoading: loadingSedes } = useQuery<Sede[]>({
     queryKey: ["sedes"],
@@ -54,6 +79,27 @@ export default function NewProfessionalPage() {
   });
 
   const users: UserListItem[] = usersResponse?.data ?? [];
+
+  const usersOptions = useMemo<SelectOption[]>(() => {
+    return users.map((user) => ({
+      value: user.id_usuario,
+      label: `${user.nombre_completo}${user.email ? ` (${user.email})` : ""}`,
+    }));
+  }, [users]);
+
+  const sedesOptions = useMemo<SelectOption[]>(() => {
+    return (sedes ?? []).map((sede: Sede) => ({
+      value: sede.id_sede,
+      label: sede.nombre,
+    }));
+  }, [sedes]);
+
+  const especialidadesOptions = useMemo<SelectOption[]>(() => {
+    return (especialidades ?? []).map((esp: Especialidad) => ({
+      value: esp.id_especialidad,
+      label: esp.nombre,
+    }));
+  }, [especialidades]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -129,43 +175,30 @@ export default function NewProfessionalPage() {
               <label className="text-xs font-medium text-slate-600">
                 Usuario del sistema <span className="text-red-500">*</span>
               </label>
-              <select
-                value={form.id_usuario}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (!value) {
+              <Select
+                menuPortalTarget={menuPortalTarget}
+                menuPosition="fixed"
+                styles={selectStyles}
+                placeholder={loadingUsers ? "Cargando usuarios..." : "Seleccione un usuario"}
+                options={usersOptions}
+                value={(() => {
+                  if (!form.id_usuario) return null;
+                  const idNum = Number(form.id_usuario);
+                  return usersOptions.find((o) => o.value === idNum) ?? null;
+                })()}
+                onChange={(option: any) => {
+                  const selected = option as SelectOption | null;
+                  if (!selected) {
                     setSelectedUser(null);
                     setForm((prev) => ({ ...prev, id_usuario: "" }));
                     return;
                   }
-
-                  const id = Number(value);
-                  const list = users;
-                  const found = list.find((u) => u.id_usuario === id) ?? null;
+                  const id = selected.value;
+                  const found = users.find((u) => u.id_usuario === id) ?? null;
                   setSelectedUser(found);
-                  setForm((prev) => ({ ...prev, id_usuario: value }));
+                  setForm((prev) => ({ ...prev, id_usuario: String(id) }));
                 }}
-                className="mt-1 h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-                <option value="">
-                  {loadingUsers ? "Cargando usuarios..." : "Seleccione un usuario"}
-                </option>
-                {users
-                  .filter((user) => {
-                    const q = userSearch.trim().toLowerCase();
-                    if (!q) return true;
-                    return (
-                      user.nombre_completo.toLowerCase().includes(q) ||
-                      (user.email ?? "").toLowerCase().includes(q)
-                    );
-                  })
-                  .map((user) => (
-                    <option key={user.id_usuario} value={user.id_usuario}>
-                      {user.nombre_completo}
-                      {user.email ? ` (${user.email})` : ""}
-                    </option>
-                  ))}
-              </select>
+              />
               {selectedUser && (
                 <p className="mt-1 text-[11px] text-emerald-700">
                   Usuario seleccionado: {selectedUser.nombre_completo}
@@ -176,44 +209,42 @@ export default function NewProfessionalPage() {
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Sede</label>
-              <select
-                value={form.id_sede}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, id_sede: e.target.value }))
-                }
-                className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-                <option value="">
-                  {loadingSedes ? "Cargando sedes..." : "Seleccione una sede (opcional)"}
-                </option>
-                {(sedes ?? []).map((sede: Sede) => (
-                  <option key={sede.id_sede} value={sede.id_sede}>
-                    {sede.nombre}
-                  </option>
-                ))}
-              </select>
+              <Select
+                menuPortalTarget={menuPortalTarget}
+                menuPosition="fixed"
+                styles={selectStyles}
+                placeholder={loadingSedes ? "Cargando sedes..." : "Seleccione una sede (opcional)"}
+                options={sedesOptions}
+                value={(() => {
+                  if (!form.id_sede) return null;
+                  const idNum = Number(form.id_sede);
+                  return sedesOptions.find((o) => o.value === idNum) ?? null;
+                })()}
+                onChange={(option: any) => {
+                  const selected = option as SelectOption | null;
+                  setForm((prev) => ({ ...prev, id_sede: selected ? String(selected.value) : "" }));
+                }}
+              />
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Especialidad</label>
-              <select
-                value={form.id_especialidad}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, id_especialidad: e.target.value }))
-                }
-                className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm bg-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-                <option value="">
-                  {loadingEspecialidades
-                    ? "Cargando especialidades..."
-                    : "Seleccione una especialidad (opcional)"}
-                </option>
-                {(especialidades ?? []).map((esp: Especialidad) => (
-                  <option key={esp.id_especialidad} value={esp.id_especialidad}>
-                    {esp.nombre}
-                  </option>
-                ))}
-              </select>
+              <Select
+                menuPortalTarget={menuPortalTarget}
+                menuPosition="fixed"
+                styles={selectStyles}
+                placeholder={loadingEspecialidades ? "Cargando especialidades..." : "Seleccione una especialidad (opcional)"}
+                options={especialidadesOptions}
+                value={(() => {
+                  if (!form.id_especialidad) return null;
+                  const idNum = Number(form.id_especialidad);
+                  return especialidadesOptions.find((o) => o.value === idNum) ?? null;
+                })()}
+                onChange={(option: any) => {
+                  const selected = option as SelectOption | null;
+                  setForm((prev) => ({ ...prev, id_especialidad: selected ? String(selected.value) : "" }));
+                }}
+              />
             </div>
 
             <div className="flex flex-col gap-1">

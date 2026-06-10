@@ -3,19 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/layout/app-shell";
 import type { PatientsResponse } from "@/types/patients";
 import { fetchPatients, togglePatientActive } from "@/services/patients";
+import { BulkUploadModal } from "@/components/patients/bulk-upload-modal";
 import Swal from "sweetalert2";
 
 export function PatientsView() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
   const [page, setPage] = useState(1);
   const [documento, setDocumento] = useState("");
   const [nombre, setNombre] = useState("");
   const [tipoUsuario, setTipoUsuario] = useState("");
   const [programa, setPrograma] = useState("");
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+
+  const userRole = (session?.user as any)?.role;
+  const isAdmin = userRole === "super_admin" || userRole === "administrador";
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, activo }: { id: string; activo: boolean }) => togglePatientActive(id, activo),
@@ -61,7 +68,16 @@ export function PatientsView() {
               Consulta básica de pacientes registrados en el sistema.
             </p>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowBulkUploadModal(true)}
+                className="rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-medium text-sky-700 shadow-sm transition hover:bg-sky-50"
+              >
+                Carga Masiva
+              </button>
+            )}
             <button
               type="button"
               onClick={() => router.push("/patients/new")}
@@ -298,6 +314,14 @@ export function PatientsView() {
           )}
         </div>
       </section>
+
+      <BulkUploadModal
+        isOpen={showBulkUploadModal}
+        onClose={() => setShowBulkUploadModal(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["patients"] });
+        }}
+      />
     </AppShell>
   );
 }
