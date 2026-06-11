@@ -1035,29 +1035,18 @@ async function main() {
     if (!id_departamento) continue;
 
     for (const c of ciudades) {
-      const existing = await prisma.ciudades.findUnique({
-        where: {
-          id_departamento_nombre: {
-            id_departamento,
-            nombre: c.nombre,
-          },
+      await prisma.ciudades.upsert({
+        where: { codigo_dane: c.codigo_dane },
+        update: {
+          id_departamento,
+          nombre: c.nombre,
+        },
+        create: {
+          id_departamento,
+          nombre: c.nombre,
+          codigo_dane: c.codigo_dane,
         },
       });
-
-      if (existing) {
-        await prisma.ciudades.update({
-          where: { id_ciudad: existing.id_ciudad },
-          data: { codigo_dane: c.codigo_dane },
-        });
-      } else {
-        await prisma.ciudades.create({
-          data: {
-            id_departamento,
-            nombre: c.nombre,
-            codigo_dane: c.codigo_dane,
-          },
-        });
-      }
     }
   }
 
