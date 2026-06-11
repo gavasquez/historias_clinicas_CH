@@ -451,6 +451,7 @@ export default function EditAppointmentPage() {
             ? String(citaData.id_modalidad_atencion)
             : "",
         id_programa_salud: citaData.id_programa_salud ? String(citaData.id_programa_salud) : "",
+        id_tipo_historia: citaData.id_tipo_historia ? String(citaData.id_tipo_historia) : "",
         fecha_hora_inicio: startLocal ? formatDateTimeLocalInput(startLocal) : startISO.slice(0, 16),
         fecha_hora_fin: endLocal ? formatDateTimeLocalInput(endLocal) : endISO ? endISO.slice(0, 16) : "",
         seguimiento: citaData.seguimiento ? "SI" : "NO",
