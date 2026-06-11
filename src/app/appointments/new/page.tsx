@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
@@ -21,7 +21,7 @@ import { fetchProfessionals, fetchMedicalProfessionals, getProfessionalById } fr
 
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
-export default function NewAppointmentPage() {
+function NewAppointmentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const profesionalIdFromQuery = searchParams.get("profesionalId");
@@ -1547,5 +1547,13 @@ export default function NewAppointmentPage() {
         </div>
       </section>
     </AppShell>
+  );
+}
+
+export default function NewAppointmentPage() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <NewAppointmentContent />
+    </Suspense>
   );
 }
