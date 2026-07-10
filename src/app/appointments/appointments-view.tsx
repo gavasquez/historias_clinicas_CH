@@ -163,6 +163,7 @@ export function AppointmentsView() {
 
   const roleName = (session?.user as any)?.role as string | undefined;
   const idProfesionalAutenticado = profesionalAutenticado?.id_profesional;
+  const canCreateEdit = roleName === "administrador";
 
   const { data: tiposCita } = useQuery<TipoCita[]>({
     queryKey: ["tipos-cita"],
@@ -234,21 +235,28 @@ export function AppointmentsView() {
           </p>
         </div>
         <div className="flex gap-2">
-  <button
-    type="button"
-    onClick={() => router.push("/professionals")}
-    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-  >
-    Ver profesionales
-  </button>
-  <button
-    type="button"
-    onClick={() => router.push("/appointments/new")}
-    className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700"
-  >
-    Nueva cita
-  </button>
-</div>
+          <button
+            type="button"
+            onClick={() => router.push("/professionals")}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+          >
+            Ver profesionales
+          </button>
+          <button
+            type="button"
+            disabled={!canCreateEdit}
+            onClick={() => {
+              if (canCreateEdit) router.push("/appointments/new");
+            }}
+            className={
+              canCreateEdit
+                ? "rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                : "rounded-lg bg-sky-300 px-3 py-1.5 text-xs font-semibold text-white shadow-sm opacity-60 cursor-not-allowed"
+            }
+          >
+            Nueva cita
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-xs md:grid-cols-6">
@@ -470,13 +478,23 @@ export function AppointmentsView() {
                             </td>
                             <td className="px-3 py-2 text-right">
                               <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => router.push(`/appointments/${cita.id_cita}/edit`)}
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-                                >
-                                  Editar
-                                </button>
+                                {canCreateEdit ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => router.push(`/appointments/${cita.id_cita}/edit`)}
+                                    className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+                                  >
+                                    Editar
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-400 shadow-sm cursor-not-allowed"
+                                  >
+                                    Editar
+                                  </button>
+                                )}
                                 {shouldShowAttendButton && (
                                   <button
                                     type="button"
