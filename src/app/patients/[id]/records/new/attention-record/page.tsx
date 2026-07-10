@@ -346,7 +346,8 @@ export default function NewAttentionRecordDirectPage() {
       router.push(`/patients/${idPaciente}/records`);
     },
     onError: (err: any) => {
-      const msg = err?.message || "No se pudo registrar la atención.";
+      const backendMsg = err?.response?.data?.message;
+      const msg = backendMsg || err?.message || "No se pudo registrar la atención.";
       setError(msg);
     },
   });

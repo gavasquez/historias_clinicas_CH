@@ -9,7 +9,7 @@ import Swal from "sweetalert2";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPatientDetailById } from "@/services/patients";
 import { fetchPatientRecords } from "@/services/patient-records";
-import { fetchHistoryDetail } from "@/services/histories";
+import { fetchHistoryDetail, voidHistory } from "@/services/histories";
 import {
   fetchModalidadesAtencion,
   fetchTiposAtencion,
@@ -81,6 +81,13 @@ export default function PatientRecordsPage() {
       return {
         label: "No registrado",
         className: "bg-slate-100 text-slate-700 ring-slate-200",
+      };
+    }
+
+    if (normalized === "anulado") {
+      return {
+        label: "Anulado",
+        className: "bg-rose-50 text-rose-700 ring-rose-200",
       };
     }
 
@@ -178,6 +185,47 @@ export default function PatientRecordsPage() {
     recordsFilterFechaDesde,
     recordsFilterFechaHasta,
   ]);
+
+  // Mutación para anular folio
+  const voidHistoryMutation = useMutation({
+    mutationFn: async (vars: { historyId: number; reason: string }) => {
+      return voidHistory(vars.historyId, { reason: vars.reason, confirm: "ANULAR" });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["patient-clinical-records", id] });
+      await queryClient.invalidateQueries({ queryKey: ["history-detail", selectedHistoryId] });
+      Swal.fire({ icon: "success", title: "Folio anulado", text: "La historia fue anulada correctamente.", timer: 1800, showConfirmButton: false });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || "No se pudo anular el folio";
+      Swal.fire({ icon: "error", title: "Error", text: msg });
+    }
+  });
+
+  const handleVoidHistory = async (historyId: number, tipoHistoria: string) => {
+    // Paso 1: solicitar motivo
+    const { value: reason } = await Swal.fire({
+      title: `Anular folio de ${tipoHistoria}`,
+      html: '<p class="text-xs text-slate-600">Esta acción marcará el registro como Anulado. No se elimina la información y quedará registrado en auditoría.</p>',
+      input: "textarea",
+      inputLabel: "Motivo de anulación",
+      inputPlaceholder: "Describa claramente el motivo (mín. 20 caracteres)",
+      inputAttributes: { maxlength: "500" },
+      inputValidator: (value) => {
+        const v = String(value ?? "").trim();
+        if (!v || v.length < 20) return "El motivo debe tener al menos 20 caracteres";
+        return undefined as any;
+      },
+      showCancelButton: true,
+      confirmButtonText: "Anular folio",
+      cancelButtonText: "Cancelar",
+      focusConfirm: false,
+      allowOutsideClick: () => !Swal.isLoading(),
+    });
+    if (!reason) return;
+    // Ejecutar anulación directamente
+    await voidHistoryMutation.mutateAsync({ historyId, reason });
+  };
 
   // Agrupar historias para el acordeón: principales (sin vinculación) y sus hijas
   const groupedRecords = useMemo(() => {
@@ -720,7 +768,7 @@ export default function PatientRecordsPage() {
                           <React.Fragment key={ h.id_historia }>
                             {/* Fila principal */}
                             <tr
-                              className="cursor-pointer hover:bg-slate-50"
+                              className={`cursor-pointer ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100 hover:bg-rose-100" : "hover:bg-slate-50"}`}
                               onClick={() => {
                                 setSelectedHistoryId(h.id_historia);
                                 setExpandedAttentions({});
@@ -734,7 +782,7 @@ export default function PatientRecordsPage() {
                                 }
                               }}
                             >
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 {h.hasChildren ? (
                                   <button
                                     type="button"
@@ -751,15 +799,15 @@ export default function PatientRecordsPage() {
                                   <span className="text-slate-300 text-lg" title="Historia sin vinculadas">📄</span>
                                 )}
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="max-w-[160px] truncate" title={h.last_attention_sede ?? "No registrado"}>
                                   { h.last_attention_sede ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 { new Date( (h.last_attention_fecha_hora ?? h.fecha_apertura) ).toLocaleString() }
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div
                                   className="max-w-[180px] truncate"
                                   title={h.tipo_historia}
@@ -767,7 +815,7 @@ export default function PatientRecordsPage() {
                                   { h.tipo_historia }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div
                                   className="max-w-[180px] truncate"
                                   title={h.profesional_responsable ?? "No registrado"}
@@ -775,7 +823,7 @@ export default function PatientRecordsPage() {
                                   { h.profesional_responsable ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div
                                   className="max-w-[180px] truncate"
                                   title={h.profesional_registro ?? "No registrado"}
@@ -783,7 +831,7 @@ export default function PatientRecordsPage() {
                                   { h.profesional_registro ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 {(() => {
                                   const badge = estadoBadge(h.estado);
                                   return (
@@ -795,17 +843,17 @@ export default function PatientRecordsPage() {
                                   );
                                 })()}
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="max-w-[180px] truncate" title={h.last_attention_tipo ?? "No registrado"}>
                                   { h.last_attention_tipo ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="max-w-[180px] truncate" title={h.last_attention_modalidad ?? "No registrado"}>
                                   { h.last_attention_modalidad ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 {(() => {
                                   const seguimientoValue = typeof h.last_attention_seguimiento === "boolean"
                                     ? (h.last_attention_seguimiento ? "SI" : "NO")
@@ -824,7 +872,7 @@ export default function PatientRecordsPage() {
                                   );
                                 })()}
                               </td>
-                            <td className="px-3 py-2">
+                            <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
@@ -837,6 +885,20 @@ export default function PatientRecordsPage() {
                                 >
                                   Ver detalle
                                 </button>
+                                {String(h.estado ?? "").trim().toLowerCase() === "finalizado" && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleVoidHistory(h.id_historia, h.tipo_historia);
+                                    }}
+                                    disabled={voidHistoryMutation.isPending}
+                                    className="cursor-pointer rounded-md border border-red-300 bg-white px-2 py-1 text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                                    title="Anular folio"
+                                  >
+                                    {voidHistoryMutation.isPending ? "Anulando..." : "Anular folio"}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -845,7 +907,7 @@ export default function PatientRecordsPage() {
                           {h.hasChildren && expandedHistories[h.id_historia] && h.children.map((child: any) => (
                             <tr
                               key={`child-${child.id_historia}`}
-                              className="bg-slate-50/50 cursor-pointer hover:bg-slate-50/80"
+                              className={`cursor-pointer ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100 hover:bg-rose-100" : "bg-slate-50/50 hover:bg-slate-50/80"}`}
                               onClick={() => {
                                 setSelectedHistoryId(child.id_historia);
                                 setExpandedAttentions({});
@@ -859,18 +921,18 @@ export default function PatientRecordsPage() {
                                 }
                               }}
                             >
-                              <td className="px-3 py-2 pl-8">
+                              <td className={`px-3 py-2 pl-8 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <span className="text-slate-400 text-lg" title="Historia vinculada">📄</span>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="max-w-[160px] truncate" title={child.last_attention_sede ?? "No registrado"}>
                                   { child.last_attention_sede ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 { new Date( (child.last_attention_fecha_hora ?? child.fecha_apertura) ).toLocaleString() }
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div
                                   className="max-w-[180px] truncate"
                                   title={child.tipo_historia}
@@ -878,7 +940,7 @@ export default function PatientRecordsPage() {
                                   { child.tipo_historia }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div
                                   className="max-w-[180px] truncate"
                                   title={child.profesional_responsable ?? "No registrado"}
@@ -886,7 +948,7 @@ export default function PatientRecordsPage() {
                                   { child.profesional_responsable ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div
                                   className="max-w-[180px] truncate"
                                   title={child.profesional_registro ?? "No registrado"}
@@ -894,7 +956,7 @@ export default function PatientRecordsPage() {
                                   { child.profesional_registro ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 {(() => {
                                   const badge = estadoBadge(child.estado);
                                   return (
@@ -906,17 +968,17 @@ export default function PatientRecordsPage() {
                                   );
                                 })()}
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="max-w-[180px] truncate" title={child.last_attention_tipo ?? "No registrado"}>
                                   { child.last_attention_tipo ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="max-w-[180px] truncate" title={child.last_attention_modalidad ?? "No registrado"}>
                                   { child.last_attention_modalidad ?? "No registrado" }
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 {(() => {
                                   const seguimientoValue = typeof child.last_attention_seguimiento === "boolean"
                                     ? (child.last_attention_seguimiento ? "SI" : "NO")
@@ -935,7 +997,7 @@ export default function PatientRecordsPage() {
                                   );
                                 })()}
                               </td>
-                              <td className="px-3 py-2">
+                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
@@ -948,6 +1010,20 @@ export default function PatientRecordsPage() {
                                   >
                                     Ver detalle
                                   </button>
+                                  {String(child.estado ?? "").trim().toLowerCase() === "finalizado" && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleVoidHistory(child.id_historia, child.tipo_historia);
+                                      }}
+                                      disabled={voidHistoryMutation.isPending}
+                                      className="cursor-pointer rounded-md border border-red-300 bg-white px-2 py-1 text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                                      title="Anular folio"
+                                    >
+                                      {voidHistoryMutation.isPending ? "Anulando..." : "Anular folio"}
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

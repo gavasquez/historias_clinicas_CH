@@ -229,12 +229,6 @@ export async function POST(
     }
 
     const seguimientoOpcionTrim = String(seguimiento_opcion ?? "").trim();
-    if (!seguimientoOpcionTrim) {
-      return NextResponse.json(
-        { message: "El tipo de seguimiento es obligatorio" },
-        { status: 400 },
-      );
-    }
     const seguimientoEfectivoBool = normalizeOptionalBoolean(seguimiento_efectivo);
     const cierreSeguimientoBool = normalizeOptionalBoolean(cierre_seguimiento);
     const seguimientoFechaDate = normalizeDateOnly(seguimiento_fecha);

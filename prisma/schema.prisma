@@ -468,6 +468,14 @@ model historias_clinicas {
   profesionales_salud        profesionales_salud?       @relation(fields: [id_profesional_responsable], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
   tipos_historia_clinica     tipos_historia_clinica     @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
 
+  // Campos de anulación (void)
+  voided_at                  DateTime?                  @db.Timestamp(6)
+  voided_by                  Int?
+  void_reason                String?
+  previous_status            String?                    @db.VarChar(50)
+  void_ip                    String?                    @db.VarChar(100)
+  void_user_agent            String?                    @db.VarChar(255)
+
   @@index([id_paciente], map: "idx_historia_paciente")
   @@index([id_historia_vinculada], map: "idx_historia_vinculada")
 }
