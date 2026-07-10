@@ -42,6 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
 
   const [mounted, setMounted] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -74,6 +75,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     },
   });
 
+  const { data: myProfessional } = useQuery({
+    queryKey: ["my-professional"],
+    enabled: mounted && !!session?.user,
+    queryFn: async () => {
+      const res = await fetch("/api/me/professional");
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.data ?? null;
+    },
+  });
+
   useEffect(() => {
     if (userData?.password_reset_required && pathname !== "/me/change-password") {
       router.push("/me/change-password");
@@ -99,7 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       dashboard: "dashboard",
       patients: "pacientes",
       appointments: "citas",
-      professionals: "citas",
+      professionals: "profesionales",
       users: "admin",
       records: "historias",
       reports: "admin",
@@ -109,6 +121,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       const moduleName = navKeyToModule[item.key] ?? item.key;
 
       if (moduleName === "dashboard") return true;
+
+      // Regla especial para Profesionales:
+      // - Visible si el usuario NO es "medico" y tiene módulo "profesionales" o (compatibilidad) "citas".
+      if (item.key === "professionals") {
+        if (roleName === "medico") return false;
+        return modules.has("profesionales") || modules.has("citas");
+      }
 
       return modules.has(moduleName);
     });
@@ -194,9 +213,73 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="font-medium text-slate-800">{userName}</span>
               <span className="text-slate-500">{roleDescription}</span>
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-600 text-sm font-semibold text-white">
-              {initials}
-            </div>
+            {(() => {
+              const editRoute =
+                roleName === "medico" && (myProfessional as any)?.id_profesional
+                  ? `/professionals/${(myProfessional as any).id_profesional}/edit`
+                  : userData?.id_usuario
+                  ? `/users/${userData.id_usuario}/edit`
+                  : null;
+
+              return (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowUserMenu((v) => !v)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-600 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-sky-300 cursor-pointer hover:bg-sky-700"
+                    aria-haspopup="menu"
+                    aria-expanded={showUserMenu}
+                  >
+                    {initials}
+                  </button>
+                  {showUserMenu && (
+                    <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-lg">
+                      {/* Editar datos de usuario */}
+                      <button
+                        type="button"
+                        disabled={!userData?.id_usuario}
+                        onClick={() => {
+                          if (userData?.id_usuario) router.push(`/users/${userData.id_usuario}/edit`);
+                          setShowUserMenu(false);
+                        }}
+                        className={
+                          userData?.id_usuario
+                            ? "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-slate-700 hover:bg-slate-50 cursor-pointer"
+                            : "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-slate-400 cursor-not-allowed"
+                        }
+                      >
+                        Editar datos de usuario
+                      </button>
+                      {/* Editar datos del profesional (solo médico/enfermera y si existe profesional) */}
+                      {(roleName === "medico" || roleName === "enfermera") && (myProfessional as any)?.id_profesional ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const idProf = (myProfessional as any)?.id_profesional;
+                            if (idProf) router.push(`/professionals/${idProf}/edit`);
+                            setShowUserMenu(false);
+                          }}
+                          className="mt-0.5 flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Editar datos del profesional
+                        </button>
+                      ) : null}
+                      {/* Cerrar sesión */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          signOut({ callbackUrl: "/login" });
+                        }}
+                        className="mt-0.5 flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-red-600 hover:bg-red-50 cursor-pointer"
+                      >
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </header>
 

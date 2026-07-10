@@ -7,11 +7,15 @@ import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/lib/api";
 import { fetchTiposDocumento } from "@/services/catalogs";
 import type { TipoDocumento } from "@/services/catalogs";
+import { useSession } from "next-auth/react";
 
 export default function EditUserPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id;
+  const { data: session } = useSession();
+  const roleName = (session?.user as any)?.role as string | undefined;
+  const isAdmin = roleName === "super_admin" || roleName === "administrador";
 
   const [isClient, setIsClient] = useState(false);
   const [form, setForm] = useState({
@@ -63,9 +67,12 @@ export default function EditUserPage() {
         nombre_completo: form.nombre_completo,
         email: form.email || null,
         telefono: form.telefono,
-        activo: form.activo,
-        password_reset_required: form.password_reset_required,
       };
+
+      if (isAdmin) {
+        payload.activo = form.activo;
+        payload.password_reset_required = form.password_reset_required;
+      }
 
       if (form.id_tipo_documento) {
         payload.id_tipo_documento = Number(form.id_tipo_documento);
@@ -228,26 +235,28 @@ export default function EditUserPage() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={form.activo}
-                      onChange={(e) => setForm({ ...form, activo: e.target.checked })}
-                      className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                    />
-                    <span className="text-xs font-medium text-slate-600">Usuario activo</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={form.password_reset_required}
-                      onChange={(e) => setForm({ ...form, password_reset_required: e.target.checked })}
-                      className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                    />
-                    <span className="text-xs font-medium text-slate-600">Requiere cambio de contraseña al iniciar sesión</span>
-                  </label>
-                </div>
+                {isAdmin && (
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={form.activo}
+                        onChange={(e) => setForm({ ...form, activo: e.target.checked })}
+                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                      />
+                      <span className="text-xs font-medium text-slate-600">Usuario activo</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={form.password_reset_required}
+                        onChange={(e) => setForm({ ...form, password_reset_required: e.target.checked })}
+                        className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-xs font-medium text-slate-600">Requiere cambio de contraseña al iniciar sesión</span>
+                    </label>
+                  </div>
+                )}
               </div>
             )}
 

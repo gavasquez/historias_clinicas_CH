@@ -244,6 +244,13 @@ export function PatientsView() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => router.push(`/patients/${p.id_paciente}/edit`)}
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
                             disabled={toggleActiveMutation.isPending}
                             onClick={async () => {
                               const nextActive = p.activo === false;
