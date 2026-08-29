@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireSession } from "@/lib/api-auth";
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string; diagnosisId: string }> | { id: string; diagnosisId: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const resolvedParams = await (context as any).params;
     const idAtencion = Number(resolvedParams.id);
@@ -112,6 +116,9 @@ export async function DELETE(
   _request: NextRequest,
   context: { params: Promise<{ id: string; diagnosisId: string }> | { id: string; diagnosisId: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const resolvedParams = await (context as any).params;
     const idAtencion = Number(resolvedParams.id);

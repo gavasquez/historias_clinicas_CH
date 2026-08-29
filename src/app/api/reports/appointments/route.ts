@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireSession } from "@/lib/api-auth";
 
 function parseDateOnly(value: string | null): Date | null {
   if (!value) return null;
@@ -28,6 +29,9 @@ function toCsv(rows: Record<string, unknown>[]) {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
 

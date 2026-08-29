@@ -3,10 +3,14 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { UserListItem } from "@/types/users";
+import { requireSession, ADMIN_ROLES } from "@/lib/api-auth";
 
 const PAGE_SIZE = 5;
 
 export async function GET(request: NextRequest) {
+  const auth = await requireSession(ADMIN_ROLES);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim() || "";
@@ -124,6 +128,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireSession(ADMIN_ROLES);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const {
@@ -225,6 +232,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = await requireSession(ADMIN_ROLES);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const idParam = searchParams.get("id");

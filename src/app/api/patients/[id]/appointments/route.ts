@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseDateOnlyToUtc } from "@/lib/date-time";
+import { requireSession } from "@/lib/api-auth";
 
 const PAGE_SIZE = 5;
 
@@ -12,6 +13,9 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const resolvedParams = await (context as any).params;
     const patientId = Number(resolvedParams.id);

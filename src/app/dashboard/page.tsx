@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { AppShell } from "@/components/layout/app-shell";
 import { CalendarDays, FileText, Users } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { startOfDayInAppTimeZone } from "@/lib/date-time";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -12,10 +13,9 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const now = new Date();
-  const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
-  const startOfTomorrowUtc = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0),
+  const startOfToday = startOfDayInAppTimeZone(new Date());
+  const startOfTomorrow = startOfDayInAppTimeZone(
+    new Date(startOfToday.getTime() + 36 * 60 * 60 * 1000),
   );
 
   const [patientsCount, todaysAppointmentsCount, recordsCount] = await Promise.all([
@@ -23,8 +23,8 @@ export default async function DashboardPage() {
     prisma.citas.count({
       where: {
         fecha_hora_inicio: {
-          gte: startOfTodayUtc,
-          lt: startOfTomorrowUtc,
+          gte: startOfToday,
+          lt: startOfTomorrow,
         },
       },
     }),

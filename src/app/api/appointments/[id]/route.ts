@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { validateAvailabilityOrThrow } from "@/lib/availability-validator";
+import {
+  dayOfWeek1To7,
+  minutesFromDbTime,
+  minutesFromLocalTime,
+} from "@/lib/date-time";
+import { requireSession } from "@/lib/api-auth";
 
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
 
@@ -14,6 +20,9 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
@@ -78,6 +87,9 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
@@ -231,18 +243,18 @@ export async function PUT(
       where: {
         id_profesional: idProfesionalNum,
         id_sede: idSedeValid,
-        dia_semana: ((fechaInicio.getDay() + 6) % 7) + 1,
+        dia_semana: dayOfWeek1To7(fechaInicio),
         es_excepcion: false,
       },
       orderBy: [{ hora_inicio: "asc" }],
     });
 
     const intervalCapacity = (() => {
-      const startMin = fechaInicio.getHours() * 60 + fechaInicio.getMinutes();
-      const endMin = fechaFin.getHours() * 60 + fechaFin.getMinutes();
+      const startMin = minutesFromLocalTime(fechaInicio);
+      const endMin = minutesFromLocalTime(fechaFin);
       const item = availabilityItems.find((i) => {
-        const aStart = i.hora_inicio.getUTCHours() * 60 + i.hora_inicio.getUTCMinutes();
-        const aEnd = i.hora_fin.getUTCHours() * 60 + i.hora_fin.getUTCMinutes();
+        const aStart = minutesFromDbTime(i.hora_inicio);
+        const aEnd = minutesFromDbTime(i.hora_fin);
         return startMin >= aStart && endMin <= aEnd;
       });
       const cap = item?.capacidad_simultanea ?? 1;

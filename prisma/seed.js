@@ -69,8 +69,21 @@ async function main() {
   const permId = Object.fromEntries(permisosByCode.map((p) => [p.codigo, p.id_permiso]));
 
   const superAdminRoleId = roleId["super_admin"];
-  if (superAdminRoleId) {
-    const passwordHash = await bcrypt.hash("123456789", 10);
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+
+  if (superAdminRoleId && !adminPassword) {
+    console.warn(
+      "SEED_ADMIN_PASSWORD no está definida: se omite la creación del usuario 'admin'.",
+    );
+  }
+
+  if (superAdminRoleId && adminPassword) {
+    if (adminPassword.length < 12) {
+      throw new Error("SEED_ADMIN_PASSWORD debe tener al menos 12 caracteres");
+    }
+
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+
     await prisma.usuarios.upsert({
       where: { username: "admin" },
       update: {
@@ -79,7 +92,6 @@ async function main() {
         telefono: "0000000000",
         activo: true,
         id_rol: superAdminRoleId,
-        password_hash: passwordHash,
       },
       create: {
         username: "admin",
@@ -89,6 +101,7 @@ async function main() {
         telefono: "0000000000",
         activo: true,
         id_rol: superAdminRoleId,
+        password_reset_required: true,
       },
     });
   }

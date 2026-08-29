@@ -693,220 +693,223 @@ export async function POST(
       );
     }
 
-    const atencion = existingAttention?.id_atencion
-      ? await prisma.atenciones_salud.update({
-          where: { id_atencion: existingAttention.id_atencion },
-          data: {
-            id_historia: historia.id_historia,
-            id_cita: cita.id_cita,
-            id_profesional: cita.id_profesional,
-            id_tipo_atencion: idTipoAtencionNum,
-            id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
-            analisis: analisisTrim || null,
-            observacion_analisis: observacionAnalisisTrim || null,
-            llega_por_sus_medios: llega_por_sus_medios,
-            llega_por_sus_medios_cual:
-              llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
-            estado_a_la_llegada: estadoLlegada,
-            caso_accidente_intoxicacion_violencia: caso_accidente_intoxicacion_violencia,
-            fecha_ocurrencia_evento:
-              caso_accidente_intoxicacion_violencia === true ? fechaOcurrencia : null,
-            lugar_ocurrencia_evento:
-              caso_accidente_intoxicacion_violencia === true ? lugarOcurrenciaTrim : null,
-            notificacion_policia:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_policia === true : null,
-            notificacion_cti:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_cti === true : null,
-            notificacion_acudiente:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_acudiente === true : null,
-            notificacion_otro:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_otro === true : null,
-            notificacion_otro_cual:
-              caso_accidente_intoxicacion_violencia === true && notificacion_otro === true
-                ? notificacionOtroCualTrim
-                : null,
-          } as any,
-        })
-      : await prisma.atenciones_salud.create({
-          data: {
-            id_historia: historia.id_historia,
-            id_cita: cita.id_cita,
-            id_profesional: cita.id_profesional,
-            id_tipo_atencion: idTipoAtencionNum,
-            id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
-            analisis: analisisTrim || null,
-            observacion_analisis: observacionAnalisisTrim || null,
-            llega_por_sus_medios: llega_por_sus_medios,
-            llega_por_sus_medios_cual:
-              llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
-            estado_a_la_llegada: estadoLlegada,
-            caso_accidente_intoxicacion_violencia: caso_accidente_intoxicacion_violencia,
-            fecha_ocurrencia_evento:
-              caso_accidente_intoxicacion_violencia === true ? fechaOcurrencia : null,
-            lugar_ocurrencia_evento:
-              caso_accidente_intoxicacion_violencia === true ? lugarOcurrenciaTrim : null,
-            notificacion_policia:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_policia === true : null,
-            notificacion_cti:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_cti === true : null,
-            notificacion_acudiente:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_acudiente === true : null,
-            notificacion_otro:
-              caso_accidente_intoxicacion_violencia === true ? notificacion_otro === true : null,
-            notificacion_otro_cual:
-              caso_accidente_intoxicacion_violencia === true && notificacion_otro === true
-                ? notificacionOtroCualTrim
-                : null,
-          } as any,
-        });
+    // Todo el guardado clínico ocurre en una única transacción para evitar
+    // atenciones parcialmente escritas si falla alguna de las secciones.
+    const atencion = await prisma.$transaction(async (tx) => {
+      const atencion = existingAttention?.id_atencion
+        ? await tx.atenciones_salud.update({
+            where: { id_atencion: existingAttention.id_atencion },
+            data: {
+              id_historia: historia.id_historia,
+              id_cita: cita.id_cita,
+              id_profesional: cita.id_profesional,
+              id_tipo_atencion: idTipoAtencionNum,
+              id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
+              analisis: analisisTrim || null,
+              observacion_analisis: observacionAnalisisTrim || null,
+              llega_por_sus_medios: llega_por_sus_medios,
+              llega_por_sus_medios_cual:
+                llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
+              estado_a_la_llegada: estadoLlegada,
+              caso_accidente_intoxicacion_violencia: caso_accidente_intoxicacion_violencia,
+              fecha_ocurrencia_evento:
+                caso_accidente_intoxicacion_violencia === true ? fechaOcurrencia : null,
+              lugar_ocurrencia_evento:
+                caso_accidente_intoxicacion_violencia === true ? lugarOcurrenciaTrim : null,
+              notificacion_policia:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_policia === true : null,
+              notificacion_cti:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_cti === true : null,
+              notificacion_acudiente:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_acudiente === true : null,
+              notificacion_otro:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_otro === true : null,
+              notificacion_otro_cual:
+                caso_accidente_intoxicacion_violencia === true && notificacion_otro === true
+                  ? notificacionOtroCualTrim
+                  : null,
+            } as any,
+          })
+        : await tx.atenciones_salud.create({
+            data: {
+              id_historia: historia.id_historia,
+              id_cita: cita.id_cita,
+              id_profesional: cita.id_profesional,
+              id_tipo_atencion: idTipoAtencionNum,
+              id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
+              analisis: analisisTrim || null,
+              observacion_analisis: observacionAnalisisTrim || null,
+              llega_por_sus_medios: llega_por_sus_medios,
+              llega_por_sus_medios_cual:
+                llega_por_sus_medios === false ? llegaPorSusMediosCualTrim : null,
+              estado_a_la_llegada: estadoLlegada,
+              caso_accidente_intoxicacion_violencia: caso_accidente_intoxicacion_violencia,
+              fecha_ocurrencia_evento:
+                caso_accidente_intoxicacion_violencia === true ? fechaOcurrencia : null,
+              lugar_ocurrencia_evento:
+                caso_accidente_intoxicacion_violencia === true ? lugarOcurrenciaTrim : null,
+              notificacion_policia:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_policia === true : null,
+              notificacion_cti:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_cti === true : null,
+              notificacion_acudiente:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_acudiente === true : null,
+              notificacion_otro:
+                caso_accidente_intoxicacion_violencia === true ? notificacion_otro === true : null,
+              notificacion_otro_cual:
+                caso_accidente_intoxicacion_violencia === true && notificacion_otro === true
+                  ? notificacionOtroCualTrim
+                  : null,
+            } as any,
+          });
 
-    const idAtencion = atencion.id_atencion;
+      const idAtencion = atencion.id_atencion;
 
-    await prisma.hc_anamnesis_atencion.upsert({
-      where: { id_atencion: idAtencion },
-      create: {
-        id_atencion: idAtencion,
-        motivo_consulta: anamnesisMotivoTrim || null,
-        enfermedad_actual: anamnesisEnfActualTrim || null,
-      },
-      update: {
-        motivo_consulta: anamnesisMotivoTrim || null,
-        enfermedad_actual: anamnesisEnfActualTrim || null,
-      },
-    });
-
-    await prisma.hc_ssr_atencion.upsert({
-      where: { id_atencion: idAtencion },
-      create: { id_atencion: idAtencion, contenido: hcSsrTrim },
-      update: { contenido: hcSsrTrim },
-    });
-
-    await prisma.hc_tamizajes_atencion.upsert({
-      where: { id_atencion: idAtencion },
-      create: { id_atencion: idAtencion, contenido: hcTamizajesTrim },
-      update: { contenido: hcTamizajesTrim },
-    });
-
-    await prisma.hc_examen_fisico_atencion.upsert({
-      where: { id_atencion: idAtencion },
-      create: { id_atencion: idAtencion, contenido: hcExamenFisicoTrim },
-      update: { contenido: hcExamenFisicoTrim },
-    });
-
-    await prisma.hc_valoracion_sistemas_atencion.upsert({
-      where: { id_atencion: idAtencion },
-      create: { id_atencion: idAtencion, contenido: hcValoracionSistemasTrim },
-      update: { contenido: hcValoracionSistemasTrim },
-    });
-
-    if (habitosData) {
-      await prisma.hc_habitos_atencion.upsert({
+      await tx.hc_anamnesis_atencion.upsert({
         where: { id_atencion: idAtencion },
-        create: { id_atencion: idAtencion, ...habitosData } as any,
-        update: habitosData as any,
-      });
-    }
-
-    await prisma.hc_atencion_cierre.upsert({
-      where: { id_atencion: idAtencion },
-      create: {
-        id_atencion: idAtencion,
-        conducta_plan_estudio_manejo: cierreConductaTrim || null,
-        recomendaciones: cierreRecomendacionesTrim || null,
-        certificado_recomendaciones: cierreCertRecomTrim || null,
-        certificado_emitido: cierreCertEmitido,
-        certificado_opcion: cierreCertEmitido === true ? cierreCertOpcionTrim || null : null,
-        notificacion_emitida: cierreNotifEmitida,
-        seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
-        notificacion_observaciones: cierreNotifObsTrim || null,
-        seguimiento_observaciones: cierreSegObsTrim || null,
-        seguimiento_opcion: cierreSegOpcionTrim || null,
-        seguimiento_efectivo: cierreSegEfectivo,
-        cierre_seguimiento: cierreSegCierre,
-        seguimiento_fecha: cierreSegFecha,
-      } as any,
-      update: {
-        conducta_plan_estudio_manejo: cierreConductaTrim || null,
-        recomendaciones: cierreRecomendacionesTrim || null,
-        certificado_recomendaciones: cierreCertRecomTrim || null,
-        certificado_emitido: cierreCertEmitido,
-        certificado_opcion: cierreCertEmitido === true ? cierreCertOpcionTrim || null : null,
-        notificacion_emitida: cierreNotifEmitida,
-        seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
-        notificacion_observaciones: cierreNotifObsTrim || null,
-        seguimiento_observaciones: cierreSegObsTrim || null,
-        seguimiento_opcion: cierreSegOpcionTrim || null,
-        seguimiento_efectivo: cierreSegEfectivo,
-        cierre_seguimiento: cierreSegCierre,
-        seguimiento_fecha: cierreSegFecha,
-      } as any,
-    });
-
-    await prisma.hc_antecedentes_atencion.deleteMany({ where: { id_atencion: idAtencion } });
-    if (antecedentesCreate.length > 0) {
-      await prisma.hc_antecedentes_atencion.createMany({
-        data: (antecedentesCreate as any[]).map((row: any) => ({ ...row, id_atencion: idAtencion })),
-      });
-    }
-
-    await prisma.hc_antecedentes_traumaticos_atencion.upsert({
-      where: { id_atencion: idAtencion },
-      create: {
-        id_atencion: idAtencion,
-        naturaleza_lesion: naturalezaLesionTrim || null,
-        fecha_ocurrencia: fechaOcurrenciaTrauma,
-        secuelas: secuelasTrim || null,
-      },
-      update: {
-        naturaleza_lesion: naturalezaLesionTrim || null,
-        fecha_ocurrencia: fechaOcurrenciaTrauma,
-        secuelas: secuelasTrim || null,
-      },
-    });
-
-    // Only delete and recreate diagnoses if new diagnoses are being sent
-    // This prevents data loss when updating attention without sending diagnoses
-    if (diagnosticosCreate.length > 0) {
-      await prisma.diagnosticos_atencion.deleteMany({ where: { id_atencion: idAtencion } });
-      await prisma.diagnosticos_atencion.createMany({
-        data: (diagnosticosCreate as any[]).map((row: any) => ({ ...row, id_atencion: idAtencion })),
-      });
-    }
-
-    // Actualizar estado de la cita según si se cerró la atención.
-    // - Si hay cierre: REALIZADA
-    // - Si no hay cierre: ATENDIDA
-    try {
-      const targetCodigo = hasCierre ? "REALIZADA" : "ATENDIDA";
-      const targetEstado = await prisma.estados_cita.findFirst({
-        where: {
-          codigo: {
-            equals: targetCodigo,
-            mode: "insensitive",
-          },
+        create: {
+          id_atencion: idAtencion,
+          motivo_consulta: anamnesisMotivoTrim || null,
+          enfermedad_actual: anamnesisEnfActualTrim || null,
         },
-        select: { id_estado_cita: true },
+        update: {
+          motivo_consulta: anamnesisMotivoTrim || null,
+          enfermedad_actual: anamnesisEnfActualTrim || null,
+        },
       });
 
-      if (targetEstado?.id_estado_cita) {
-        await prisma.citas.update({
-          where: { id_cita: cita.id_cita },
-          data: {
-            id_estado_cita: targetEstado.id_estado_cita,
-            seguimiento: historia.estado === "Seguimiento",
-          },
-        });
-      } else {
-        // Si no hay cambio de estado, actualizar seguimiento basado en estado de historia
-        await prisma.citas.update({
-          where: { id_cita: cita.id_cita },
-          data: { seguimiento: historia.estado === "Seguimiento" },
+      await tx.hc_ssr_atencion.upsert({
+        where: { id_atencion: idAtencion },
+        create: { id_atencion: idAtencion, contenido: hcSsrTrim },
+        update: { contenido: hcSsrTrim },
+      });
+
+      await tx.hc_tamizajes_atencion.upsert({
+        where: { id_atencion: idAtencion },
+        create: { id_atencion: idAtencion, contenido: hcTamizajesTrim },
+        update: { contenido: hcTamizajesTrim },
+      });
+
+      await tx.hc_examen_fisico_atencion.upsert({
+        where: { id_atencion: idAtencion },
+        create: { id_atencion: idAtencion, contenido: hcExamenFisicoTrim },
+        update: { contenido: hcExamenFisicoTrim },
+      });
+
+      await tx.hc_valoracion_sistemas_atencion.upsert({
+        where: { id_atencion: idAtencion },
+        create: { id_atencion: idAtencion, contenido: hcValoracionSistemasTrim },
+        update: { contenido: hcValoracionSistemasTrim },
+      });
+
+      if (habitosData) {
+        await tx.hc_habitos_atencion.upsert({
+          where: { id_atencion: idAtencion },
+          create: { id_atencion: idAtencion, ...habitosData } as any,
+          update: habitosData as any,
         });
       }
-    } catch (e) {
-      console.error("Error actualizando estado de la cita tras registrar atención", e);
-      // No interrumpimos la creación de la atención si falla el update del estado
-    }
+
+      await tx.hc_atencion_cierre.upsert({
+        where: { id_atencion: idAtencion },
+        create: {
+          id_atencion: idAtencion,
+          conducta_plan_estudio_manejo: cierreConductaTrim || null,
+          recomendaciones: cierreRecomendacionesTrim || null,
+          certificado_recomendaciones: cierreCertRecomTrim || null,
+          certificado_emitido: cierreCertEmitido,
+          certificado_opcion: cierreCertEmitido === true ? cierreCertOpcionTrim || null : null,
+          notificacion_emitida: cierreNotifEmitida,
+          seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
+          notificacion_observaciones: cierreNotifObsTrim || null,
+          seguimiento_observaciones: cierreSegObsTrim || null,
+          seguimiento_opcion: cierreSegOpcionTrim || null,
+          seguimiento_efectivo: cierreSegEfectivo,
+          cierre_seguimiento: cierreSegCierre,
+          seguimiento_fecha: cierreSegFecha,
+        } as any,
+        update: {
+          conducta_plan_estudio_manejo: cierreConductaTrim || null,
+          recomendaciones: cierreRecomendacionesTrim || null,
+          certificado_recomendaciones: cierreCertRecomTrim || null,
+          certificado_emitido: cierreCertEmitido,
+          certificado_opcion: cierreCertEmitido === true ? cierreCertOpcionTrim || null : null,
+          notificacion_emitida: cierreNotifEmitida,
+          seguimiento_notificacion: cierreNotifEmitida === true ? cierreSegNotifTrim || null : null,
+          notificacion_observaciones: cierreNotifObsTrim || null,
+          seguimiento_observaciones: cierreSegObsTrim || null,
+          seguimiento_opcion: cierreSegOpcionTrim || null,
+          seguimiento_efectivo: cierreSegEfectivo,
+          cierre_seguimiento: cierreSegCierre,
+          seguimiento_fecha: cierreSegFecha,
+        } as any,
+      });
+
+      await tx.hc_antecedentes_atencion.deleteMany({ where: { id_atencion: idAtencion } });
+      if (antecedentesCreate.length > 0) {
+        await tx.hc_antecedentes_atencion.createMany({
+          data: (antecedentesCreate as any[]).map((row: any) => ({ ...row, id_atencion: idAtencion })),
+        });
+      }
+
+      await tx.hc_antecedentes_traumaticos_atencion.upsert({
+        where: { id_atencion: idAtencion },
+        create: {
+          id_atencion: idAtencion,
+          naturaleza_lesion: naturalezaLesionTrim || null,
+          fecha_ocurrencia: fechaOcurrenciaTrauma,
+          secuelas: secuelasTrim || null,
+        },
+        update: {
+          naturaleza_lesion: naturalezaLesionTrim || null,
+          fecha_ocurrencia: fechaOcurrenciaTrauma,
+          secuelas: secuelasTrim || null,
+        },
+      });
+
+      // Only delete and recreate diagnoses if new diagnoses are being sent
+      // This prevents data loss when updating attention without sending diagnoses
+      if (diagnosticosCreate.length > 0) {
+        await tx.diagnosticos_atencion.deleteMany({ where: { id_atencion: idAtencion } });
+        await tx.diagnosticos_atencion.createMany({
+          data: (diagnosticosCreate as any[]).map((row: any) => ({ ...row, id_atencion: idAtencion })),
+        });
+      }
+
+      // Actualizar estado de la cita según si se cerró la atención.
+      // - Si hay cierre: REALIZADA
+      // - Si no hay cierre: ATENDIDA
+      const targetCodigo = hasCierre ? "REALIZADA" : "ATENDIDA";
+      {
+        const targetEstado = await tx.estados_cita.findFirst({
+          where: {
+            codigo: {
+              equals: targetCodigo,
+              mode: "insensitive",
+            },
+          },
+          select: { id_estado_cita: true },
+        });
+
+        if (targetEstado?.id_estado_cita) {
+          await tx.citas.update({
+            where: { id_cita: cita.id_cita },
+            data: {
+              id_estado_cita: targetEstado.id_estado_cita,
+              seguimiento: historia.estado === "Seguimiento",
+            },
+          });
+        } else {
+          // Si no hay cambio de estado, actualizar seguimiento basado en estado de historia
+          await tx.citas.update({
+            where: { id_cita: cita.id_cita },
+            data: { seguimiento: historia.estado === "Seguimiento" },
+          });
+        }
+      }
+
+      return atencion;
+    }, { maxWait: 10_000, timeout: 30_000 });
 
     return NextResponse.json(
       { historia, atencion },
@@ -917,81 +920,12 @@ export async function POST(
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2021") {
-        let diagnostics: any = undefined;
-        try {
-          const row = await prisma.$queryRaw<
-            Array<{
-              db: string | null;
-              schema: string | null;
-              search_path: string | null;
-              atenciones_salud: string | null;
-              hc_anamnesis_atencion: string | null;
-              hc_antecedentes_atencion: string | null;
-              hc_antecedentes_traumaticos_atencion: string | null;
-              hc_atencion_cierre: string | null;
-              hc_ssr_atencion: string | null;
-              hc_tamizajes_atencion: string | null;
-              hc_examen_fisico_atencion: string | null;
-              hc_valoracion_sistemas_atencion: string | null;
-              diagnosticos_atencion: string | null;
-              historias_clinicas: string | null;
-              citas: string | null;
-            }>
-          >`
-            SELECT
-              current_database()::text as db,
-              current_schema()::text as schema,
-              current_setting('search_path')::text as search_path,
-              to_regclass('public.atenciones_salud')::text as atenciones_salud,
-              to_regclass('public.hc_anamnesis_atencion')::text as hc_anamnesis_atencion,
-              to_regclass('public.hc_antecedentes_atencion')::text as hc_antecedentes_atencion,
-              to_regclass('public.hc_antecedentes_traumaticos_atencion')::text as hc_antecedentes_traumaticos_atencion,
-              to_regclass('public.hc_atencion_cierre')::text as hc_atencion_cierre,
-              to_regclass('public.hc_ssr_atencion')::text as hc_ssr_atencion,
-              to_regclass('public.hc_tamizajes_atencion')::text as hc_tamizajes_atencion,
-              to_regclass('public.hc_examen_fisico_atencion')::text as hc_examen_fisico_atencion,
-              to_regclass('public.hc_valoracion_sistemas_atencion')::text as hc_valoracion_sistemas_atencion,
-              to_regclass('public.diagnosticos_atencion')::text as diagnosticos_atencion,
-              to_regclass('public.historias_clinicas')::text as historias_clinicas,
-              to_regclass('public.citas')::text as citas
-          `;
-          diagnostics = row?.[0] ?? undefined;
-        } catch (e) {
-          console.error("No se pudieron obtener diagnósticos de conexión (P2021)", e);
-        }
-
-        const metaTable = (error.meta as any)?.table ? String((error.meta as any).table) : null;
-
-        const missingTables = (() => {
-          if (!diagnostics || typeof diagnostics !== "object") return [] as string[];
-          const candidates = [
-            "atenciones_salud",
-            "hc_anamnesis_atencion",
-            "hc_antecedentes_atencion",
-            "hc_antecedentes_traumaticos_atencion",
-            "hc_atencion_cierre",
-            "hc_ssr_atencion",
-            "hc_tamizajes_atencion",
-            "hc_examen_fisico_atencion",
-            "hc_valoracion_sistemas_atencion",
-            "diagnosticos_atencion",
-            "historias_clinicas",
-            "citas",
-          ];
-
-          return candidates.filter((k) => (diagnostics as any)[k] === null);
-        })();
-
-        const friendlyMissing = missingTables.length > 0 ? missingTables.join(", ") : null;
+        console.error("Tabla inexistente al guardar la atención", error.meta);
 
         return NextResponse.json(
           {
-            message: friendlyMissing
-              ? `No se pudo guardar la atención porque falta(n) la(s) tabla(s): ${friendlyMissing}. Debes crear/aplicar las migraciones en la BD.`
-              : "No se pudo guardar la atención porque la API está conectada a una base de datos donde no existe la tabla requerida. Verifica que el DATABASE_URL apunte a la BD correcta y que el esquema/migraciones estén aplicados.",
-            code: error.code,
-            table: metaTable,
-            diagnostics,
+            message:
+              "No se pudo guardar la atención porque falta una tabla en la base de datos. Verifica que las migraciones estén aplicadas.",
           },
           { status: 500 },
         );

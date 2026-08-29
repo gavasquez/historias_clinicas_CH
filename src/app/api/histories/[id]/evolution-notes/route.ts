@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireSession } from "@/lib/api-auth";
 
 function normalizeOptionalInt(input: unknown): number | null {
   if (input === null || input === undefined) return null;
@@ -21,6 +22,9 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
@@ -73,6 +77,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;

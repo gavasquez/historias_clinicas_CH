@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { validateAvailabilityOrThrow } from "@/lib/availability-validator";
+import {
+  dayOfWeek1To7,
+  minutesFromDbTime,
+  minutesFromLocalTime,
+} from "@/lib/date-time";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+class AppointmentOverlapError extends Error {
+  constructor() {
+    super("APPOINTMENT_OVERLAP");
+  }
+}
 
 const PAGE_SIZE = 5;
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
@@ -187,8 +198,6 @@ export async function POST(request: NextRequest) {
       id_historia_vinculada,
     } = body;
 
-    const prismaAny = prisma as any;
-
     const idPacienteNum = Number(id_paciente);
     const idProfesionalNum = Number(id_profesional);
 
@@ -332,84 +341,94 @@ export async function POST(request: NextRequest) {
       where: {
         id_profesional: idProfesionalNum,
         id_sede: idSedeValid,
-        dia_semana: ((fechaInicio.getDay() + 6) % 7) + 1,
+        dia_semana: dayOfWeek1To7(fechaInicio),
         es_excepcion: false,
       },
       orderBy: [{ hora_inicio: "asc" }],
     });
 
     const intervalCapacity = (() => {
-      const startMin = fechaInicio.getHours() * 60 + fechaInicio.getMinutes();
-      const endMin = fechaFin.getHours() * 60 + fechaFin.getMinutes();
+      const startMin = minutesFromLocalTime(fechaInicio);
+      const endMin = minutesFromLocalTime(fechaFin);
       const item = availabilityItems.find((i) => {
-        const aStart = i.hora_inicio.getUTCHours() * 60 + i.hora_inicio.getUTCMinutes();
-        const aEnd = i.hora_fin.getUTCHours() * 60 + i.hora_fin.getUTCMinutes();
+        const aStart = minutesFromDbTime(i.hora_inicio);
+        const aEnd = minutesFromDbTime(i.hora_fin);
         return startMin >= aStart && endMin <= aEnd;
       });
       const cap = item?.capacidad_simultanea ?? 1;
       return Math.max(Number(cap) || 1, 1);
     })();
 
-    const possibleOverlaps = await prisma.citas.findMany({
-      where: {
-        id_profesional: idProfesionalNum,
-        fecha_hora_inicio: { lt: fechaFin },
-        OR: [{ fecha_hora_fin: { gt: fechaInicio } }, { fecha_hora_fin: null }],
-      },
-      select: {
-        id_cita: true,
-        fecha_hora_inicio: true,
-        fecha_hora_fin: true,
-      },
+    const cita = await prisma.$transaction(async (tx) => {
+      // Serializa la verificación de solapamiento y la creación de la cita por
+      // profesional para evitar dobles agendamientos bajo concurrencia.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${idProfesionalNum}::bigint)`;
+
+      const possibleOverlaps = await tx.citas.findMany({
+        where: {
+          id_profesional: idProfesionalNum,
+          fecha_hora_inicio: { lt: fechaFin },
+          OR: [{ fecha_hora_fin: { gt: fechaInicio } }, { fecha_hora_fin: null }],
+        },
+        select: {
+          id_cita: true,
+          fecha_hora_inicio: true,
+          fecha_hora_fin: true,
+        },
+      });
+
+      const overlaps = possibleOverlaps.reduce((acc, c) => {
+        const s = c.fecha_hora_inicio;
+        const e = computeEndDate({ start: c.fecha_hora_inicio, end: c.fecha_hora_fin });
+        const isOverlap = s < fechaFin && e > fechaInicio;
+        return acc + (isOverlap ? 1 : 0);
+      }, 0);
+
+      if (overlaps >= intervalCapacity) {
+        throw new AppointmentOverlapError();
+      }
+
+      return (tx as any).citas.create({
+        data: {
+          id_paciente: idPacienteNum,
+          id_profesional: idProfesionalNum,
+          id_sede: idSedeValid,
+          id_tipo_cita:
+            idTipoCitaNum && Number.isInteger(idTipoCitaNum) && idTipoCitaNum > 0
+              ? idTipoCitaNum
+              : null,
+          id_estado_cita:
+            idEstadoCitaNum && Number.isInteger(idEstadoCitaNum) && idEstadoCitaNum > 0
+              ? idEstadoCitaNum
+              : null,
+          id_modalidad_atencion:
+            idModalidadAtencionNum && Number.isInteger(idModalidadAtencionNum) && idModalidadAtencionNum > 0
+              ? idModalidadAtencionNum
+              : null,
+          id_programa_salud: idProgramaSaludNum,
+          id_tipo_historia: idTipoHistoriaNum,
+          fecha_hora_inicio: fechaInicio,
+          fecha_hora_fin: fechaFin,
+          seguimiento: seguimientoBool,
+          tipo_seguimiento:
+            seguimiento === true && typeof tipo_seguimiento === "string" && tipo_seguimiento.trim()
+              ? tipo_seguimiento.trim()
+              : null,
+          id_historia_vinculada: seguimientoBool ? (idHistoriaVinculadaNum as number) : null,
+          canal_recordatorio: canal_recordatorio ?? null,
+        },
+      });
     });
 
-    const overlaps = possibleOverlaps.reduce((acc, c) => {
-      const s = c.fecha_hora_inicio;
-      const e = computeEndDate({ start: c.fecha_hora_inicio, end: c.fecha_hora_fin });
-      const isOverlap = s < fechaFin && e > fechaInicio;
-      return acc + (isOverlap ? 1 : 0);
-    }, 0);
-
-    if (overlaps >= intervalCapacity) {
+    return NextResponse.json(cita, { status: 201 });
+  } catch (error) {
+    if (error instanceof AppointmentOverlapError) {
       return NextResponse.json(
         { message: "El profesional ya tiene una cita programada en ese horario" },
         { status: 400 },
       );
     }
 
-    const cita = await prismaAny.citas.create({
-      data: {
-        id_paciente: idPacienteNum,
-        id_profesional: idProfesionalNum,
-        id_sede: idSedeValid,
-        id_tipo_cita:
-          idTipoCitaNum && Number.isInteger(idTipoCitaNum) && idTipoCitaNum > 0
-            ? idTipoCitaNum
-            : null,
-        id_estado_cita:
-          idEstadoCitaNum && Number.isInteger(idEstadoCitaNum) && idEstadoCitaNum > 0
-            ? idEstadoCitaNum
-            : null,
-        id_modalidad_atencion:
-          idModalidadAtencionNum && Number.isInteger(idModalidadAtencionNum) && idModalidadAtencionNum > 0
-            ? idModalidadAtencionNum
-            : null,
-        id_programa_salud: idProgramaSaludNum,
-        id_tipo_historia: idTipoHistoriaNum,
-        fecha_hora_inicio: fechaInicio,
-        fecha_hora_fin: fechaFin,
-        seguimiento: seguimientoBool,
-        tipo_seguimiento:
-          seguimiento === true && typeof tipo_seguimiento === "string" && tipo_seguimiento.trim()
-            ? tipo_seguimiento.trim()
-            : null,
-        id_historia_vinculada: seguimientoBool ? (idHistoriaVinculadaNum as number) : null,
-        canal_recordatorio: canal_recordatorio ?? null,
-      },
-    });
-
-    return NextResponse.json(cita, { status: 201 });
-  } catch (error) {
     console.error("Error creating appointment", error);
     return NextResponse.json(
       { message: "Error creando cita" },

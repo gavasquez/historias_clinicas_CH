@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireSession } from "@/lib/api-auth";
 
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
@@ -139,6 +143,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
