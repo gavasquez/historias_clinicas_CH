@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const municipios = require("./departamentos.json");
 
 const prisma = new PrismaClient();
 
@@ -629,64 +630,52 @@ async function main() {
     },
   });
 
-  const departamentos = [
-    { nombre: "Amazonas", codigo_dane: "91" },
-    { nombre: "Antioquia", codigo_dane: "05" },
-    { nombre: "Arauca", codigo_dane: "81" },
-    { nombre: "Atlántico", codigo_dane: "08" },
-    { nombre: "Bogotá D.C.", codigo_dane: "11" },
-    { nombre: "Bolívar", codigo_dane: "13" },
-    { nombre: "Boyacá", codigo_dane: "15" },
-    { nombre: "Caldas", codigo_dane: "17" },
-    { nombre: "Caquetá", codigo_dane: "18" },
-    { nombre: "Casanare", codigo_dane: "85" },
-    { nombre: "Cauca", codigo_dane: "19" },
-    { nombre: "Cesar", codigo_dane: "20" },
-    { nombre: "Chocó", codigo_dane: "27" },
-    { nombre: "Córdoba", codigo_dane: "23" },
-    { nombre: "Cundinamarca", codigo_dane: "25" },
-    { nombre: "Guainía", codigo_dane: "94" },
-    { nombre: "Guaviare", codigo_dane: "95" },
-    { nombre: "Huila", codigo_dane: "41" },
-    { nombre: "La Guajira", codigo_dane: "44" },
-    { nombre: "Magdalena", codigo_dane: "47" },
-    { nombre: "Meta", codigo_dane: "50" },
-    { nombre: "Nariño", codigo_dane: "52" },
-    { nombre: "Norte de Santander", codigo_dane: "54" },
-    { nombre: "Putumayo", codigo_dane: "86" },
-    { nombre: "Quindío", codigo_dane: "63" },
-    { nombre: "Risaralda", codigo_dane: "66" },
-    { nombre: "San Andrés y Providencia", codigo_dane: "88" },
-    { nombre: "Santander", codigo_dane: "68" },
-    { nombre: "Sucre", codigo_dane: "70" },
-    { nombre: "Tolima", codigo_dane: "73" },
-    { nombre: "Valle del Cauca", codigo_dane: "76" },
-    { nombre: "Vaupés", codigo_dane: "97" },
-    { nombre: "Vichada", codigo_dane: "99" },
-  ];
+  // Cargar departamentos y ciudades desde departamentos.json
+  const departamentoMap = new Map();
+  for (const m of municipios) {
+    if (!departamentoMap.has(m.cod_dpto)) {
+      departamentoMap.set(m.cod_dpto, {
+        nombre: m.dpto,
+        codigo_dane: m.cod_dpto,
+      });
+    }
+  }
+  const departamentos = Array.from(departamentoMap.values());
 
   for (const d of departamentos) {
     await prisma.departamentos.upsert({
-      where: { nombre: d.nombre },
-      update: { codigo_dane: d.codigo_dane },
+      where: { codigo_dane: d.codigo_dane },
+      update: { nombre: d.nombre },
       create: d,
     });
   }
 
   const depRows = await prisma.departamentos.findMany({
-    where: { nombre: { in: departamentos.map((d) => d.nombre) } },
-    select: { id_departamento: true, nombre: true },
+    where: { codigo_dane: { in: departamentos.map((d) => d.codigo_dane) } },
+    select: { id_departamento: true, codigo_dane: true },
   });
-  const depIdByName = Object.fromEntries(depRows.map((d) => [d.nombre, d.id_departamento]));
+  const depIdByDane = Object.fromEntries(depRows.map((d) => [d.codigo_dane, d.id_departamento]));
 
-  const ciudadesByDepartamento = {
-    "Amazonas": [
-      { nombre: "Leticia", codigo_dane: "91001" },
-      { nombre: "Puerto Nariño", codigo_dane: "91545" },
-      { nombre: "El Encanto", codigo_dane: "91288" },
-      { nombre: "La Pedrera", codigo_dane: "91401" },
-      { nombre: "Tarapacá", codigo_dane: "91775" },
-    ],
+  // Insertar ciudades a partir del JSON de municipios
+  for (const m of municipios) {
+    const id_departamento = depIdByDane[m.cod_dpto];
+    if (!id_departamento) continue;
+
+    await prisma.ciudades.upsert({
+      where: { codigo_dane: m.cod_mpio },
+      update: {
+        id_departamento,
+        nombre: m.nom_mpio,
+      },
+      create: {
+        id_departamento,
+        nombre: m.nom_mpio,
+        codigo_dane: m.cod_mpio,
+      },
+    });
+  }
+
+  /* Legacy data replaced by departamentos.json
     "Antioquia": [
       { nombre: "Medellín", codigo_dane: "05001" },
       { nombre: "Envigado", codigo_dane: "05266" },
@@ -1065,6 +1054,8 @@ async function main() {
       });
     }
   }
+
+  */
 
   console.log(
     "Seed completado: roles, permisos, roles_permisos, catálogos (documentos, géneros, estados civiles, tipos usuario, sedes, eps, programas, tipos sangre, especialidades, modalidades, estados_cita, tipos_cita, departamentos, ciudades)"
