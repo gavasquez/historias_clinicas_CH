@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAnyPermission } from "@/lib/auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["HISTORIAS_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
 

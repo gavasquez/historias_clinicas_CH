@@ -1,7 +1,22 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const prisma = new PrismaClient();
+
+function getAdminPassword() {
+  if (process.env.SEED_ADMIN_PASSWORD) {
+    return process.env.SEED_ADMIN_PASSWORD;
+  }
+
+  const temporaryPassword = crypto.randomBytes(12).toString("hex");
+  console.warn(
+    "ADVERTENCIA: SEED_ADMIN_PASSWORD no está definida. Se generó una contraseña temporal para el usuario admin.",
+  );
+  console.warn(`Contraseña temporal: ${temporaryPassword}`);
+  console.warn("Cámbiela inmediatamente después de iniciar sesión.");
+  return temporaryPassword;
+}
 
 async function main() {
   async function upsertByNombreField(model, where, createData, updateData) {
@@ -18,7 +33,7 @@ async function main() {
     { nombre: "super_admin", descripcion: "Super administrador del sistema" },
     { nombre: "medico", descripcion: "Profesional de salud" },
     { nombre: "enfermera", descripcion: "Profesional de enfermería" },
-    { nombre: "administrativo", descripcion: "Usuario administrativo (agenda, pacientes)" },
+    { nombre: "administrador", descripcion: "Usuario administrativo (agenda, pacientes)" },
     { nombre: "directivo", descripcion: "Directivo / coordinación" },
   ];
 
@@ -70,7 +85,8 @@ async function main() {
 
   const superAdminRoleId = roleId["super_admin"];
   if (superAdminRoleId) {
-    const passwordHash = await bcrypt.hash("123456789", 10);
+    const adminPassword = getAdminPassword();
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
     await prisma.usuarios.upsert({
       where: { username: "admin" },
       update: {
@@ -122,12 +138,12 @@ async function main() {
     ["enfermera", "HISTORIAS_VER"],
     ["enfermera", "HISTORIAS_REGISTRAR"],
 
-    // administrativo => 1,2,3,5,6
-    ["administrativo", "PACIENTES_VER"],
-    ["administrativo", "PACIENTES_CREAR"],
-    ["administrativo", "PACIENTES_EDITAR"],
-    ["administrativo", "CITAS_VER"],
-    ["administrativo", "CITAS_GESTIONAR"],
+    // administrador => 1,2,3,5,6
+    ["administrador", "PACIENTES_VER"],
+    ["administrador", "PACIENTES_CREAR"],
+    ["administrador", "PACIENTES_EDITAR"],
+    ["administrador", "CITAS_VER"],
+    ["administrador", "CITAS_GESTIONAR"],
   ];
 
   for (const [rol, codigo] of grants) {

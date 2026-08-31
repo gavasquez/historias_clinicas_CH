@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { Prisma } from "@prisma/client";
+import { requireAnyPermission } from "@/lib/auth";
+import { DEFAULT_PAGE_SIZE, normalizePage, normalizePageSize } from "@/lib/pagination";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["PACIENTES_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(request.url);
-    const pageParam = searchParams.get("page");
-    const page = Math.max(Number(pageParam) || 1, 1);
+    const page = normalizePage(searchParams.get("page"));
+    const pageSize = normalizePageSize(searchParams.get("pageSize"));
 
     const documento = searchParams.get("documento")?.trim() || "";
     const nombre = searchParams.get("nombre")?.trim() || "";
     const tipoUsuario = searchParams.get("tipoUsuario")?.trim() || "";
     const programa = searchParams.get("programa")?.trim() || "";
 
-    const skip = (page - 1) * PAGE_SIZE;
+    const skip = (page - 1) * pageSize;
 
-    const where: any = {};
+    const where: Prisma.pacientesWhereInput = {};
 
     if (documento) {
       where.numero_documento = {
@@ -64,7 +69,7 @@ export async function GET(request: NextRequest) {
     const [items, total] = await Promise.all([
       prisma.pacientes.findMany({
         skip,
-        take: PAGE_SIZE,
+        take: pageSize,
         orderBy: { fecha_creacion: "desc" },
         where,
         include: {
@@ -81,9 +86,9 @@ export async function GET(request: NextRequest) {
       data: items,
       pagination: {
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         total,
-        totalPages: Math.max(Math.ceil(total / PAGE_SIZE), 1),
+        totalPages: Math.max(Math.ceil(total / pageSize), 1),
       },
     });
   } catch (error) {
@@ -97,6 +102,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["PACIENTES_CREAR"]);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await request.json();
 
     const {
@@ -209,7 +217,7 @@ export async function POST(request: NextRequest) {
     console.error("Error creating patient", error);
 
     if (
-      error instanceof PrismaClientKnownRequestError &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
       // Violación de restricción única (probablemente numero_documento duplicado)

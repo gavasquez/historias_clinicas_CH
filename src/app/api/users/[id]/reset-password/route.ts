@@ -1,28 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requireRole } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
-    }
-
-    const roleName = (session.user as any)?.role as string | undefined;
-    
-    // Solo super_admin puede restablecer contraseñas
-    if (roleName !== "super_admin") {
-      return NextResponse.json(
-        { message: "Solo los super administradores pueden restablecer contraseñas" },
-        { status: 403 },
-      );
-    }
+    const auth = await requireRole(request, ["super_admin"]);
+    if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;
     const idUsuario = Number(resolvedParams.id);
@@ -62,7 +49,7 @@ export async function POST(
     });
 
     // Registrar en auditoría
-    const idUsuarioAdmin = Number((session.user as any)?.id);
+    const idUsuarioAdmin = Number(auth.user.id);
     await prisma.auditoria.create({
       data: {
         id_usuario: idUsuarioAdmin,

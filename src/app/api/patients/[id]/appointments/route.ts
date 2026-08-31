@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { parseDateOnlyToUtc } from "@/lib/date-time";
+import { endOfDayInZone, parseDateInZoneToUtc } from "@/lib/date-time";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
-const PAGE_SIZE = 5;
-
-function addDaysUtc(date: Date, days: number) {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
-}
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export async function GET(
   request: NextRequest,
@@ -32,8 +29,8 @@ export async function GET(
     const sedeIdParam = searchParams.get("id_sede");
     const profesionalParam = searchParams.get("profesional")?.trim() || "";
 
-    const desde = desdeParam ? parseDateOnlyToUtc(desdeParam) : null;
-    const hastaDateOnly = hastaParam ? parseDateOnlyToUtc(hastaParam) : null;
+    const desde = desdeParam ? parseDateInZoneToUtc(desdeParam) : null;
+    const hastaDateOnly = hastaParam ? parseDateInZoneToUtc(hastaParam) : null;
 
     if (desdeParam && !desde) {
       return NextResponse.json(
@@ -56,7 +53,7 @@ export async function GET(
       );
     }
 
-    const hastaExclusive = hastaDateOnly ? addDaysUtc(hastaDateOnly, 1) : null;
+    const hasta = hastaDateOnly ? endOfDayInZone(hastaDateOnly) : null;
 
     const idEstadoCita = estadoIdParam ? Number(estadoIdParam) : null;
     const idSede = sedeIdParam ? Number(sedeIdParam) : null;
@@ -74,11 +71,11 @@ export async function GET(
             },
           }
         : {}),
-      ...(desde || hastaExclusive
+      ...(desde || hasta
         ? {
             fecha_hora_inicio: {
               ...(desde ? { gte: desde } : {}),
-              ...(hastaExclusive ? { lt: hastaExclusive } : {}),
+              ...(hasta ? { lte: hasta } : {}),
             },
           }
         : {}),

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAnyPermission } from "@/lib/auth";
 
 function normalizeOptionalInt(input: unknown): number | null {
   if (input === null || input === undefined) return null;
@@ -18,10 +19,13 @@ function normalizeOptionalDate(input: unknown): Date | null {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["HISTORIAS_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
     const historyId = Number(resolvedParams.id);
@@ -74,6 +78,9 @@ export async function POST(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR"]);
+    if (auth instanceof NextResponse) return auth;
+
     const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
     const historyId = Number(resolvedParams.id);

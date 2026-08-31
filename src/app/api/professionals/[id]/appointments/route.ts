@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
+import { endOfDayInZone, parseDateInZoneToUtc } from "@/lib/date-time";
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
 
@@ -18,13 +23,12 @@ export async function GET(
 
     const date = request.nextUrl.searchParams.get("date");
 
-    let dateFilter: { gte: Date; lt: Date } | undefined;
+    let dateFilter: { gte: Date; lte: Date } | undefined;
     if (date) {
-      const start = new Date(`${date}T00:00:00`);
-      if (!Number.isNaN(start.getTime())) {
-        const end = new Date(start);
-        end.setDate(end.getDate() + 1);
-        dateFilter = { gte: start, lt: end };
+      const start = parseDateInZoneToUtc(date);
+      if (start) {
+        const end = endOfDayInZone(start);
+        dateFilter = { gte: start, lte: end };
       }
     }
 

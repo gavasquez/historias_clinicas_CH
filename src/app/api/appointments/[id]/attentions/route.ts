@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requireAnyPermission } from "@/lib/auth";
 
 function normalizeDateOnly(input: unknown): Date | null {
   if (input === null || input === undefined) return null;
@@ -47,13 +46,11 @@ export async function POST(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
-    }
+    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR"]);
+    if (auth instanceof NextResponse) return auth;
 
-    const roleName = (session.user as any)?.role as string | undefined;
-    const idUsuario = Number((session.user as any)?.id);
+    const roleName = auth.user.role;
+    const idUsuario = Number(auth.user.id);
 
     // Validar que enfermera no pueda atender citas
     if (roleName === "enfermera") {

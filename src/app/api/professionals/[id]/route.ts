@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
 
@@ -42,7 +46,7 @@ export async function GET(
       role: profesional.usuarios.roles?.nombre,
       activo: profesional.activo,
       registro_medico: profesional.registro_medico ?? null,
-      firma_digital: (profesional as any).firma_digital ?? null,
+      firma_digital: profesional.firma_digital ?? null,
       especialidad: profesional.especialidades
         ? {
             nombre: profesional.especialidades.nombre,
@@ -73,6 +77,9 @@ export async function PUT(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
 
@@ -134,7 +141,7 @@ export async function PUT(
       email: updated.usuarios.email,
       activo: updated.activo,
       registro_medico: updated.registro_medico ?? null,
-      firma_digital: (updated as any).firma_digital ?? null,
+      firma_digital: updated.firma_digital ?? null,
       especialidad: updated.especialidades
         ? {
             nombre: updated.especialidades.nombre,

@@ -12,7 +12,7 @@ import {
 } from "@/services/catalogs";
 import type { ProfesionalSaludListItem, ProfessionalsResponse } from "@/types/professionals";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 export function ProfessionalsView() {
   const router = useRouter();

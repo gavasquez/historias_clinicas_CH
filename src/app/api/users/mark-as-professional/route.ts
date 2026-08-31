@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { requireAnyPermission } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["ADMIN_USUARIOS"]);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await request.json();
     const id_usuario = Number(body?.id_usuario);
 

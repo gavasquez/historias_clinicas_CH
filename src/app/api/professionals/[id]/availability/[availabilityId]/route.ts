@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseDateOnlyToUtc, parseTimeToUtcDate, timeFromUtcDate } from "@/lib/date-time";
+import { requireAuth } from "@/lib/auth";
 
 const DEFAULT_CAPACIDAD_SIMULTANEA = 1;
 
@@ -17,12 +18,15 @@ function dateOnlyOrMax(d: Date | null) {
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context:
     | { params: Promise<{ id: string; availabilityId: string }> }
     | { params: { id: string; availabilityId: string } },
 ) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const professionalId = Number(resolvedParams.id);
     const availabilityId = Number(resolvedParams.availabilityId);
@@ -71,6 +75,9 @@ export async function PUT(
     | { params: { id: string; availabilityId: string } },
 ) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const professionalId = Number(resolvedParams.id);
     const availabilityId = Number(resolvedParams.availabilityId);

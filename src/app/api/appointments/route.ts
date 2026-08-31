@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { validateAvailabilityOrThrow } from "@/lib/availability-validator";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requireAnyPermission } from "@/lib/auth";
+import { parseDateInZoneToUtc, endOfDayInZone } from "@/lib/date-time";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
 
 function computeEndDate(params: { start: Date; end: Date | null }) {
@@ -15,9 +17,11 @@ function computeEndDate(params: { start: Date; end: Date | null }) {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const roleName = (session?.user as any)?.role as string | undefined;
-    const idUsuario = Number((session?.user as any)?.id);
+    const auth = await requireAnyPermission(request, ["CITAS_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
+    const roleName = auth.user.role;
+    const idUsuario = Number(auth.user.id);
 
     const { searchParams } = new URL(request.url);
     const pageParam = searchParams.get("page");
@@ -46,7 +50,7 @@ export async function GET(request: NextRequest) {
       idProfesionalAutenticado = profesional?.id_profesional ?? null;
     }
 
-    const where: any = {
+    const where: Prisma.citasWhereInput = {
       // Solo mostrar citas programadas (con tipo y estado definidos)
       id_tipo_cita: { not: null },
       id_estado_cita: { not: null },
@@ -97,7 +101,7 @@ export async function GET(request: NextRequest) {
             },
           }
         : {}),
-      ...(Number.isInteger(idSede as any) && (idSede as number) > 0
+      ...(idSede !== null && Number.isInteger(idSede) && idSede > 0
         ? {
             id_sede: idSede,
           }
@@ -105,9 +109,9 @@ export async function GET(request: NextRequest) {
     };
 
     if (fecha) {
-      const start = new Date(`${fecha}T00:00:00`);
-      const end = new Date(`${fecha}T23:59:59.999`);
-      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+      const start = parseDateInZoneToUtc(fecha);
+      const end = start ? endOfDayInZone(start) : null;
+      if (start && end) {
         where.fecha_hora_inicio = {
           gte: start,
           lte: end,
@@ -169,6 +173,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["CITAS_GESTIONAR"]);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await request.json();
     const {
       id_paciente,
@@ -186,8 +193,6 @@ export async function POST(request: NextRequest) {
       tipo_seguimiento,
       id_historia_vinculada,
     } = body;
-
-    const prismaAny = prisma as any;
 
     const idPacienteNum = Number(id_paciente);
     const idProfesionalNum = Number(id_profesional);
@@ -256,7 +261,11 @@ export async function POST(request: NextRequest) {
         : Number(id_historia_vinculada);
 
     if (seguimientoBool) {
-      if (!Number.isInteger(idHistoriaVinculadaNum as any) || (idHistoriaVinculadaNum as number) <= 0) {
+      if (
+        idHistoriaVinculadaNum === null ||
+        !Number.isInteger(idHistoriaVinculadaNum) ||
+        idHistoriaVinculadaNum <= 0
+      ) {
         return NextResponse.json(
           { message: "Debe seleccionar una historia en seguimiento para vincular" },
           { status: 400 },
@@ -265,7 +274,7 @@ export async function POST(request: NextRequest) {
 
       const historiaVinculada = await prisma.historias_clinicas.findFirst({
         where: {
-          id_historia: idHistoriaVinculadaNum as number,
+          id_historia: idHistoriaVinculadaNum,
           id_paciente: idPacienteNum,
           estado: "Seguimiento",
         },
@@ -377,7 +386,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cita = await prismaAny.citas.create({
+    const cita = await prisma.citas.create({
       data: {
         id_paciente: idPacienteNum,
         id_profesional: idProfesionalNum,

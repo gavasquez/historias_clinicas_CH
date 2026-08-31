@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
       especialidad: p.especialidades?.nombre ?? null,
       sede: p.sedes?.nombre ?? null,
       registro_medico: p.registro_medico ?? null,
-      firma_digital: (p as any).firma_digital ?? null,
+      firma_digital: p.firma_digital ?? null,
       activo: p.activo,
     }));
 

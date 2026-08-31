@@ -3,19 +3,29 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { UserListItem } from "@/types/users";
+import { requireAnyPermission } from "@/lib/auth";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["ADMIN_USUARIOS"]);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim() || "";
     const pageParam = searchParams.get("page");
     const page = Math.max(Number(pageParam) || 1, 1);
     const skip = (page - 1) * PAGE_SIZE;
 
+    const superAdminRole = await prisma.roles.findUnique({
+      where: { nombre: "super_admin" },
+      select: { id_rol: true },
+    });
+
     const where: Prisma.usuariosWhereInput = {
-      id_rol: { not: 1 },
+      ...(superAdminRole ? { id_rol: { not: superAdminRole.id_rol } } : {}),
       ...(search
         ? {
             OR: [
@@ -125,6 +135,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["ADMIN_USUARIOS"]);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await request.json();
     const {
       username,
@@ -226,6 +239,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["ADMIN_USUARIOS"]);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(request.url);
     const idParam = searchParams.get("id");
     const id_usuario = idParam ? Number(idParam) : NaN;

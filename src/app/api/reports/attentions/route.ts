@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
+import { endOfDayInZone, parseDateInZoneToUtc } from "@/lib/date-time";
 
-function parseDateOnly(value: string | null): Date | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
-  const date = new Date(`${trimmed}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
+function parseDateRange(value: { from: string | null; to: string | null }):
+  | { gte: Date; lte: Date }
+  | undefined {
+  const from = value.from ? parseDateInZoneToUtc(value.from) : null;
+  const to = value.to ? parseDateInZoneToUtc(value.to) : null;
+  if (!from && !to) return undefined;
+
+  const gte = from ?? parseDateInZoneToUtc("1900-01-01")!;
+  const lte = to ? endOfDayInZone(to) : new Date(8640000000000000);
+  return { gte, lte };
 }
 
 function toCsv(rows: Record<string, unknown>[]) {
@@ -29,10 +35,15 @@ function toCsv(rows: Record<string, unknown>[]) {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(request.url);
 
-    const from = parseDateOnly(searchParams.get("from"));
-    const to = parseDateOnly(searchParams.get("to"));
+    const dateRange = parseDateRange({
+      from: searchParams.get("from"),
+      to: searchParams.get("to"),
+    });
 
     const profesional = searchParams.get("profesional")?.trim() || "";
     const tipoAtencion = searchParams.get("tipo")?.trim() || "";
@@ -40,14 +51,7 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get("format")?.trim().toLowerCase() || "json";
 
     const where: any = {
-      ...(from || to
-        ? {
-            fecha_hora: {
-              ...(from ? { gte: from } : {}),
-              ...(to ? { lt: new Date(to.getTime() + 24 * 60 * 60 * 1000) } : {}),
-            },
-          }
-        : {}),
+      ...(dateRange ? { fecha_hora: dateRange } : {}),
       ...(profesional
         ? {
             profesionales_salud: {

@@ -1,9 +1,10 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { AppShell } from "@/components/layout/app-shell";
 import { CalendarDays, FileText, Users } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { endOfDayInZone, startOfDayInZone } from "@/lib/date-time";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -13,10 +14,8 @@ export default async function DashboardPage() {
   }
 
   const now = new Date();
-  const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
-  const startOfTomorrowUtc = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0),
-  );
+  const startOfTodayUtc = startOfDayInZone(now);
+  const endOfTodayUtc = endOfDayInZone(now);
 
   const [patientsCount, todaysAppointmentsCount, recordsCount] = await Promise.all([
     prisma.pacientes.count(),
@@ -24,7 +23,7 @@ export default async function DashboardPage() {
       where: {
         fecha_hora_inicio: {
           gte: startOfTodayUtc,
-          lt: startOfTomorrowUtc,
+          lte: endOfTodayUtc,
         },
       },
     }),

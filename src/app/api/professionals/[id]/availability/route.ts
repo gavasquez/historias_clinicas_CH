@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseDateOnlyToUtc, parseTimeToUtcDate, timeFromUtcDate } from "@/lib/date-time";
+import { requireAuth } from "@/lib/auth";
 
 const DEFAULT_CAPACIDAD_SIMULTANEA = 1;
 
@@ -21,6 +22,9 @@ export async function GET(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const professionalId = Number(resolvedParams.id);
 
@@ -72,6 +76,9 @@ export async function POST(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const professionalId = Number(resolvedParams.id);
 

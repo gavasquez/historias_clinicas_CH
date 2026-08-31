@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { getServerSession } from "next-auth";
 
 import prisma from "@/lib/prisma";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requireAnyPermission } from "@/lib/auth";
 
 function normalizeOptionalInt(input: unknown): number | null {
   if (input === null || input === undefined) return null;
@@ -62,10 +61,11 @@ export async function POST(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    const idUsuario = session?.user ? Number((session.user as any).id) : NaN;
+    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR"]);
+    if (auth instanceof NextResponse) return auth;
 
-    if (!session?.user || !Number.isInteger(idUsuario) || idUsuario <= 0) {
+    const idUsuario = Number(auth.user.id);
+    if (!Number.isInteger(idUsuario) || idUsuario <= 0) {
       return NextResponse.json({ message: "No autenticado" }, { status: 401 });
     }
 

@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAnyPermission } from "@/lib/auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["PACIENTES_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ message: "ID inválido" }, { status: 400 });
     }
 
-    const prismaAny = prisma as any;
-    const paciente = await prismaAny.pacientes.findUnique({
+    const paciente = await prisma.pacientes.findUnique({
       where: { id_paciente: id },
       include: {
         tipos_documento: true,
@@ -59,6 +62,9 @@ export async function PUT(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["PACIENTES_EDITAR"]);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
     if (!Number.isInteger(id) || id <= 0) {
@@ -195,8 +201,7 @@ export async function PUT(
       updateData.activo = activo;
     }
 
-    const prismaAny = prisma as any;
-    const pacienteActualizado = await prismaAny.pacientes.update({
+    const pacienteActualizado = await prisma.pacientes.update({
       where: { id_paciente: id },
       data: updateData,
     });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { validateAvailabilityOrThrow } from "@/lib/availability-validator";
+import { requireAnyPermission } from "@/lib/auth";
 
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 20;
 
@@ -11,10 +12,13 @@ function computeEndDate(params: { start: Date; end: Date | null }) {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["CITAS_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
 
@@ -48,13 +52,13 @@ export async function GET(
       id_tipo_cita: cita.id_tipo_cita,
       id_estado_cita: cita.id_estado_cita,
       id_modalidad_atencion: cita.id_modalidad_atencion,
-      id_programa_salud: (cita as any).id_programa_salud ?? null,
-      id_tipo_historia: (cita as any).id_tipo_historia ?? null,
+      id_programa_salud: cita.id_programa_salud ?? null,
+      id_tipo_historia: cita.id_tipo_historia ?? null,
       fecha_hora_inicio: cita.fecha_hora_inicio.toISOString(),
       fecha_hora_fin: cita.fecha_hora_fin ? cita.fecha_hora_fin.toISOString() : null,
-      seguimiento: (cita as any).seguimiento ?? false,
-      tipo_seguimiento: (cita as any).tipo_seguimiento ?? null,
-      id_historia_vinculada: (cita as any).id_historia_vinculada ?? null,
+      seguimiento: cita.seguimiento,
+      tipo_seguimiento: cita.tipo_seguimiento ?? null,
+      id_historia_vinculada: cita.id_historia_vinculada ?? null,
       canal_recordatorio: cita.canal_recordatorio,
       ultima_atencion: ultimaAtencion
         ? {
@@ -79,6 +83,9 @@ export async function PUT(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["CITAS_GESTIONAR"]);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
 

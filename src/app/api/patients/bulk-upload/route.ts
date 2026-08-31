@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
+import { requireAnyPermission } from "@/lib/auth";
 
 // Función para normalizar texto (eliminar tildes y convertir a mayúsculas)
 function normalizeText(text: string): string {
@@ -16,15 +13,8 @@ function normalizeText(text: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    const userRole = (session.user as any)?.role;
-    if (userRole !== "super_admin" && userRole !== "administrador") {
-      return NextResponse.json({ error: "Solo administradores pueden cargar pacientes masivamente" }, { status: 403 });
-    }
+    const auth = await requireAnyPermission(req, ["PACIENTES_CREAR"]);
+    if (auth instanceof NextResponse) return auth;
 
     const formData = await req.formData();
     const file = formData.get("file") as File;

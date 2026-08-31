@@ -17,7 +17,7 @@ import type { AppointmentListItem, AppointmentsResponse } from "@/types/appointm
 import { getEstadoCitaBadgeClasses } from "@/lib/appointment-status";
 import Swal from "sweetalert2";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 function normalizeText(value: string | null) {
   return String(value ?? "")

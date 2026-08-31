@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(request.url);
     const pageParam = searchParams.get("page");
     const nombre = searchParams.get("nombre")?.trim() || "";
@@ -72,7 +77,7 @@ export async function GET(request: NextRequest) {
       especialidad: p.especialidades?.nombre ?? null,
       sede: p.sedes?.nombre ?? null,
       registro_medico: p.registro_medico ?? null,
-      firma_digital: (p as any).firma_digital ?? null,
+      firma_digital: p.firma_digital ?? null,
       activo: p.activo,
     }));
 
@@ -93,6 +98,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await request.json();
     const {
       id_usuario,

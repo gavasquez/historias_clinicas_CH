@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;
     const idHistoria = Number(resolvedParams.id);
@@ -62,11 +59,11 @@ export async function POST(
       );
     }
 
-    // Permisos: super_admin/admin o responsable dentro de ventana de 72h
-    const roleName = (session.user as any)?.role as string | undefined;
-    const userId = Number((session.user as any)?.id);
+    // Permisos: super_admin/administrador o responsable dentro de ventana de 72h
+    const roleName = auth.user.role;
+    const userId = Number(auth.user.id);
 
-    const isAdmin = roleName === "super_admin" || roleName === "admin";
+    const isAdmin = roleName === "super_admin" || roleName === "administrador";
     const isResponsible = Number(historia?.profesionales_salud?.usuarios?.id_usuario) === userId
       || Number(historia?.profesionales_salud?.id_usuario) === userId;
 

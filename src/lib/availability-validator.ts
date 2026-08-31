@@ -1,9 +1,9 @@
 import prisma from "@/lib/prisma";
 import {
-  dateOnlyUtcFromLocal,
-  dayOfWeek1To7,
+  dateOnlyFromDateInZone,
+  dayOfWeekInZone,
+  minutesFromDateInZone,
   minutesFromDbTime,
-  minutesFromLocalTime,
 } from "@/lib/date-time";
 
 export async function validateAvailabilityOrThrow(params: {
@@ -13,8 +13,8 @@ export async function validateAvailabilityOrThrow(params: {
   end: Date;
 }) {
   const { idProfesional, idSede, start, end } = params;
-  const dia = dayOfWeek1To7(start);
-  const dateOnly = dateOnlyUtcFromLocal(start);
+  const dia = dayOfWeekInZone(start);
+  const dateOnly = dateOnlyFromDateInZone(start);
 
   const items = await prisma.disponibilidades_profesional.findMany({
     where: {
@@ -33,8 +33,8 @@ export async function validateAvailabilityOrThrow(params: {
     },
   });
 
-  const startMin = minutesFromLocalTime(start);
-  const endMin = minutesFromLocalTime(end);
+  const startMin = minutesFromDateInZone(start);
+  const endMin = minutesFromDateInZone(end);
 
   const ok = items.some((i) => {
     const aStart = minutesFromDbTime(i.hora_inicio);
