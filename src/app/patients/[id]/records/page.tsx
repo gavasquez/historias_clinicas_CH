@@ -20,6 +20,7 @@ import { apiClient } from "@/lib/api";
 import { downloadReport, getReportsForHistory, type ReportDefinition } from "@/lib/reports";
 import { referenciaPacientesReport } from "@/lib/reports/referencia-pacientes";
 import { ReferenciaPacientesModal } from "./referencia-pacientes-modal";
+import { HistoryDocumentsModal } from "./history-documents-modal";
 import {
   AttentionDiagnosesSection,
   type DiagnosisDraft,
@@ -55,6 +56,10 @@ export default function PatientRecordsPage() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showReferenciaModal, setShowReferenciaModal] = useState(false);
   const [referenciaModalHistoryId, setReferenciaModalHistoryId] = useState<number | null>(null);
+  const [documentsModalHistory, setDocumentsModalHistory] = useState<{
+    id: number;
+    label: string;
+  } | null>(null);
   const [newHistoryStep, setNewHistoryStep] = useState<1 | 2>(1);
   const [selectedTipoHistoriaId, setSelectedTipoHistoriaId] = useState<number | null>(null);
   const [selectedNewHistoryTarget, setSelectedNewHistoryTarget] = useState<
@@ -968,6 +973,20 @@ export default function PatientRecordsPage() {
                                 >
                                   Reportes
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDocumentsModalHistory({
+                                      id: h.id_historia,
+                                      label: `${h.tipo_historia} · ${new Date(h.last_attention_fecha_hora ?? h.fecha_apertura).toLocaleString()}`,
+                                    });
+                                  }}
+                                  className="cursor-pointer rounded-md border border-emerald-300 bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 shadow-sm hover:bg-emerald-50"
+                                  title="Cargar o descargar documentos"
+                                >
+                                  Documentos
+                                </button>
                                 {String(h.estado ?? "").trim().toLowerCase() === "finalizado" && (
                                   <button
                                     type="button"
@@ -1092,6 +1111,20 @@ export default function PatientRecordsPage() {
                                     className="cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
                                   >
                                     Ver detalle
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDocumentsModalHistory({
+                                        id: child.id_historia,
+                                        label: `${child.tipo_historia} · ${new Date(child.last_attention_fecha_hora ?? child.fecha_apertura).toLocaleString()}`,
+                                      });
+                                    }}
+                                    className="cursor-pointer rounded-md border border-emerald-300 bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 shadow-sm hover:bg-emerald-50"
+                                    title="Cargar o descargar documentos"
+                                  >
+                                    Documentos
                                   </button>
                                   {String(child.estado ?? "").trim().toLowerCase() === "finalizado" && (
                                     <button
@@ -2053,6 +2086,16 @@ export default function PatientRecordsPage() {
               )}
             </div>
           </div>
+        )}
+
+        {documentsModalHistory && id && (
+          <HistoryDocumentsModal
+            isOpen
+            onClose={() => setDocumentsModalHistory(null)}
+            patientId={id}
+            historyId={documentsModalHistory.id}
+            historyLabel={documentsModalHistory.label}
+          />
         )}
 
         {data && (

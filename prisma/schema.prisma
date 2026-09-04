@@ -23,12 +23,15 @@ model archivos_adjuntos {
   id_entidad       Int
   nombre_archivo   String    @db.VarChar(255)
   ruta             String    @db.VarChar(500)
+  tipo_documento   String?   @db.VarChar(80)
+  extension        String?   @db.VarChar(10)
   tipo_mime        String?   @db.VarChar(100)
   tamano_bytes     BigInt?
   id_usuario_subio Int?
   fecha_subida     DateTime  @default(now()) @db.Timestamp(6)
   usuarios         usuarios? @relation(fields: [id_usuario_subio], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
 
+  @@unique([entidad, id_entidad, tipo_documento], map: "uq_adjuntos_entidad_tipo")
   @@index([entidad, id_entidad], map: "idx_adjuntos_entidad")
 }
 
