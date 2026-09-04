@@ -63,10 +63,17 @@ export async function GET(
             hc_tamizajes_atencion: true,
             hc_examen_fisico_atencion: true,
             hc_valoracion_sistemas_atencion: true,
+            certificados_medicos: {
+              include: {
+                usuarios: { select: { nombre_completo: true } },
+                tipos_certificado_medico: true,
+              },
+            },
             diagnosticos_atencion: {
               orderBy: { es_principal: "desc" },
               include: {
                 cie10: true,
+                tipos_confirmacion_diagnostico: true,
               },
             },
           },

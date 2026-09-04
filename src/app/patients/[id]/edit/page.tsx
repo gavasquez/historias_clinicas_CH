@@ -6,7 +6,9 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
 import type { PatientCreateInput } from "@/services/patients";
 import { getPatientById, updatePatient } from "@/services/patients";
+import { getCompanionsByPatient } from "@/services/companions";
 import type { PacienteDetalleApi } from "@/types/patients";
+import type { Acompanante } from "@/types/companions";
 import { usePatientCatalogs } from "@/hooks/usePatientCatalogs";
 import { patientSchema } from "@/validation/patient";
 import type {
@@ -60,44 +62,56 @@ export default function EditPatientPage() {
     queryFn: () => getPatientById(String(id)),
   });
 
+  const { data: companions, isLoading: loadingCompanions } = useQuery<Acompanante[]>({
+    queryKey: ["companions", id],
+    enabled: !!id,
+    queryFn: () => getCompanionsByPatient(String(id)),
+  });
+
   useEffect(() => {
-    if (pacienteApi && !form) {
-      if (pacienteApi.id_departamento) {
-        setIdDepartamento(pacienteApi.id_departamento);
-      }
+    if (!pacienteApi || loadingCompanions || form) return;
 
-      const grupoPoblacionalValue = (() => {
-        const value = pacienteApi.grupo_poblacional;
-        if (value === "DISCAPACIDAD") return "DISCAPACIDAD";
-        if (value === "VICTIMA_CONFLICTO_ARMADO") return "VICTIMA_CONFLICTO_ARMADO";
-        if (value === "NINGUNA") return "NINGUNA";
-        if (value === "OTRA") return "OTRA";
-        return "";
-      })();
-
-      setForm({
-        id_tipo_documento: pacienteApi.id_tipo_documento,
-        numero_documento: pacienteApi.numero_documento,
-        nombres: pacienteApi.nombres,
-        apellidos: pacienteApi.apellidos,
-        fecha_nacimiento: pacienteApi.fecha_nacimiento.substring(0, 10),
-        telefono: pacienteApi.telefono ?? "",
-        email: pacienteApi.email ?? "",
-        id_ciudad: pacienteApi.id_ciudad ?? undefined,
-        id_genero: pacienteApi.id_genero ?? undefined,
-        id_estado_civil: pacienteApi.id_estado_civil ?? undefined,
-        direccion: pacienteApi.direccion ?? "",
-        grupo_poblacional: grupoPoblacionalValue,
-        grupo_poblacional_otro: pacienteApi.grupo_poblacional_otro ?? "",
-        id_tipo_sangre: pacienteApi.id_tipo_sangre ?? undefined,
-        id_sede: pacienteApi.id_sede ?? undefined,
-        id_programa_academico: pacienteApi.id_programa_academico ?? undefined,
-        id_eps: pacienteApi.id_eps ?? undefined,
-        condicion_particular: pacienteApi.condicion_particular ?? "",
-        id_tipo_usuario: pacienteApi.id_tipo_usuario ?? undefined,
-      });
+    if (pacienteApi.id_departamento) {
+      setIdDepartamento(pacienteApi.id_departamento);
     }
-  }, [pacienteApi, form]);
+
+    const grupoPoblacionalValue = (() => {
+      const value = pacienteApi.grupo_poblacional;
+      if (value === "DISCAPACIDAD") return "DISCAPACIDAD";
+      if (value === "VICTIMA_CONFLICTO_ARMADO") return "VICTIMA_CONFLICTO_ARMADO";
+      if (value === "NINGUNA") return "NINGUNA";
+      if (value === "OTRA") return "OTRA";
+      return "";
+    })();
+
+    const companion = companions?.[0];
+
+    setForm({
+      id_tipo_documento: pacienteApi.id_tipo_documento,
+      numero_documento: pacienteApi.numero_documento,
+      nombres: pacienteApi.nombres,
+      apellidos: pacienteApi.apellidos,
+      fecha_nacimiento: pacienteApi.fecha_nacimiento.substring(0, 10),
+      telefono: pacienteApi.telefono ?? "",
+      email: pacienteApi.email ?? "",
+      id_ciudad: pacienteApi.id_ciudad ?? undefined,
+      id_genero: pacienteApi.id_genero ?? undefined,
+      id_estado_civil: pacienteApi.id_estado_civil ?? undefined,
+      direccion: pacienteApi.direccion ?? "",
+      grupo_poblacional: grupoPoblacionalValue,
+      grupo_poblacional_otro: pacienteApi.grupo_poblacional_otro ?? "",
+      id_tipo_sangre: pacienteApi.id_tipo_sangre ?? undefined,
+      id_sede: pacienteApi.id_sede ?? undefined,
+      id_programa_academico: pacienteApi.id_programa_academico ?? undefined,
+      id_eps: pacienteApi.id_eps ?? undefined,
+      condicion_particular: pacienteApi.condicion_particular ?? "",
+      id_tipo_usuario: pacienteApi.id_tipo_usuario ?? undefined,
+      contacto_emergencia_nombre: companion?.nombre ?? "",
+      contacto_emergencia_relacion: companion?.relacion_con_paciente ?? "",
+      contacto_emergencia_telefono: companion?.telefono ?? "",
+      contacto_emergencia_direccion: companion?.direccion ?? "",
+    });
+  }, [pacienteApi, companions, loadingCompanions, form]);
 
   useEffect(() => {
     if (!form?.id_ciudad) return;
@@ -156,6 +170,7 @@ export default function EditPatientPage() {
         grupo_poblacional: form.grupo_poblacional ? form.grupo_poblacional : undefined,
         id_tipo_documento: Number(form.id_tipo_documento),
       });
+
       setToast({ type: "success", message: "Paciente actualizado correctamente" });
       router.push(`/patients/${id}`);
     } catch (error) {
@@ -658,6 +673,59 @@ export default function EditPatientPage() {
                   placeholder="Ej: Estudiante en práctica, visitante, otro, observaciones adicionales"
                   className="min-h-[64px] rounded-md border border-slate-300 px-2 py-1 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
+              </div>
+
+              {/* Contacto de emergencia */}
+              <div className="md:col-span-2">
+                <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-2">
+                  <div className="md:col-span-2">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Contacto de emergencia</p>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Nombre completo</label>
+                    <input
+                      type="text"
+                      value={form.contacto_emergencia_nombre ?? ""}
+                      onChange={(e) => handleChange("contacto_emergencia_nombre", e.target.value)}
+                      placeholder="Nombre del contacto"
+                      className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Relación con el paciente</label>
+                    <input
+                      type="text"
+                      value={form.contacto_emergencia_relacion ?? ""}
+                      onChange={(e) => handleChange("contacto_emergencia_relacion", e.target.value)}
+                      placeholder="Ej: Madre, Padre, Tutor"
+                      className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Teléfono</label>
+                    <input
+                      type="text"
+                      value={form.contacto_emergencia_telefono ?? ""}
+                      onChange={(e) => handleChange("contacto_emergencia_telefono", e.target.value)}
+                      placeholder="Teléfono del contacto"
+                      className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-600">Dirección</label>
+                    <input
+                      type="text"
+                      value={form.contacto_emergencia_direccion ?? ""}
+                      onChange={(e) => handleChange("contacto_emergencia_direccion", e.target.value)}
+                      placeholder="Dirección del contacto"
+                      className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { FileText, Loader2 } from "lucide-react";
 import Swal from "sweetalert2";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPatientDetailById } from "@/services/patients";
@@ -16,6 +17,9 @@ import {
   fetchTiposHistoriaClinica,
 } from "@/services/catalogs";
 import { apiClient } from "@/lib/api";
+import { downloadReport, getReportsForHistory, type ReportDefinition } from "@/lib/reports";
+import { referenciaPacientesReport } from "@/lib/reports/referencia-pacientes";
+import { ReferenciaPacientesModal } from "./referencia-pacientes-modal";
 import {
   AttentionDiagnosesSection,
   type DiagnosisDraft,
@@ -46,6 +50,11 @@ export default function PatientRecordsPage() {
   const [recordsPage, setRecordsPage] = useState(1);
 
   const [showNewHistoryModal, setShowNewHistoryModal] = useState(false);
+  const [showReportsModal, setShowReportsModal] = useState(false);
+  const [reportsModalHistory, setReportsModalHistory] = useState<{ id_historia: number; tipo_historia_codigo: string } | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showReferenciaModal, setShowReferenciaModal] = useState(false);
+  const [referenciaModalHistoryId, setReferenciaModalHistoryId] = useState<number | null>(null);
   const [newHistoryStep, setNewHistoryStep] = useState<1 | 2>(1);
   const [selectedTipoHistoriaId, setSelectedTipoHistoriaId] = useState<number | null>(null);
   const [selectedNewHistoryTarget, setSelectedNewHistoryTarget] = useState<
@@ -562,6 +571,69 @@ export default function PatientRecordsPage() {
     setShowEvolutionModal(true);
   };
 
+  const handleOpenReportsModal = (historyId: number, historyTypeCode: string) => {
+    setReportsModalHistory({ id_historia: historyId, tipo_historia_codigo: historyTypeCode });
+    setShowReportsModal(true);
+  };
+
+  const handleGenerateSelectedReport = async (report: ReportDefinition) => {
+    if (!data || !reportsModalHistory) return;
+
+    if (report.id === "referencia-pacientes") {
+      setReferenciaModalHistoryId(reportsModalHistory.id_historia);
+      setShowReferenciaModal(true);
+      setShowReportsModal(false);
+      setReportsModalHistory(null);
+      return;
+    }
+
+    setIsGeneratingReport(true);
+    try {
+      const detail = await fetchHistoryDetail(String(reportsModalHistory.id_historia));
+      const history = detail?.data;
+      const attention = history?.atenciones_salud?.[0];
+
+      if (!attention) {
+        Swal.fire({ icon: "warning", title: "Sin atenciones", text: "La historia clínica no tiene atenciones registradas para generar el reporte." });
+        return;
+      }
+
+      const user = session?.user as { nombre_completo?: string; name?: string; firma_digital?: string | null } | undefined;
+
+      let professional;
+      try {
+        const professionalRes = await apiClient.get("/me/professional");
+        professional = professionalRes?.data?.data;
+      } catch {
+        professional = undefined;
+      }
+
+      await downloadReport(report, {
+        patient: data,
+        history,
+        attention,
+        issuedBy: {
+          nombre_completo: professional?.usuarios?.nombre_completo || user?.nombre_completo || user?.name || "No registrado",
+          firma_digital: professional?.firma_digital || null,
+        },
+      }, `${report.id}_${reportsModalHistory.id_historia}.pdf`);
+
+      setShowReportsModal(false);
+      setReportsModalHistory(null);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      const msg = error.response?.data?.message || "No se pudo generar el reporte";
+      Swal.fire({ icon: "error", title: "Error", text: msg });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const availableReports = useMemo(() => {
+    if (!reportsModalHistory) return [];
+    return getReportsForHistory(reportsModalHistory.tipo_historia_codigo);
+  }, [reportsModalHistory]);
+
   return (
     <AppShell>
       <section className="space-y-4">
@@ -885,6 +957,17 @@ export default function PatientRecordsPage() {
                                 >
                                   Ver detalle
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenReportsModal(h.id_historia, h.tipo_historia_codigo);
+                                  }}
+                                  className="cursor-pointer rounded-md border border-sky-300 bg-white px-2 py-1 text-[11px] font-medium text-sky-700 shadow-sm hover:bg-sky-50"
+                                  title="Ver reportes disponibles"
+                                >
+                                  Reportes
+                                </button>
                                 {String(h.estado ?? "").trim().toLowerCase() === "finalizado" && (
                                   <button
                                     type="button"
@@ -1083,6 +1166,20 @@ export default function PatientRecordsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {detailData && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const typeCode = detailData.tipos_historia_clinica?.codigo;
+                        if (typeCode && selectedHistoryId) {
+                          handleOpenReportsModal(selectedHistoryId as number, typeCode);
+                        }
+                      }}
+                      className="rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-700 shadow-sm hover:bg-sky-50"
+                    >
+                      Reportes
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1887,6 +1984,89 @@ export default function PatientRecordsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {showReportsModal && reportsModalHistory && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="relative w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl">
+              <div className="border-b border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">Reportes disponibles</h2>
+                    <p className="mt-0.5 text-xs text-slate-600">Seleccione el formato a generar</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReportsModal(false);
+                      setReportsModalHistory(null);
+                    }}
+                    className="cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-[60vh] overflow-auto p-4">
+                {availableReports.length === 0 && (
+                  <p className="text-xs text-slate-600">
+                    No hay reportes configurados para el tipo {reportsModalHistory?.tipo_historia_codigo ? `(${reportsModalHistory.tipo_historia_codigo})` : ""}.
+                  </p>
+                )}
+                {availableReports.length > 0 && (
+                  <div className="space-y-3">
+                    {availableReports.map((report) => (
+                      <div
+                        key={report.id}
+                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3"
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-slate-900">{report.name}</p>
+                          <p className="text-[11px] text-slate-600">
+                            Código: {report.code} · Versión: {report.version} · Vigencia: {report.vigencia}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateSelectedReport(report)}
+                          className="cursor-pointer rounded-md bg-sky-600 p-2 text-white shadow-sm transition hover:bg-sky-700"
+                          title="Generar PDF"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {isGeneratingReport && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-white/80 backdrop-blur-sm">
+                  <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+                  <p className="mt-2 text-sm font-medium text-slate-700">Generando reporte...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {data && (
+          <ReferenciaPacientesModal
+            isOpen={showReferenciaModal}
+            onClose={() => {
+              setShowReferenciaModal(false);
+              setReferenciaModalHistoryId(null);
+            }}
+            patientId={Number(params.id)}
+            patient={data}
+            historyId={referenciaModalHistoryId ?? 0}
+            report={referenciaPacientesReport}
+          />
         )}
       </section>
     </AppShell>

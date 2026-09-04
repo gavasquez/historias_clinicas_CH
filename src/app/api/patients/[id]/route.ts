@@ -100,6 +100,10 @@ export async function PUT(
       condicion_particular,
       id_tipo_usuario,
       activo,
+      contacto_emergencia_nombre,
+      contacto_emergencia_relacion,
+      contacto_emergencia_telefono,
+      contacto_emergencia_direccion,
     } = body;
 
     const updateData: any = {};
@@ -201,9 +205,44 @@ export async function PUT(
       updateData.activo = activo;
     }
 
-    const pacienteActualizado = await prisma.pacientes.update({
-      where: { id_paciente: id },
-      data: updateData,
+    const pacienteActualizado = await prisma.$transaction(async (tx) => {
+      const paciente = await tx.pacientes.update({
+        where: { id_paciente: id },
+        data: updateData,
+      });
+
+      const contactoNombreTrim = String(contacto_emergencia_nombre ?? "").trim();
+      if (contactoNombreTrim) {
+        const companionData = {
+          nombre: contactoNombreTrim,
+          relacion_con_paciente: contacto_emergencia_relacion
+            ? String(contacto_emergencia_relacion)
+            : null,
+          telefono: contacto_emergencia_telefono
+            ? String(contacto_emergencia_telefono)
+            : null,
+          direccion: contacto_emergencia_direccion
+            ? String(contacto_emergencia_direccion)
+            : null,
+        };
+
+        const acompananteExistente = await tx.acompanantes.findFirst({
+          where: { id_paciente: id },
+        });
+
+        if (acompananteExistente) {
+          await tx.acompanantes.update({
+            where: { id_acompanante: acompananteExistente.id_acompanante },
+            data: companionData,
+          });
+        } else {
+          await tx.acompanantes.create({
+            data: { id_paciente: id, ...companionData },
+          });
+        }
+      }
+
+      return paciente;
     });
 
     return NextResponse.json(pacienteActualizado);

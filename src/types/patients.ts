@@ -7,7 +7,7 @@ export interface Paciente {
   activo?: boolean;
   tipos_documento: { codigo: string } | null;
   tipos_usuario: { descripcion: string } | null;
-  programas_academicos: { nombre: string } | null;
+  programas_academicos: { nombre: string; codigo?: string } | null;
   sedes: { nombre: string } | null;
 }
 
@@ -61,7 +61,7 @@ export interface PacienteDetalle {
   condicion_particular: string | null;
   tipos_documento: { codigo: string; descripcion?: string } | null;
   tipos_usuario: { descripcion: string } | null;
-  programas_academicos: { nombre: string } | null;
+  programas_academicos: { nombre: string; codigo?: string } | null;
   sedes: { nombre: string } | null;
   generos: { descripcion: string } | null;
   estados_civiles: { descripcion: string } | null;

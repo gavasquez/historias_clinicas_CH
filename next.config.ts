@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data:; " +
               "font-src 'self'; " +
               "connect-src 'self'; " +
+              "frame-src 'self' blob:; " +
               "frame-ancestors 'none';",
           },
         ],

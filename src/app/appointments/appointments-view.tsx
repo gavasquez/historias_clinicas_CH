@@ -161,9 +161,23 @@ export function AppointmentsView() {
     },
   });
 
-  const roleName = (session?.user as any)?.role as string | undefined;
+  const roleName = (session?.user as { role?: string } | undefined)?.role;
   const idProfesionalAutenticado = profesionalAutenticado?.id_profesional;
-  const canCreateEdit = roleName === "administrador";
+
+  const { data: permissionsData } = useQuery({
+    queryKey: ["me-permissions"],
+    queryFn: async () => {
+      const res = await fetch("/api/me/permissions");
+      if (!res.ok) return { data: [] };
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const myPermissions = permissionsData?.data ?? [];
+  const canCreateEdit = myPermissions.some(
+    (p: { codigo?: string }) => p.codigo === "CITAS_GESTIONAR",
+  );
 
   const { data: tiposCita } = useQuery<TipoCita[]>({
     queryKey: ["tipos-cita"],
