@@ -15,6 +15,8 @@ function normalizeDateOnly(input: unknown): Date | null {
 function normalizeOptionalBoolean(input: unknown): boolean | null {
   if (input === true) return true;
   if (input === false) return false;
+  if (input === "SI" || input === "SÍ") return true;
+  if (input === "NO") return false;
   return null;
 }
 
@@ -604,23 +606,11 @@ export async function POST(
     const cierreRecomendacionesTrim = String((cierreRaw as any)?.recomendaciones ?? "").trim();
     const cierreCertRecomTrim = String((cierreRaw as any)?.certificado_recomendaciones ?? "").trim();
 
-    const cierreCertEmitidoRaw = (cierreRaw as any)?.certificado_emitido;
-    const cierreCertEmitido =
-      cierreCertEmitidoRaw === true
-        ? true
-        : cierreCertEmitidoRaw === false
-          ? false
-          : null;
+    const cierreCertEmitido = normalizeOptionalBoolean((cierreRaw as any)?.certificado_emitido);
 
     const cierreCertOpcionTrim = String((cierreRaw as any)?.certificado_opcion ?? "").trim();
 
-    const cierreNotifEmitidaRaw = (cierreRaw as any)?.notificacion_emitida;
-    const cierreNotifEmitida =
-      cierreNotifEmitidaRaw === true
-        ? true
-        : cierreNotifEmitidaRaw === false
-          ? false
-          : null;
+    const cierreNotifEmitida = normalizeOptionalBoolean((cierreRaw as any)?.notificacion_emitida);
 
     const cierreSegNotifTrim = String((cierreRaw as any)?.seguimiento_notificacion ?? "").trim();
     const cierreNotifObsTrim = String((cierreRaw as any)?.notificacion_observaciones ?? "").trim();

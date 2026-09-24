@@ -14,6 +14,7 @@ export interface ReportData {
   attention?: any;
   issuedBy?: {
     nombre_completo?: string;
+    registro_medico?: string | null;
     firma_digital?: string | null;
   };
   meta?: unknown;

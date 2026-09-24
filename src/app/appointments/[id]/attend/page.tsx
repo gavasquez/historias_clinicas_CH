@@ -39,7 +39,7 @@ type AttendPayloadInput = {
   simpleForm: {
     motivoAtencion: string;
     observacionAnalisis: string;
-    planManejo: string;
+    recomendaciones: string;
     seguimiento: string;
     seguimientoOpcion: string;
     seguimientoEfectivo: string;
@@ -157,7 +157,8 @@ function buildAttendPayload(input: AttendPayloadInput) {
 
   // En el flujo simplificado, usar datos de simpleForm, si no, usar form
   const analisisValue = form.analisis;
-  const planManejoValue = isRegAtencionSalud ? simpleForm.planManejo : form.conducta_plan_estudio_manejo;
+  const recomendacionesValue = isRegAtencionSalud ? simpleForm.recomendaciones : form.atencion_recomendaciones;
+  const conductaPlanManejoValue = isRegAtencionSalud ? null : form.conducta_plan_estudio_manejo || null;
   const seguimientoOpcionValue = isRegAtencionSalud ? simpleForm.seguimientoOpcion : form.seguimiento_opcion;
   const seguimientoEfectivoValue = isRegAtencionSalud ? simpleForm.seguimientoEfectivo : form.seguimiento_efectivo;
   const cierreSeguimientoValue = isRegAtencionSalud ? simpleForm.cierreSeguimiento : form.cierre_seguimiento;
@@ -167,8 +168,7 @@ function buildAttendPayload(input: AttendPayloadInput) {
   const casoBool = form.caso_accidente_intoxicacion_violencia === "SI";
 
   const hasCierre =
-    planManejoValue.trim() ||
-    form.atencion_recomendaciones.trim() ||
+    recomendacionesValue.trim() ||
     form.certificado_recomendaciones.trim() ||
     form.certificado_emitido.trim() ||
     form.certificado_opcion.trim() ||
@@ -195,8 +195,8 @@ function buildAttendPayload(input: AttendPayloadInput) {
     observacion_analisis: isRegAtencionSalud ? simpleForm.observacionAnalisis || undefined : undefined,
     hc_atencion_cierre: hasCierre
       ? {
-          conducta_plan_estudio_manejo: planManejoValue || undefined,
-          recomendaciones: form.atencion_recomendaciones || undefined,
+          conducta_plan_estudio_manejo: conductaPlanManejoValue ?? undefined,
+          recomendaciones: recomendacionesValue || undefined,
           certificado_recomendaciones: form.certificado_recomendaciones || undefined,
           certificado_emitido:
             form.certificado_emitido === "SI"
@@ -282,7 +282,7 @@ function isTabComplete(input: {
   simpleForm: {
     motivoAtencion: string;
     observacionAnalisis: string;
-    planManejo: string;
+    recomendaciones: string;
     seguimiento: string;
     seguimientoOpcion: string;
     seguimientoEfectivo: string;
@@ -325,8 +325,8 @@ function isTabComplete(input: {
     if (!simpleForm.observacionAnalisis.trim()) {
       return { ok: false, message: "Debe diligenciar la observación / análisis." };
     }
-    if (!simpleForm.planManejo.trim()) {
-      return { ok: false, message: "Debe diligenciar el plan de manejo." };
+    if (!simpleForm.recomendaciones.trim()) {
+      return { ok: false, message: "Debe diligenciar las recomendaciones." };
     }
     if (!simpleForm.seguimiento.trim()) {
       return { ok: false, message: "Debe seleccionar si es seguimiento." };
@@ -439,12 +439,19 @@ function isTabComplete(input: {
       return { ok: false, message: "Debe agregar al menos un diagnóstico." };
     }
 
+    if (isRegAtencionSalud && !form.atencion_recomendaciones.trim()) {
+      return { ok: false, message: "Debe diligenciar las recomendaciones." };
+    }
+
     return { ok: true };
   }
 
   if (activeTab === "ATENCION") {
     if (!form.conducta_plan_estudio_manejo.trim()) {
       return { ok: false, message: "Debe diligenciar la conducta / plan de manejo." };
+    }
+    if (!form.atencion_recomendaciones.trim()) {
+      return { ok: false, message: "Debe diligenciar las recomendaciones." };
     }
     return { ok: true };
   }
@@ -650,7 +657,7 @@ export default function AttendAppointmentPage() {
   const [simpleForm, setSimpleForm] = useState({
     motivoAtencion: "",
     observacionAnalisis: "",
-    planManejo: "",
+    recomendaciones: "",
     seguimiento: "",
     seguimientoOpcion: "",
     seguimientoEfectivo: "",
@@ -693,7 +700,7 @@ export default function AttendAppointmentPage() {
       if (isRegAtencionSalud && activeTab === "NOTA_ATENCION" && targetTab === "DIAGNOSTICOS") {
         setForm((prev) => ({
           ...prev,
-          conducta_plan_estudio_manejo: simpleForm.planManejo,
+          atencion_recomendaciones: simpleForm.recomendaciones,
           seguimiento_opcion: simpleForm.seguimientoOpcion,
           seguimiento_efectivo: (simpleForm.seguimientoEfectivo || "") as AttentionFormState["seguimiento_efectivo"],
           cierre_seguimiento: (simpleForm.cierreSeguimiento || "") as AttentionFormState["cierre_seguimiento"],
@@ -810,7 +817,7 @@ export default function AttendAppointmentPage() {
       form.analisis.trim() ||
       simpleForm.motivoAtencion.trim() ||
       simpleForm.observacionAnalisis.trim() ||
-      simpleForm.planManejo.trim() ||
+      simpleForm.recomendaciones.trim() ||
       form.hc_ssr_contenido.trim() ||
       tamizajesHasMeaningfulValue ||
       form.hc_examen_fisico_contenido.trim() ||
@@ -839,7 +846,7 @@ export default function AttendAppointmentPage() {
 
         const modalResult = await Swal.fire({
           title: "Precargar información clínica",
-          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (anamnesis, antecedentes, análisis, plan de manejo, SSR, tamizajes, examen físico y examen por sistema)?",
+          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (anamnesis, antecedentes, análisis, recomendaciones, SSR, tamizajes, examen físico y examen por sistema)?",
           icon: "question",
           showCancelButton: true,
           confirmButtonText: "Sí, precargar",
@@ -902,7 +909,7 @@ export default function AttendAppointmentPage() {
             observacionAnalisis: prev.observacionAnalisis.trim()
               ? prev.observacionAnalisis
               : nextObservacionAnalisis,
-            planManejo: prev.planManejo.trim() ? prev.planManejo : nextConductaPlan,
+            recomendaciones: prev.recomendaciones.trim() ? prev.recomendaciones : nextRecomendaciones,
             seguimientoOpcion: prev.seguimientoOpcion.trim()
               ? prev.seguimientoOpcion
               : String(lastAttention?.hc_atencion_cierre?.seguimiento_opcion ?? ""),
@@ -991,7 +998,7 @@ export default function AttendAppointmentPage() {
     observacionAntecedentesPersonal,
     simpleForm.observacionAnalisis,
     simpleForm.motivoAtencion,
-    simpleForm.planManejo,
+    simpleForm.recomendaciones,
   ]);
 
   useEffect(() => {
@@ -1592,16 +1599,6 @@ export default function AttendAppointmentPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-[11px] font-semibold text-slate-700">Plan de manejo</label>
-                <textarea
-                  value={simpleForm.planManejo}
-                  onChange={(e) => setSimpleForm({ ...simpleForm, planManejo: e.target.value })}
-                  rows={4}
-                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
-                />
-              </div>
-
               <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">SEGUIMIENTO</div>
 
               <div className="space-y-3">
@@ -1721,14 +1718,28 @@ export default function AttendAppointmentPage() {
           )}
 
           {activeTab === "DIAGNOSTICOS" && (
-            <DiagnosticosTab
-              diagnosticosDraft={diagnosticosDraft}
-              setDiagnosticosDraft={setDiagnosticosDraft}
-              form={form}
-              setForm={setForm}
-              setError={setError}
-              setSuccessMessage={setSuccessMessage}
-            />
+            <>
+              <DiagnosticosTab
+                diagnosticosDraft={diagnosticosDraft}
+                setDiagnosticosDraft={setDiagnosticosDraft}
+                form={form}
+                setForm={setForm}
+                setError={setError}
+                setSuccessMessage={setSuccessMessage}
+              />
+              {isRegAtencionSalud && (
+                <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px]">
+                  <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">RECOMENDACIONES</div>
+                  <textarea
+                    value={simpleForm.recomendaciones}
+                    onChange={(e) => setSimpleForm({ ...simpleForm, recomendaciones: e.target.value })}
+                    rows={6}
+                    className="min-h-[140px] w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    placeholder="Escriba las recomendaciones"
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === "ATENCION" && <AtencionTab form={form} setForm={setForm} />}

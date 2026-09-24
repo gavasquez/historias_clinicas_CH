@@ -35,6 +35,23 @@ model archivos_adjuntos {
   @@index([entidad, id_entidad], map: "idx_adjuntos_entidad")
 }
 
+model documentos_exportados {
+  id_exportacion      Int                @id @default(autoincrement())
+  id_historia_clinica Int
+  id_atencion         Int?
+  id_usuario_exporto  Int
+  tipo_documento      String             @db.VarChar(80)
+  nombre_archivo      String             @db.VarChar(255)
+  ruta                String?            @db.VarChar(500)
+  tamano_bytes        BigInt?
+  fecha_exportacion   DateTime           @default(now()) @db.Timestamp(6)
+  historias_clinicas  historias_clinicas @relation(fields: [id_historia_clinica], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
+  usuarios            usuarios           @relation(fields: [id_usuario_exporto], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_historia_clinica], map: "idx_documentos_exportados_historia")
+  @@index([id_usuario_exporto], map: "idx_documentos_exportados_usuario")
+}
+
 model atenciones_salud {
   id_atencion                           Int                                   @id @default(autoincrement())
   id_historia                           Int
@@ -464,6 +481,7 @@ model historias_clinicas {
   antecedentes_familiares    String?
   atenciones_salud           atenciones_salud[]
   notas_evolucion_historia   notas_evolucion_historia[]
+  documentos_exportados      documentos_exportados[]
   historia_vinculada         historias_clinicas?         @relation("historias_vinculo", fields: [id_historia_vinculada], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
   historias_vinculadas       historias_clinicas[]        @relation("historias_vinculo")
   citas_vinculadas           citas[]                     @relation("citas_historia_vinculada")
@@ -825,6 +843,7 @@ model usuarios {
   archivos_adjuntos         archivos_adjuntos[]
   auditoria                 auditoria[]
   certificados_medicos      certificados_medicos[]
+  documentos_exportados     documentos_exportados[]
   pacientes                 pacientes[]
   plantillas_consentimiento plantillas_consentimiento[]
   profesionales_salud       profesionales_salud[]

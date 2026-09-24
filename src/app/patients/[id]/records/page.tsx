@@ -17,10 +17,11 @@ import {
   fetchTiposHistoriaClinica,
 } from "@/services/catalogs";
 import { apiClient } from "@/lib/api";
-import { downloadReport, getReportsForHistory, type ReportDefinition } from "@/lib/reports";
+import { getReportBlob, getReportsForHistory, type ReportDefinition } from "@/lib/reports";
 import { referenciaPacientesReport } from "@/lib/reports/referencia-pacientes";
 import { ReferenciaPacientesModal } from "./referencia-pacientes-modal";
 import { HistoryDocumentsModal } from "./history-documents-modal";
+import { registerExportedDocument } from "@/services/history-documents";
 import {
   AttentionDiagnosesSection,
   type DiagnosisDraft,
@@ -613,15 +614,38 @@ export default function PatientRecordsPage() {
         professional = undefined;
       }
 
-      await downloadReport(report, {
+      const filename = `${report.id}_${reportsModalHistory.id_historia}.pdf`;
+      const reportData = {
         patient: data,
         history,
         attention,
         issuedBy: {
           nombre_completo: professional?.usuarios?.nombre_completo || user?.nombre_completo || user?.name || "No registrado",
+          registro_medico: professional?.registro_medico || null,
           firma_digital: professional?.firma_digital || null,
         },
-      }, `${report.id}_${reportsModalHistory.id_historia}.pdf`);
+      };
+
+      const blob = await getReportBlob(report, reportData);
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+
+      if (id && report.id === "indicaciones-medicas") {
+        await registerExportedDocument(String(id), reportsModalHistory.id_historia, {
+          tipo_documento: "indicaciones-medicas",
+          id_atencion: attention?.id_atencion ?? null,
+          nombre_archivo: filename,
+          file: new File([blob], filename, { type: "application/pdf" }),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: ["history-exported-documents", String(id), reportsModalHistory.id_historia],
+        });
+      }
 
       setShowReportsModal(false);
       setReportsModalHistory(null);
@@ -824,7 +848,7 @@ export default function PatientRecordsPage() {
                     ) : null}
 
                     <div className="overflow-x-auto rounded-md border border-slate-200">
-                    <table className="min-w-full text-left text-[11px]">
+                    <table className="min-w-[1100px] text-left text-[11px]">
                       <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                         <tr>
                           <th className="px-3 py-2 w-8"></th>
@@ -838,6 +862,7 @@ export default function PatientRecordsPage() {
                           <th className="px-3 py-2">Modalidad de la atención</th>
                           <th className="px-3 py-2">Seguimiento</th>
                           <th className="px-3 py-2">Acciones</th>
+                          <th className="px-3 py-2">Anular</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700">
@@ -949,7 +974,7 @@ export default function PatientRecordsPage() {
                                   );
                                 })()}
                               </td>
-                            <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
+                            <td className={`whitespace-nowrap px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
@@ -959,8 +984,9 @@ export default function PatientRecordsPage() {
                                     setExpandedAttentions({});
                                   }}
                                   className="cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                                  title="Ver detalle"
                                 >
-                                  Ver detalle
+                                  Ver
                                 </button>
                                 <button
                                   type="button"
@@ -987,21 +1013,23 @@ export default function PatientRecordsPage() {
                                 >
                                   Documentos
                                 </button>
-                                {String(h.estado ?? "").trim().toLowerCase() === "finalizado" && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleVoidHistory(h.id_historia, h.tipo_historia);
-                                    }}
-                                    disabled={voidHistoryMutation.isPending}
-                                    className="cursor-pointer rounded-md border border-red-300 bg-white px-2 py-1 text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
-                                    title="Anular folio"
-                                  >
-                                    {voidHistoryMutation.isPending ? "Anulando..." : "Anular folio"}
-                                  </button>
-                                )}
                               </div>
+                            </td>
+                            <td className={`whitespace-nowrap px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
+                              {String(h.estado ?? "").trim().toLowerCase() === "finalizado" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVoidHistory(h.id_historia, h.tipo_historia);
+                                  }}
+                                  disabled={voidHistoryMutation.isPending}
+                                  className="cursor-pointer rounded-md border border-red-300 bg-white px-2 py-1 text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                                  title="Anular folio"
+                                >
+                                  {voidHistoryMutation.isPending ? "Anulando..." : "Anular"}
+                                </button>
+                              )}
                             </td>
                           </tr>
                           
@@ -1099,7 +1127,7 @@ export default function PatientRecordsPage() {
                                   );
                                 })()}
                               </td>
-                              <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
+                              <td className={`whitespace-nowrap px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
@@ -1109,8 +1137,9 @@ export default function PatientRecordsPage() {
                                       setExpandedAttentions({});
                                     }}
                                     className="cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                                    title="Ver detalle"
                                   >
-                                    Ver detalle
+                                    Ver
                                   </button>
                                   <button
                                     type="button"
@@ -1126,21 +1155,23 @@ export default function PatientRecordsPage() {
                                   >
                                     Documentos
                                   </button>
-                                  {String(child.estado ?? "").trim().toLowerCase() === "finalizado" && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleVoidHistory(child.id_historia, child.tipo_historia);
-                                      }}
-                                      disabled={voidHistoryMutation.isPending}
-                                      className="cursor-pointer rounded-md border border-red-300 bg-white px-2 py-1 text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
-                                      title="Anular folio"
-                                    >
-                                      {voidHistoryMutation.isPending ? "Anulando..." : "Anular folio"}
-                                    </button>
-                                  )}
                                 </div>
+                              </td>
+                              <td className={`whitespace-nowrap px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
+                                {String(child.estado ?? "").trim().toLowerCase() === "finalizado" && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleVoidHistory(child.id_historia, child.tipo_historia);
+                                    }}
+                                    disabled={voidHistoryMutation.isPending}
+                                    className="cursor-pointer rounded-md border border-red-300 bg-white px-2 py-1 text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                                    title="Anular folio"
+                                  >
+                                    {voidHistoryMutation.isPending ? "Anulando..." : "Anular"}
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -1639,10 +1670,10 @@ export default function PatientRecordsPage() {
                                   </div>
                                 )}
 
-                                {a.hc_anamnesis_atencion?.conducta_plan_estudio_manejo && (
+                                {!isRegAtencionSalud && a.hc_atencion_cierre?.conducta_plan_estudio_manejo && (
                                   <div>
                                     <p className="text-[10px] font-semibold uppercase text-slate-500">Plan de manejo</p>
-                                    <p>{a.hc_anamnesis_atencion.conducta_plan_estudio_manejo}</p>
+                                    <p>{a.hc_atencion_cierre.conducta_plan_estudio_manejo}</p>
                                   </div>
                                 )}
 
@@ -1660,10 +1691,10 @@ export default function PatientRecordsPage() {
                                   </div>
                                 )}
 
-                                {/* Cierre (común para ambos tipos) */}
+                                {/* Recomendaciones (común para ambos tipos) */}
                                 {a.hc_atencion_cierre?.recomendaciones && (
                                   <div>
-                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Cierre</p>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Recomendaciones</p>
                                     <p>{a.hc_atencion_cierre.recomendaciones}</p>
                                   </div>
                                 )}

@@ -18,6 +18,8 @@ function isNonEmptyString(v: unknown): v is string {
 function normalizeOptionalBoolean(input: unknown): boolean | null {
   if (input === true) return true;
   if (input === false) return false;
+  if (input === "SI" || input === "SÍ") return true;
+  if (input === "NO") return false;
   return null;
 }
 
@@ -629,13 +631,9 @@ export async function POST(
     const cierreConductaTrim = String((cierreRaw as any)?.conducta_plan_estudio_manejo ?? "").trim();
     const cierreRecomendacionesTrim = String(cierreRaw?.recomendaciones ?? "").trim();
     const cierreCertRecomTrim = String(cierreRaw?.certificado_recomendaciones ?? "").trim();
-    const cierreCertEmitidoRaw = (cierreRaw as any)?.certificado_emitido;
-    const cierreCertEmitido =
-      cierreCertEmitidoRaw === true ? true : cierreCertEmitidoRaw === false ? false : null;
+    const cierreCertEmitido = normalizeOptionalBoolean((cierreRaw as any)?.certificado_emitido);
     const cierreCertOpcionTrim = String((cierreRaw as any)?.certificado_opcion ?? "").trim();
-    const cierreNotifEmitidaRaw = (cierreRaw as any)?.notificacion_emitida;
-    const cierreNotifEmitida =
-      cierreNotifEmitidaRaw === true ? true : cierreNotifEmitidaRaw === false ? false : null;
+    const cierreNotifEmitida = normalizeOptionalBoolean((cierreRaw as any)?.notificacion_emitida);
     const cierreSegNotifTrim = String((cierreRaw as any)?.seguimiento_notificacion ?? "").trim();
     const cierreNotifObsTrim = String((cierreRaw as any)?.notificacion_observaciones ?? "").trim();
     const cierreSegObsTrim = String((cierreRaw as any)?.seguimiento_observaciones ?? "").trim();
@@ -808,7 +806,7 @@ export async function POST(
       where: { id_atencion: idAtencion },
       create: {
         id_atencion: idAtencion,
-        conducta_plan_estudio_manejo: cierreConductaTrim || null,
+        conducta_plan_estudio_manejo: isRegAtencionSalud ? null : cierreConductaTrim || null,
         recomendaciones: cierreRecomendacionesTrim || null,
         certificado_recomendaciones: cierreCertRecomTrim || null,
         certificado_emitido: cierreCertEmitido,
@@ -823,7 +821,7 @@ export async function POST(
         seguimiento_fecha: cierreSegFecha,
       } as any,
       update: {
-        conducta_plan_estudio_manejo: cierreConductaTrim || null,
+        conducta_plan_estudio_manejo: isRegAtencionSalud ? null : cierreConductaTrim || null,
         recomendaciones: cierreRecomendacionesTrim || null,
         certificado_recomendaciones: cierreCertRecomTrim || null,
         certificado_emitido: cierreCertEmitido,
@@ -1091,6 +1089,8 @@ export async function PATCH(
       );
     }
 
+    const isRegAtencionSalud = tipoHistoria.codigo === "REG_ATENCION_SALUD";
+
     const existingAttention = await prisma.atenciones_salud.findFirst({
       where: { id_cita: idCita },
       orderBy: { id_atencion: "desc" },
@@ -1225,7 +1225,7 @@ export async function PATCH(
         where: { id_atencion: idAtencion },
         create: {
           id_atencion: idAtencion,
-          conducta_plan_estudio_manejo: String((cierre as any).conducta_plan_estudio_manejo ?? "").trim() || null,
+          conducta_plan_estudio_manejo: isRegAtencionSalud ? null : String((cierre as any).conducta_plan_estudio_manejo ?? "").trim() || null,
           recomendaciones: String((cierre as any).recomendaciones ?? "").trim() || null,
           certificado_recomendaciones: String((cierre as any).certificado_recomendaciones ?? "").trim() || null,
           certificado_emitido:
@@ -1243,8 +1243,9 @@ export async function PATCH(
             : null,
         },
         update: {
-          conducta_plan_estudio_manejo:
-            (cierre as any).conducta_plan_estudio_manejo !== undefined
+          conducta_plan_estudio_manejo: isRegAtencionSalud
+            ? null
+            : (cierre as any).conducta_plan_estudio_manejo !== undefined
               ? String((cierre as any).conducta_plan_estudio_manejo ?? "").trim() || null
               : undefined,
           recomendaciones:

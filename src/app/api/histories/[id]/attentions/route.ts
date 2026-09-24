@@ -118,7 +118,7 @@ export async function POST(
       motivo_atencion,
       observacion_analisis,
       analisis,
-      plan_manejo,
+      recomendaciones,
       seguimiento_opcion,
       seguimiento_efectivo,
       cierre_seguimiento,
@@ -169,17 +169,10 @@ export async function POST(
 
     const analisisTrim = String(analisis ?? "").trim();
     const observacionAnalisisTrim = String(observacion_analisis ?? "").trim();
+    const recomendacionesTrim = String(recomendaciones ?? "").trim();
     if (!analisisTrim) {
       return NextResponse.json(
         { message: "El análisis es obligatorio" },
-        { status: 400 },
-      );
-    }
-
-    const planManejoTrim = String(plan_manejo ?? "").trim();
-    if (!planManejoTrim) {
-      return NextResponse.json(
-        { message: "El plan de manejo es obligatorio" },
         { status: 400 },
       );
     }
@@ -281,8 +274,8 @@ export async function POST(
         },
         hc_atencion_cierre: {
           create: {
-            conducta_plan_estudio_manejo: planManejoTrim,
-            recomendaciones: null,
+            conducta_plan_estudio_manejo: null,
+            recomendaciones: recomendacionesTrim || null,
             certificado_recomendaciones: null,
             certificado_emitido: null,
             certificado_opcion: null,

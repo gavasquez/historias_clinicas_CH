@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { unifiedForm } from "./base";
 import type { ReportData, ReportDefinition } from "./types";
 
 export interface ReferenciaDiagnostico {
@@ -38,8 +39,6 @@ export interface ReferenciaPacientesMeta {
     relacion: string;
     numeroDocumento: string;
     tipoDocumento: string;
-    fechaNacimiento: string;
-    edad: string;
     telefono: string;
     direccion: string;
     departamento: string;
@@ -47,7 +46,6 @@ export interface ReferenciaPacientesMeta {
   };
   personalRefiere: {
     nombre: string;
-    celular: string;
     servicio: string;
     telefono: string;
   };
@@ -81,24 +79,6 @@ function valueOrDefault(value: string | undefined | null, fallback = ""): string
   return value ?? fallback;
 }
 
-function sectionTitle(text: string) {
-  return { text, style: "sectionTitle" };
-}
-
-function fieldTable(rows: [string, string | null | undefined][]) {
-  return {
-    table: {
-      widths: ["40%", "60%"],
-      body: rows.map(([label, val]) => [
-        { text: `${label}:`, bold: true, fontSize: 9 },
-        { text: valueOrDefault(val), fontSize: 9 },
-      ]) as any,
-    },
-    layout: "noBorders",
-    margin: [0, 0, 0, 8],
-  };
-}
-
 function buildContent(data: ReportData): any[] {
   const meta = (data.meta as ReferenciaPacientesMeta | undefined);
   const patient = data.patient;
@@ -123,15 +103,13 @@ function buildContent(data: ReportData): any[] {
     relacion: "",
     numeroDocumento: "",
     tipoDocumento: "",
-    fechaNacimiento: "",
-    edad: "",
     telefono: "",
     direccion: "",
     departamento: "",
     municipio: "",
   };
 
-  const personal = meta?.personalRefiere ?? { nombre: "", celular: "", servicio: "", telefono: "" };
+  const personal = meta?.personalRefiere ?? { nombre: "", servicio: "", telefono: "" };
   const signos = meta?.signosVitales ?? { fc: "", fr: "", temp: "", satO2: "", ta: "", glasgow: "", otros: "" };
   const diagnosticos = meta?.diagnosticos ?? [];
   const firmas = meta?.firmas ?? { remite: { nombre: "", cargo: "", cedula: "" }, recibe: { nombre: "", cargo: "", cedula: "" } };
@@ -140,143 +118,182 @@ function buildContent(data: ReportData): any[] {
     ? diagnosticos.map((d) => [d.codigo, d.nombre, d.tipo, d.esPrincipal ? "Sí" : "No"])
     : [["", "", "", ""]]) as any;
 
-  return [
-    { text: "REFERENCIA DE PACIENTES", alignment: "center", bold: true, fontSize: 13, margin: [0, 0, 0, 12] },
-
-    sectionTitle("1. Información del prestador o entidad emisora"),
-    fieldTable([
-      ["Nombre", pe?.nombre],
-      ["NIT", pe?.nit],
-      ["Dirección", pe?.direccion],
-      ["Teléfono", pe?.telefono],
-      ["Departamento", pe?.departamento],
-      ["Municipio", pe?.municipio],
-    ]),
-
-    sectionTitle("2. Información del prestador de referencia"),
-    fieldTable([
-      ["Nombre", pr?.nombre],
-      ["NIT", pr?.nit],
-    ]),
-
-    sectionTitle("3. Datos del paciente"),
-    fieldTable([
-      ["Nombre completo", paciente.nombreCompleto],
-      ["Número de documento", paciente.numeroDocumento],
-      ["Tipo de documento", paciente.tipoDocumento],
-      ["Fecha de nacimiento", paciente.fechaNacimiento],
-      ["Edad", paciente.edad],
-      ["Teléfono", paciente.telefono],
-      ["Dirección", paciente.direccion],
-      ["Departamento", paciente.departamento],
-      ["Municipio", paciente.municipio],
-    ]),
-
-    sectionTitle("4. Datos de la persona responsable del paciente"),
-    fieldTable([
-      ["Nombre completo", responsable.nombreCompleto],
-      ["Relación con el paciente", responsable.relacion],
-      ["Número de documento", responsable.numeroDocumento],
-      ["Tipo de documento", responsable.tipoDocumento],
-      ["Fecha de nacimiento", responsable.fechaNacimiento],
-      ["Edad", responsable.edad],
-      ["Teléfono", responsable.telefono],
-      ["Dirección actual", responsable.direccion],
-      ["Departamento", responsable.departamento],
-      ["Municipio", responsable.municipio],
-    ]),
-
-    sectionTitle("5. Personal que refiere"),
-    fieldTable([
-      ["Nombre", personal.nombre],
-      ["Celular", personal.celular],
-      ["Servicio", personal.servicio],
-      ["Número de teléfono", personal.telefono],
-    ]),
-
-    sectionTitle("6. Información clínica relevante"),
+  const sections: { title: string; content: any }[] = [
     {
-      text: valueOrDefault(meta?.informacionClinica, "Sin información registrada"),
-      margin: [0, 0, 0, 8],
-      fontSize: 9,
-    },
-
-    sectionTitle("6.1 Signos vitales"),
-    fieldTable([
-      ["FC", signos.fc],
-      ["FR", signos.fr],
-      ["TEMP", signos.temp],
-      ["SAT O2", signos.satO2],
-      ["TA", signos.ta],
-      ["Glasgow", signos.glasgow],
-      ["Otros", signos.otros],
-    ]),
-
-    sectionTitle("6.2 Hallazgos del examen físico"),
-    {
-      text: valueOrDefault(meta?.hallazgosExamenFisico, "Sin hallazgos registrados"),
-      margin: [0, 0, 0, 8],
-      fontSize: 9,
-    },
-
-    sectionTitle("7. Diagnósticos CIE-10"),
-    {
-      table: {
-        widths: ["20%", "40%", "25%", "15%"],
-        headerRows: 1,
-        body: [
-          [
-            { text: "Código", bold: true, fontSize: 9 },
-            { text: "Nombre", bold: true, fontSize: 9 },
-            { text: "Tipo", bold: true, fontSize: 9 },
-            { text: "Principal", bold: true, fontSize: 9 },
+      title: "1. Información del prestador o entidad emisora",
+      content: {
+        table: {
+          widths: ["40%", "60%"],
+          body: [
+            [{ text: "Nombre:", bold: true }, { text: valueOrDefault(pe?.nombre) }],
+            [{ text: "NIT:", bold: true }, { text: valueOrDefault(pe?.nit) }],
+            [{ text: "Dirección:", bold: true }, { text: valueOrDefault(pe?.direccion) }],
+            [{ text: "Teléfono:", bold: true }, { text: valueOrDefault(pe?.telefono) }],
+            [{ text: "Departamento:", bold: true }, { text: valueOrDefault(pe?.departamento) }],
+            [{ text: "Municipio:", bold: true }, { text: valueOrDefault(pe?.municipio) }],
           ],
-          ...diagnosticosRows,
-        ] as any,
+        },
+        layout: "noBorders",
       },
-      layout: {
-        hLineWidth: () => 0.5,
-        vLineWidth: () => 0.5,
-        hLineColor: () => "#d1d5db",
-        vLineColor: () => "#d1d5db",
-        fillColor: (rowIndex: number) => (rowIndex === 0 ? "#f3f4f6" : null),
-      } as any,
-      margin: [0, 0, 0, 8],
     },
-
-    sectionTitle("8. Firmas"),
     {
-      table: {
-        widths: ["50%", "50%"],
-        body: [
-          [
-            { text: "Personal que remite", bold: true, fontSize: 9, alignment: "center" },
-            { text: "Personal que recibe", bold: true, fontSize: 9, alignment: "center" },
+      title: "2. Información del prestador de referencia",
+      content: {
+        table: {
+          widths: ["40%", "60%"],
+          body: [
+            [{ text: "Nombre:", bold: true }, { text: valueOrDefault(pr?.nombre) }],
+            [{ text: "NIT:", bold: true }, { text: valueOrDefault(pr?.nit) }],
           ],
-          [
-            {
-              stack: [
-                { text: "Firma: _________________________________", fontSize: 9, margin: [0, 12, 0, 0] },
-                { text: `Nombre: ${firmas.remite.nombre}`, fontSize: 9, margin: [0, 4, 0, 0] },
-                { text: `Cargo: ${firmas.remite.cargo}`, fontSize: 9 },
-                { text: `Cédula / Registro Profesional: ${firmas.remite.cedula}`, fontSize: 9 },
-              ],
-            },
-            {
-              stack: [
-                { text: "Firma: _________________________________", fontSize: 9, margin: [0, 12, 0, 0] },
-                { text: `Nombre: ${firmas.recibe.nombre}`, fontSize: 9, margin: [0, 4, 0, 0] },
-                { text: `Cargo: ${firmas.recibe.cargo}`, fontSize: 9 },
-                { text: `Cédula / Registro Profesional: ${firmas.recibe.cedula}`, fontSize: 9 },
-              ],
-            },
-          ],
-        ],
+        },
+        layout: "noBorders",
       },
-      layout: "noBorders",
-      margin: [0, 0, 0, 8],
+    },
+    {
+      title: "3. Datos del paciente",
+      content: {
+        table: {
+          widths: ["40%", "60%"],
+          body: [
+            [{ text: "Nombre completo:", bold: true }, { text: valueOrDefault(paciente.nombreCompleto) }],
+            [{ text: "Número de documento:", bold: true }, { text: valueOrDefault(paciente.numeroDocumento) }],
+            [{ text: "Tipo de documento:", bold: true }, { text: valueOrDefault(paciente.tipoDocumento) }],
+            [{ text: "Fecha de nacimiento:", bold: true }, { text: valueOrDefault(paciente.fechaNacimiento) }],
+            [{ text: "Edad:", bold: true }, { text: valueOrDefault(paciente.edad) }],
+            [{ text: "Teléfono:", bold: true }, { text: valueOrDefault(paciente.telefono) }],
+            [{ text: "Dirección:", bold: true }, { text: valueOrDefault(paciente.direccion) }],
+            [{ text: "Departamento:", bold: true }, { text: valueOrDefault(paciente.departamento) }],
+            [{ text: "Municipio:", bold: true }, { text: valueOrDefault(paciente.municipio) }],
+          ],
+        },
+        layout: "noBorders",
+      },
+    },
+    {
+      title: "4. Datos de la persona responsable del paciente",
+      content: {
+        table: {
+          widths: ["40%", "60%"],
+          body: [
+            [{ text: "Nombre completo:", bold: true }, { text: valueOrDefault(responsable.nombreCompleto) }],
+            [{ text: "Relación con el paciente:", bold: true }, { text: valueOrDefault(responsable.relacion) }],
+            [{ text: "Número de documento:", bold: true }, { text: valueOrDefault(responsable.numeroDocumento) }],
+            [{ text: "Tipo de documento:", bold: true }, { text: valueOrDefault(responsable.tipoDocumento) }],
+            [{ text: "Teléfono:", bold: true }, { text: valueOrDefault(responsable.telefono) }],
+            [{ text: "Dirección actual:", bold: true }, { text: valueOrDefault(responsable.direccion) }],
+            [{ text: "Departamento:", bold: true }, { text: valueOrDefault(responsable.departamento) }],
+            [{ text: "Municipio:", bold: true }, { text: valueOrDefault(responsable.municipio) }],
+          ],
+        },
+        layout: "noBorders",
+      },
+    },
+    {
+      title: "5. Personal que refiere",
+      content: {
+        table: {
+          widths: ["40%", "60%"],
+          body: [
+            [{ text: "Nombre:", bold: true }, { text: valueOrDefault(personal.nombre) }],
+            [{ text: "Servicio:", bold: true }, { text: valueOrDefault(personal.servicio) }],
+            [{ text: "Teléfono:", bold: true }, { text: valueOrDefault(personal.telefono) }],
+          ],
+        },
+        layout: "noBorders",
+      },
+    },
+    {
+      title: "6. Información clínica relevante",
+      content: { text: valueOrDefault(meta?.informacionClinica, "Sin información registrada"), fontSize: 10 },
+    },
+    {
+      title: "6.1 Signos vitales",
+      content: {
+        table: {
+          widths: ["40%", "60%"],
+          body: [
+            [{ text: "FC:", bold: true }, { text: valueOrDefault(signos.fc) }],
+            [{ text: "FR:", bold: true }, { text: valueOrDefault(signos.fr) }],
+            [{ text: "TEMP:", bold: true }, { text: valueOrDefault(signos.temp) }],
+            [{ text: "SAT O2:", bold: true }, { text: valueOrDefault(signos.satO2) }],
+            [{ text: "TA:", bold: true }, { text: valueOrDefault(signos.ta) }],
+            [{ text: "Glasgow:", bold: true }, { text: valueOrDefault(signos.glasgow) }],
+            [{ text: "Otros:", bold: true }, { text: valueOrDefault(signos.otros) }],
+          ],
+        },
+        layout: "noBorders",
+      },
+    },
+    {
+      title: "6.2 Hallazgos del examen físico",
+      content: { text: valueOrDefault(meta?.hallazgosExamenFisico, "Sin hallazgos registrados"), fontSize: 10 },
+    },
+    {
+      title: "7. Diagnósticos CIE-10",
+      content: {
+        table: {
+          widths: ["20%", "40%", "25%", "15%"],
+          headerRows: 1,
+          body: [
+            [
+              { text: "Código", bold: true, fontSize: 9, fillColor: "#f3f4f6" },
+              { text: "Nombre", bold: true, fontSize: 9, fillColor: "#f3f4f6" },
+              { text: "Tipo", bold: true, fontSize: 9, fillColor: "#f3f4f6" },
+              { text: "Principal", bold: true, fontSize: 9, fillColor: "#f3f4f6" },
+            ],
+            ...diagnosticosRows,
+          ] as any,
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#d1d5db",
+          vLineColor: () => "#d1d5db",
+          fillColor: (rowIndex: number) => (rowIndex === 0 ? "#f3f4f6" : null),
+        } as any,
+      },
+    },
+    {
+      title: "8. Firmas",
+      content: {
+        table: {
+          widths: ["50%", "50%"],
+          body: [
+            [
+              { text: "Personal que remite", bold: true, fontSize: 9, alignment: "center", fillColor: "#f3f4f6" },
+              { text: "Personal que recibe", bold: true, fontSize: 9, alignment: "center", fillColor: "#f3f4f6" },
+            ],
+            [
+              {
+                stack: [
+                  { text: "Firma: _________________________________", fontSize: 9, margin: [0, 12, 0, 0] },
+                  { text: `Nombre: ${firmas.remite.nombre}`, fontSize: 9, margin: [0, 4, 0, 0] },
+                  { text: `Cargo: ${firmas.remite.cargo}`, fontSize: 9 },
+                  { text: `Cédula / Registro Profesional: ${firmas.remite.cedula}`, fontSize: 9 },
+                ],
+              },
+              {
+                stack: [
+                  { text: "Firma: _________________________________", fontSize: 9, margin: [0, 12, 0, 0] },
+                  { text: `Nombre: ${firmas.recibe.nombre}`, fontSize: 9, margin: [0, 4, 0, 0] },
+                  { text: `Cargo: ${firmas.recibe.cargo}`, fontSize: 9 },
+                  { text: `Cédula / Registro Profesional: ${firmas.recibe.cedula}`, fontSize: 9 },
+                ],
+              },
+            ],
+          ],
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#d1d5db",
+          vLineColor: () => "#d1d5db",
+        } as any,
+      },
     },
   ];
+
+  return [{ text: "REFERENCIA DE PACIENTES", alignment: "center", bold: true, fontSize: 13, margin: [0, 0, 0, 12] }, unifiedForm(sections)];
 }
 
 const referenciaPacientesReport: ReportDefinition = {

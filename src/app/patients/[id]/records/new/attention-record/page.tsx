@@ -79,7 +79,7 @@ export default function NewAttentionRecordDirectPage() {
   const [motivoAtencion, setMotivoAtencion] = useState<string>("");
   const [observacionAnalisis, setObservacionAnalisis] = useState<string>("");
   const [analisis, setAnalisis] = useState<string>("");
-  const [planManejo, setPlanManejo] = useState<string>("");
+  const [recomendaciones, setRecomendaciones] = useState<string>("");
 
   const [haceParteSeguimiento, setHaceParteSeguimiento] = useState<"" | "SI" | "NO">("");
   const [seguimiento, setSeguimiento] = useState<"" | "SI" | "NO">("");
@@ -201,20 +201,40 @@ export default function NewAttentionRecordDirectPage() {
     return rows.find((s) => Number(s?.id_sede) === target)?.nombre ?? "";
   }, [idSede, sedesData]);
 
-  const canSubmit =
-    fechaHora.trim().length > 0 &&
-    idSede.trim().length > 0 &&
-    idTipoAtencion.trim().length > 0 &&
-    idModalidadAtencion.trim().length > 0 &&
-    haceParteSeguimiento.trim().length > 0 &&
-    seguimiento.trim().length > 0 &&
-    motivoAtencion.trim().length > 0 &&
-    observacionAnalisis.trim().length > 0 &&
-    analisis.trim().length > 0 &&
-    planManejo.trim().length > 0 &&
-    (seguimiento !== "SI" || seguimientoOpcion.trim().length > 0) &&
-    (!shouldRequireHistoriaVinculada || idHistoriaVinculada.trim().length > 0) &&
-    diagnosticosDraft.length > 0;
+  const missingFields = useMemo(() => {
+    const missing: string[] = [];
+    if (!fechaHora.trim()) missing.push("Fecha de atención");
+    if (!idSede.trim()) missing.push("Sede");
+    if (!idTipoAtencion.trim()) missing.push("Tipo de atención");
+    if (!idModalidadAtencion.trim()) missing.push("Modalidad de atención");
+    if (!haceParteSeguimiento.trim()) missing.push("¿Hace parte de seguimiento?");
+    if (!seguimiento.trim()) missing.push("¿Es seguimiento?");
+    if (!motivoAtencion.trim()) missing.push("Motivo de atención");
+    if (!observacionAnalisis.trim()) missing.push("Observación del análisis");
+    if (!analisis.trim()) missing.push("Análisis");
+    if (!recomendaciones.trim()) missing.push("Recomendaciones");
+    if (seguimiento === "SI" && !seguimientoOpcion.trim()) missing.push("Opción de seguimiento");
+    if (shouldRequireHistoriaVinculada && !idHistoriaVinculada.trim()) missing.push("Historia en seguimiento a vincular");
+    if (diagnosticosDraft.length === 0) missing.push("Al menos un diagnóstico CIE-10");
+    return missing;
+  }, [
+    fechaHora,
+    idSede,
+    idTipoAtencion,
+    idModalidadAtencion,
+    haceParteSeguimiento,
+    seguimiento,
+    motivoAtencion,
+    observacionAnalisis,
+    analisis,
+    recomendaciones,
+    seguimientoOpcion,
+    shouldRequireHistoriaVinculada,
+    idHistoriaVinculada,
+    diagnosticosDraft,
+  ]);
+
+  const canSubmit = missingFields.length === 0;
 
   const canGoBack = activeTab === "DIAGNOSTICOS";
   const canGoNext = activeTab === "NOTA_ATENCION";
@@ -247,11 +267,6 @@ export default function NewAttentionRecordDirectPage() {
 
     if (!observacionAnalisis.trim()) {
       setError("Debe diligenciar la observación.");
-      return;
-    }
-
-    if (!planManejo.trim()) {
-      setError("Debe diligenciar el plan de manejo.");
       return;
     }
 
@@ -324,7 +339,7 @@ export default function NewAttentionRecordDirectPage() {
         motivo_atencion: motivoAtencion,
         observacion_analisis: observacionAnalisis,
         analisis,
-        plan_manejo: planManejo,
+        recomendaciones,
         seguimiento_opcion: seguimiento === "SI" ? seguimientoOpcion || null : null,
         seguimiento_efectivo:
           seguimiento === "SI" && seguimientoEfectivo === "SI" ? true : seguimiento === "SI" && seguimientoEfectivo === "NO" ? false : null,
@@ -359,7 +374,7 @@ export default function NewAttentionRecordDirectPage() {
 
     didAttemptPrefillRef.current = true;
 
-    const hasAnyTargetValue = motivoAtencion.trim() || observacionAnalisis.trim() || analisis.trim() || planManejo.trim();
+    const hasAnyTargetValue = motivoAtencion.trim() || observacionAnalisis.trim() || analisis.trim() || recomendaciones.trim();
     if (hasAnyTargetValue) return;
 
     (async () => {
@@ -377,7 +392,7 @@ export default function NewAttentionRecordDirectPage() {
 
         const modalResult = await Swal.fire({
           title: "Precargar información clínica",
-          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (motivo, observación, análisis y plan de manejo)?",
+          text: "Se encontraron atenciones previas del paciente. ¿Deseas precargar datos clínicos (motivo, observación y recomendaciones)?",
           icon: "question",
           showCancelButton: true,
           confirmButtonText: "Sí, precargar",
@@ -399,7 +414,7 @@ export default function NewAttentionRecordDirectPage() {
         const nextMotivo = String(lastAttention?.hc_anamnesis_atencion?.motivo_consulta ?? "");
         const nextObservacionAnalisis = String(lastAttention?.observacion_analisis ?? "");
         // nextAnalisis no se usa - el análisis no debe precargarse desde atenciones anteriores
-        const nextPlan = String(lastAttention?.hc_atencion_cierre?.conducta_plan_estudio_manejo ?? "");
+        const nextRecomendaciones = String(lastAttention?.hc_atencion_cierre?.recomendaciones ?? "");
         const nextSeguimientoOpcion = String(lastAttention?.hc_atencion_cierre?.seguimiento_opcion ?? "");
         const nextSeguimientoObservaciones = String(lastAttention?.hc_atencion_cierre?.seguimiento_observaciones ?? "");
         const nextIdHistoriaVinculada = lastAttention?.historia?.id_historia_vinculada;
@@ -407,7 +422,7 @@ export default function NewAttentionRecordDirectPage() {
         setMotivoAtencion((prev) => (prev.trim() ? prev : nextMotivo));
         setObservacionAnalisis((prev) => (prev.trim() ? prev : nextObservacionAnalisis));
         // analisis no se precarga - el profesional debe ingresarlo manualmente
-        setPlanManejo((prev) => (prev.trim() ? prev : nextPlan));
+        setRecomendaciones((prev) => (prev.trim() ? prev : nextRecomendaciones));
         setHaceParteSeguimiento((prev) => {
           if (prev.trim()) return prev;
           if (nextIdHistoriaVinculada) return "SI";
@@ -449,7 +464,7 @@ export default function NewAttentionRecordDirectPage() {
         // ignore
       }
     })();
-  }, [observacionAnalisis, analisis, createMutation.isPending, idPaciente, motivoAtencion, planManejo]);
+  }, [observacionAnalisis, analisis, createMutation.isPending, idPaciente, motivoAtencion, recomendaciones]);
 
   const pacienteNombreCompleto = useMemo(() => {
     const nombres = pacienteData?.nombres ?? "";
@@ -682,7 +697,7 @@ export default function NewAttentionRecordDirectPage() {
                       .filter((o: any) => String(o.value ?? "").trim() !== "")}
                     value={(() => {
                       if (!idTipoAtencion) return null;
-                      const rows = ((tiposAtencionData ?? []) as any[]) ?? [];
+                      const rows = (tiposAtencionData ?? []) as any[];
                       const found = rows.find((t: any) => String(t?.id_tipo_atencion) === String(idTipoAtencion));
                       if (!found) return null;
                       return {
@@ -719,7 +734,7 @@ export default function NewAttentionRecordDirectPage() {
                       .filter((o: any) => String(o.value ?? "").trim() !== "")}
                     value={(() => {
                       if (!idModalidadAtencion) return null;
-                      const rows = ((modalidadesAtencionData ?? []) as any[]) ?? [];
+                      const rows = (modalidadesAtencionData ?? []) as any[];
                       const found = rows.find(
                         (m: any) => String(m?.id_modalidad_atencion) === String(idModalidadAtencion),
                       );
@@ -916,11 +931,11 @@ export default function NewAttentionRecordDirectPage() {
                   : "rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 opacity-70 cursor-default"
               }
             >
-              Diagnósticos (CIE-10)
+              Plan de Manejo
             </button>
           </div>
 
-          {error && (
+          {error && activeTab !== "DIAGNOSTICOS" && (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
           )}
 
@@ -950,16 +965,6 @@ export default function NewAttentionRecordDirectPage() {
                 <textarea
                   value={observacionAnalisis}
                   onChange={(e) => setObservacionAnalisis(e.target.value)}
-                  rows={4}
-                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-700">Plan de manejo</label>
-                <textarea
-                  value={planManejo}
-                  onChange={(e) => setPlanManejo(e.target.value)}
                   rows={4}
                   className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs shadow-sm"
                 />
@@ -1117,6 +1122,38 @@ export default function NewAttentionRecordDirectPage() {
                 setError={setError}
                 setSuccessMessage={setSuccessMessage}
               />
+
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px]">
+                <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">
+                  RECOMENDACIONES <span className="text-red-400">*</span>
+                </div>
+                <textarea
+                  value={recomendaciones}
+                  onChange={(e) => setRecomendaciones(e.target.value)}
+                  rows={6}
+                  className="min-h-[140px] w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  placeholder="Escriba las recomendaciones"
+                />
+              </div>
+            </div>
+          )}
+
+          {activeTab === "DIAGNOSTICOS" && (missingFields.length > 0 || error) && (
+            <div
+              className={`rounded-md border p-2 text-[11px] ${
+                error
+                  ? "border-red-200 bg-red-50 text-red-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              {error ? (
+                <span className="font-semibold">{error}</span>
+              ) : (
+                <>
+                  <span className="font-semibold">Faltan campos obligatorios para guardar:</span>{" "}
+                  {missingFields.join(", ")}
+                </>
+              )}
             </div>
           )}
 

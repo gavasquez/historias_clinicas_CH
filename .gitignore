@@ -44,3 +44,4 @@ next-env.d.ts
 
 # private uploaded documents
 /storage/patient-documents/
+/storage/exported-documents/

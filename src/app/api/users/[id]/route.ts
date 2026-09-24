@@ -1,21 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAnyPermission } from "@/lib/auth";
+import { requireAuth, hasPermission, type AppSession } from "@/lib/auth";
+import type { Prisma } from "@prisma/client";
+
+async function canAccessUser(
+  request: NextRequest,
+  targetUserId: number,
+): Promise<{ allowed: true; session: AppSession } | { allowed: false; response: NextResponse }> {
+  const session = await requireAuth(request);
+  if (session instanceof NextResponse) {
+    return { allowed: false, response: session };
+  }
+
+  const currentUserId = Number(session.user.id);
+  const isAdmin = await hasPermission(session.user.role, "ADMIN_USUARIOS");
+
+  if (!isAdmin && currentUserId !== targetUserId) {
+    return {
+      allowed: false,
+      response: NextResponse.json({ message: "No autorizado" }, { status: 403 }),
+    };
+  }
+
+  return { allowed: true, session };
+}
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const auth = await requireAnyPermission(request, ["ADMIN_USUARIOS"]);
-    if (auth instanceof NextResponse) return auth;
-
-    const resolvedParams = await (context as any).params;
+    const resolvedParams = await (context.params as Promise<{ id: string }>);
     const id = Number(resolvedParams.id);
 
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ message: "ID de usuario inválido" }, { status: 400 });
     }
+
+    const access = await canAccessUser(request, id);
+    if (!access.allowed) return access.response;
 
     const usuario = await prisma.usuarios.findUnique({
       where: { id_usuario: id },
@@ -70,15 +93,17 @@ export async function PUT(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const auth = await requireAnyPermission(request, ["ADMIN_USUARIOS"]);
-    if (auth instanceof NextResponse) return auth;
-
-    const resolvedParams = await (context as any).params;
+    const resolvedParams = await (context.params as Promise<{ id: string }>);
     const id = Number(resolvedParams.id);
 
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ message: "ID de usuario inválido" }, { status: 400 });
     }
+
+    const access = await canAccessUser(request, id);
+    if (!access.allowed) return access.response;
+
+    const isAdmin = await hasPermission(access.session.user.role, "ADMIN_USUARIOS");
 
     const body = await request.json();
     const {
@@ -91,7 +116,7 @@ export async function PUT(
       password_reset_required,
     } = body ?? {};
 
-    const data: any = {};
+    const data: Prisma.usuariosUpdateInput = {};
 
     if (typeof nombre_completo === "string" && nombre_completo.trim()) {
       data.nombre_completo = nombre_completo.trim();
@@ -105,11 +130,11 @@ export async function PUT(
       data.telefono = telefono.trim();
     }
 
-    if (typeof activo === "boolean") {
+    if (isAdmin && typeof activo === "boolean") {
       data.activo = activo;
     }
 
-    if (typeof password_reset_required === "boolean") {
+    if (isAdmin && typeof password_reset_required === "boolean") {
       data.password_reset_required = password_reset_required;
     }
 

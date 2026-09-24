@@ -54,7 +54,7 @@ export function AttendTabs({
                 : inactiveBaseClasses
             }
           >
-            Analisis
+            Plan de Manejo
           </button>
         </>
       ) : (

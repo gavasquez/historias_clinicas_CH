@@ -10,6 +10,10 @@ export const HISTORY_DOCUMENT_TYPES = [
     code: "DESISTIMIENTO_SEGUIMIENTO_CRONICOS",
     label: "Desistimiento informado del programa de seguimiento de condiciones crónicas en salud",
   },
+  {
+    code: "OTROS_DOCUMENTOS",
+    label: "Otros documentos",
+  },
 ] as const;
 
 export type HistoryDocumentType = (typeof HISTORY_DOCUMENT_TYPES)[number]["code"];

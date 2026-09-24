@@ -295,6 +295,9 @@ function isTabComplete(input: {
     if (!form.conducta_plan_estudio_manejo.trim()) {
       return { ok: false, message: "Debe diligenciar la conducta / plan de manejo." };
     }
+    if (!form.atencion_recomendaciones.trim()) {
+      return { ok: false, message: "Debe diligenciar las recomendaciones." };
+    }
     if (!form.seguimiento_opcion.trim()) {
       return { ok: false, message: "Debe seleccionar el tipo de seguimiento." };
     }

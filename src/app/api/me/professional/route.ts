@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
             id_usuario: true,
             nombre_completo: true,
             email: true,
+            telefono: true,
           },
         },
         sedes: {
@@ -62,6 +63,7 @@ export async function GET(request: NextRequest) {
                 id_usuario: true,
                 nombre_completo: true,
                 email: true,
+                telefono: true,
               },
             },
             sedes: {

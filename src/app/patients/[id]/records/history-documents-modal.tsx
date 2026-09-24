@@ -14,9 +14,12 @@ import {
 } from "@/lib/patient-documents";
 import {
   downloadHistoryDocument,
+  downloadExportedDocument,
   fetchHistoryDocuments,
+  fetchExportedDocuments,
   uploadHistoryDocument,
   type HistoryDocument,
+  type ExportedDocument,
 } from "@/services/history-documents";
 
 interface Props {
@@ -32,6 +35,12 @@ function formatSize(value: number | string | null): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExportedDocumentTypeLabel(type: string): string {
+  if (type === "indicaciones-medicas") return "Indicaciones médicas";
+  if (type === "referencia-pacientes") return "Referencia de pacientes";
+  return type;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -54,11 +63,19 @@ export function HistoryDocumentsModal({
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadingExportedId, setDownloadingExportedId] = useState<number | null>(null);
   const queryKey = ["history-documents", patientId, historyId];
+  const exportedQueryKey = ["history-exported-documents", patientId, historyId];
 
   const { data: documents = [], isLoading, isError, error: documentsError, refetch } = useQuery({
     queryKey,
     queryFn: () => fetchHistoryDocuments(patientId, historyId),
+    enabled: isOpen && !!patientId && historyId > 0,
+  });
+
+  const { data: exportedDocuments = [], isLoading: isLoadingExported } = useQuery({
+    queryKey: exportedQueryKey,
+    queryFn: () => fetchExportedDocuments(patientId, historyId),
     enabled: isOpen && !!patientId && historyId > 0,
   });
 
@@ -155,6 +172,31 @@ export function HistoryDocumentsModal({
     }
   };
 
+  const handleDownloadExported = async (document: ExportedDocument) => {
+    if (!document.ruta) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Documento no disponible",
+        text: "Este documento exportado no tiene archivo asociado.",
+        confirmButtonColor: "#0284c7",
+      });
+      return;
+    }
+    setDownloadingExportedId(document.id_exportacion);
+    try {
+      await downloadExportedDocument(patientId, historyId, document);
+    } catch (error) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error de descarga",
+        text: getErrorMessage(error),
+        confirmButtonColor: "#0284c7",
+      });
+    } finally {
+      setDownloadingExportedId(null);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -228,6 +270,64 @@ export function HistoryDocumentsModal({
                         <td className="px-3 py-2 text-slate-600"><div className="max-w-[220px] truncate" title={document.nombre_archivo}>{document.nombre_archivo}</div><div className="text-[10px] text-slate-500">{formatSize(document.tamano_bytes)}</div></td>
                         <td className="px-3 py-2 text-slate-600">{new Date(document.fecha_subida).toLocaleString()}<div className="text-[10px] text-slate-500">{document.usuario || "Usuario no disponible"}</div></td>
                         <td className="px-3 py-2"><button type="button" onClick={() => handleDownload(document)} disabled={downloadingId === document.id_archivo} className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-sky-300 px-2 py-1 font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50">{downloadingId === document.id_archivo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Descargar</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase text-slate-700">Documentos exportados</h3>
+            {isLoadingExported && <p className="text-xs text-slate-500">Cargando documentos exportados...</p>}
+            {!isLoadingExported && exportedDocuments.length === 0 && (
+              <p className="rounded-md border border-slate-200 p-4 text-xs text-slate-500">
+                No hay documentos exportados registrados para esta historia clínica.
+              </p>
+            )}
+            {!isLoadingExported && exportedDocuments.length > 0 && (
+              <div className="overflow-x-auto rounded-md border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-xs">
+                  <thead className="bg-slate-50 text-left text-[10px] uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Documento</th>
+                      <th className="px-3 py-2">Archivo</th>
+                      <th className="px-3 py-2">Exportación</th>
+                      <th className="px-3 py-2">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {exportedDocuments.map((document: ExportedDocument) => (
+                      <tr key={document.id_exportacion}>
+                        <td className="px-3 py-2 font-medium text-slate-800">
+                          {getExportedDocumentTypeLabel(document.tipo_documento)}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          <div className="max-w-[220px] truncate" title={document.nombre_archivo}>
+                            {document.nombre_archivo}
+                          </div>
+                          <div className="text-[10px] text-slate-500">{formatSize(document.tamano_bytes)}</div>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {new Date(document.fecha_exportacion).toLocaleString()}
+                          <div className="text-[10px] text-slate-500">{document.usuario || "Usuario no disponible"}</div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadExported(document)}
+                            disabled={downloadingExportedId === document.id_exportacion}
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-sky-300 px-2 py-1 font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {downloadingExportedId === document.id_exportacion ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                            Descargar
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
