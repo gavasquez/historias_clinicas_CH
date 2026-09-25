@@ -23,6 +23,7 @@ export interface MedicalAgendaRow {
   documento: string;
   estado: string | null;
   tipo: string | null;
+  quien_agenda: string | null;
   fecha_hora_inicio: string;
 }
 

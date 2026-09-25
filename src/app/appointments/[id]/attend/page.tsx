@@ -325,9 +325,6 @@ function isTabComplete(input: {
     if (!simpleForm.observacionAnalisis.trim()) {
       return { ok: false, message: "Debe diligenciar la observación / análisis." };
     }
-    if (!simpleForm.recomendaciones.trim()) {
-      return { ok: false, message: "Debe diligenciar las recomendaciones." };
-    }
     if (!simpleForm.seguimiento.trim()) {
       return { ok: false, message: "Debe seleccionar si es seguimiento." };
     }
@@ -439,7 +436,7 @@ function isTabComplete(input: {
       return { ok: false, message: "Debe agregar al menos un diagnóstico." };
     }
 
-    if (isRegAtencionSalud && !form.atencion_recomendaciones.trim()) {
+    if (isRegAtencionSalud && !simpleForm.recomendaciones.trim()) {
       return { ok: false, message: "Debe diligenciar las recomendaciones." };
     }
 

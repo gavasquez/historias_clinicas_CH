@@ -107,10 +107,10 @@ export default function MedicalAgendaReportPage() {
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
-              Agenda Médica
+              Atención no programada
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Consulta y exporta la agenda de citas de los médicos por rango de fechas, sede y día.
+              Consulta y exporta las atenciones no programadas por profesional, rango de fechas, sede y día.
             </p>
           </div>
 
@@ -279,6 +279,7 @@ export default function MedicalAgendaReportPage() {
                     <th className="px-3 py-2">Sede</th>
                     <th className="px-3 py-2">Paciente</th>
                     <th className="px-3 py-2">Estado</th>
+                    <th className="px-3 py-2">Quién agenda</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700">
@@ -296,6 +297,7 @@ export default function MedicalAgendaReportPage() {
                           {row.estado ?? "Atendido sin cita"}
                         </span>
                       </td>
+                      <td className="px-3 py-2">{row.quien_agenda ?? "No registrado"}</td>
                     </tr>
                   ))}
                 </tbody>

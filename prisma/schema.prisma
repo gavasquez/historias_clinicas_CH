@@ -267,7 +267,7 @@ model cie10 {
 }
 
 model citas {
-  id_cita                        Int                   @id @default(autoincrement())
+  id_cita                        Int                     @id @default(autoincrement())
   id_paciente                    Int
   id_profesional                 Int
   id_sede                        Int?
@@ -276,28 +276,31 @@ model citas {
   id_modalidad_atencion          Int?
   id_programa_salud              Int?
   id_tipo_historia               Int?
-  fecha_hora_inicio              DateTime              @db.Timestamp(6)
-  fecha_hora_fin                 DateTime?             @db.Timestamp(6)
-  seguimiento                    Boolean               @default(false)
-  tipo_seguimiento               String?               @db.VarChar(30)
-  canal_recordatorio             String?               @db.VarChar(50)
+  fecha_hora_inicio              DateTime                @db.Timestamp(6)
+  fecha_hora_fin                 DateTime?               @db.Timestamp(6)
+  seguimiento                    Boolean                 @default(false)
+  tipo_seguimiento               String?                 @db.VarChar(30)
+  canal_recordatorio             String?                 @db.VarChar(50)
   id_historia_vinculada          Int?
+  id_usuario_agenda              Int?
   atenciones_salud               atenciones_salud[]
-  estados_cita                   estados_cita?         @relation(fields: [id_estado_cita], references: [id_estado_cita])
-  pacientes                      pacientes             @relation(fields: [id_paciente], references: [id_paciente])
-  profesionales_salud            profesionales_salud   @relation(fields: [id_profesional], references: [id_profesional])
-  sedes                          sedes?                @relation(fields: [id_sede], references: [id_sede])
-  tipos_cita                     tipos_cita?           @relation(fields: [id_tipo_cita], references: [id_tipo_cita])
+  usuario_agenda                 usuarios?               @relation("citas_usuario_agenda", fields: [id_usuario_agenda], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  estados_cita                   estados_cita?           @relation(fields: [id_estado_cita], references: [id_estado_cita])
+  pacientes                      pacientes               @relation(fields: [id_paciente], references: [id_paciente])
+  profesionales_salud            profesionales_salud     @relation(fields: [id_profesional], references: [id_profesional])
+  sedes                          sedes?                  @relation(fields: [id_sede], references: [id_sede])
+  tipos_cita                     tipos_cita?             @relation(fields: [id_tipo_cita], references: [id_tipo_cita])
   tipos_historia_clinica         tipos_historia_clinica? @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
-  modalidades_atencion           modalidades_atencion? @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion])
-  programas_salud                programas_salud?      @relation(fields: [id_programa_salud], references: [id_programa_salud])
-  tipos_atencion                 tipos_atencion?       @relation(fields: [tipos_atencionId_tipo_atencion], references: [id_tipo_atencion])
+  modalidades_atencion           modalidades_atencion?   @relation(fields: [id_modalidad_atencion], references: [id_modalidad_atencion])
+  programas_salud                programas_salud?        @relation(fields: [id_programa_salud], references: [id_programa_salud])
+  tipos_atencion                 tipos_atencion?         @relation(fields: [tipos_atencionId_tipo_atencion], references: [id_tipo_atencion])
   tipos_atencionId_tipo_atencion Int?
-  historia_vinculada             historias_clinicas?   @relation("citas_historia_vinculada", fields: [id_historia_vinculada], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
+  historia_vinculada             historias_clinicas?     @relation("citas_historia_vinculada", fields: [id_historia_vinculada], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([id_paciente], map: "idx_citas_paciente")
   @@index([id_profesional, fecha_hora_inicio], map: "idx_citas_profesional")
   @@index([id_historia_vinculada], map: "idx_citas_historia_vinculada")
+  @@index([id_usuario_agenda], map: "idx_citas_usuario_agenda")
 }
 
 model consentimientos_paciente {
@@ -482,20 +485,20 @@ model historias_clinicas {
   atenciones_salud           atenciones_salud[]
   notas_evolucion_historia   notas_evolucion_historia[]
   documentos_exportados      documentos_exportados[]
-  historia_vinculada         historias_clinicas?         @relation("historias_vinculo", fields: [id_historia_vinculada], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
-  historias_vinculadas       historias_clinicas[]        @relation("historias_vinculo")
-  citas_vinculadas           citas[]                     @relation("citas_historia_vinculada")
+  historia_vinculada         historias_clinicas?        @relation("historias_vinculo", fields: [id_historia_vinculada], references: [id_historia], onDelete: NoAction, onUpdate: NoAction)
+  historias_vinculadas       historias_clinicas[]       @relation("historias_vinculo")
+  citas_vinculadas           citas[]                    @relation("citas_historia_vinculada")
   pacientes                  pacientes                  @relation(fields: [id_paciente], references: [id_paciente], onDelete: NoAction, onUpdate: NoAction)
   profesionales_salud        profesionales_salud?       @relation(fields: [id_profesional_responsable], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
   tipos_historia_clinica     tipos_historia_clinica     @relation(fields: [id_tipo_historia], references: [id_tipo_historia], onDelete: NoAction, onUpdate: NoAction)
 
   // Campos de anulación (void)
-  voided_at                  DateTime?                  @db.Timestamp(6)
-  voided_by                  Int?
-  void_reason                String?
-  previous_status            String?                    @db.VarChar(50)
-  void_ip                    String?                    @db.VarChar(100)
-  void_user_agent            String?                    @db.VarChar(255)
+  voided_at       DateTime? @db.Timestamp(6)
+  voided_by       Int?
+  void_reason     String?
+  previous_status String?   @db.VarChar(50)
+  void_ip         String?   @db.VarChar(100)
+  void_user_agent String?   @db.VarChar(255)
 
   @@index([id_paciente], map: "idx_historia_paciente")
   @@index([id_historia_vinculada], map: "idx_historia_vinculada")
@@ -844,6 +847,7 @@ model usuarios {
   auditoria                 auditoria[]
   certificados_medicos      certificados_medicos[]
   documentos_exportados     documentos_exportados[]
+  citas_agendadas           citas[]                     @relation("citas_usuario_agenda")
   pacientes                 pacientes[]
   plantillas_consentimiento plantillas_consentimiento[]
   profesionales_salud       profesionales_salud[]

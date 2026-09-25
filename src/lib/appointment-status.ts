@@ -20,8 +20,12 @@ export const getEstadoCitaBadgeClasses = (estado: string | null) => {
     return `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
   }
 
+  if (norm.includes("ATEND") && norm.includes("SIN CITA")) {
+    return `${base} border-slate-300 bg-slate-100 text-slate-700`;
+  }
+
   if (norm.includes("ATEND")) {
-    return `${base} border-green-200 bg-green-50 text-green-700`;
+    return `${base} border-indigo-300 bg-indigo-100 text-indigo-800`;
   }
 
   if (norm.includes("REALIZ")) {

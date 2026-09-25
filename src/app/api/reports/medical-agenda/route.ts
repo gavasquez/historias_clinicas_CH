@@ -76,6 +76,7 @@ export interface MedicalAgendaRow {
   documento: string;
   estado: string | null;
   tipo: string | null;
+  quien_agenda: string | null;
   fecha_hora_inicio: string;
 }
 
@@ -134,6 +135,12 @@ async function queryAgenda(params: {
       sedes: true,
       estados_cita: true,
       tipos_cita: true,
+      usuario_agenda: {
+        select: {
+          nombre_completo: true,
+          roles: { select: { nombre: true } },
+        },
+      },
     },
     orderBy: {
       fecha_hora_inicio: "asc",
@@ -144,6 +151,10 @@ async function queryAgenda(params: {
   const rows = citas.map((cita: (typeof citas)[number]) => {
     const start = cita.fecha_hora_inicio;
     const dayOfWeek = dayOfWeekInZone(start);
+    const estadoRegistrado = cita.estados_cita?.descripcion ?? "Atendido sin cita";
+    const estado = estadoRegistrado.trim().toUpperCase().includes("REALIZ")
+      ? "Atendida"
+      : estadoRegistrado;
     return {
       id_cita: cita.id_cita,
       fecha: formatDateEsCO(start),
@@ -155,8 +166,11 @@ async function queryAgenda(params: {
       sede: cita.sedes?.nombre ?? null,
       paciente: `${cita.pacientes.nombres} ${cita.pacientes.apellidos}`.trim(),
       documento: cita.pacientes.numero_documento,
-      estado: cita.estados_cita?.descripcion ?? "Atendido sin cita",
+      estado,
       tipo: cita.tipos_cita?.descripcion ?? null,
+      quien_agenda: cita.usuario_agenda
+        ? `${cita.usuario_agenda.nombre_completo} / ${cita.usuario_agenda.roles.nombre}`
+        : null,
       fecha_hora_inicio: start.toISOString(),
     };
   });
@@ -178,7 +192,9 @@ function estadoXlsxFill(estado: string | null): string {
   if (!norm) return "F1F5F9";
   if (norm.includes("PROGRAM")) return "E0F2FE";
   if (norm.includes("CONFIRM")) return "D1FAE5";
-  if (norm.includes("ATEND") || norm.includes("REALIZ")) return "DCFCE7";
+  if (norm.includes("ATEND") && norm.includes("SIN CITA")) return "E2E8F0";
+  if (norm.includes("ATEND")) return "C7D2FE";
+  if (norm.includes("REALIZ")) return "DCFCE7";
   if (norm.includes("NO ASISTE")) return "FEF3C7";
   if (norm.includes("CANCEL") && norm.includes("PACIENT")) return "FFEDD5";
   if (norm.includes("CANCEL") && (norm.includes("INSTITUC") || norm.includes("PROFESION"))) return "FEE2E2";
@@ -190,14 +206,14 @@ function buildXlsx(rows: MedicalAgendaRow[], filters: Record<string, string>) {
   const generatedAt = formatDateEsCO(new Date());
 
   const data = [
-    ["AGENDA MÉDICA"],
+    ["ATENCIÓN NO PROGRAMADA"],
     [`Fecha de generación: ${generatedAt}`],
     [`Médico: ${filters.medico}`],
     [`Sede: ${filters.sede}`],
     [`Fecha: ${filters.fecha}`],
     [`Día: ${filters.dia}`],
     [],
-    ["Fecha", "Día", "Hora inicio", "Hora fin", "Médico", "Sede", "Paciente", "Documento", "Estado", "Tipo"],
+    ["Fecha", "Día", "Hora inicio", "Hora fin", "Médico", "Sede", "Paciente", "Documento", "Estado", "Tipo", "Quién agenda"],
     ...rows.map((row) => [
       row.fecha,
       row.dia_nombre,
@@ -209,6 +225,7 @@ function buildXlsx(rows: MedicalAgendaRow[], filters: Record<string, string>) {
       row.documento,
       row.estado ?? "",
       row.tipo ?? "",
+      row.quien_agenda ?? "No registrado",
     ]),
   ];
 
@@ -225,6 +242,7 @@ function buildXlsx(rows: MedicalAgendaRow[], filters: Record<string, string>) {
     { wch: 16 },
     { wch: 20 },
     { wch: 20 },
+    { wch: 28 },
   ];
   ws["!cols"] = colWidths;
 
@@ -253,7 +271,7 @@ function buildXlsx(rows: MedicalAgendaRow[], filters: Record<string, string>) {
   }
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Agenda Médica");
+  XLSX.utils.book_append_sheet(wb, ws, "Atención no programada");
 
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 }
@@ -351,7 +369,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching medical agenda report", error);
     return NextResponse.json(
-      { message: "Error obteniendo reporte de agenda médica" },
+      { message: "Error obteniendo reporte de atención no programada" },
       { status: 500 },
     );
   }

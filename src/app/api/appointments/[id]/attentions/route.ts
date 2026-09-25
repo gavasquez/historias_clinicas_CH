@@ -653,21 +653,6 @@ export async function POST(
       }
     }
 
-    const hasCierre = !!(
-      cierreConductaTrim ||
-      cierreRecomendacionesTrim ||
-      cierreCertRecomTrim ||
-      cierreCertEmitido !== null ||
-      cierreCertOpcionTrim ||
-      cierreNotifEmitida !== null ||
-      cierreSegNotifTrim ||
-      cierreNotifObsTrim ||
-      cierreSegOpcionTrim ||
-      cierreSegEfectivo !== null ||
-      cierreSegCierre !== null ||
-      cierreSegFecha
-    );
-
     if (!isRegAtencionSalud) {
       // Solo validar conducta / plan de manejo para flujo completo
       if (!cierreConductaTrim) {
@@ -868,11 +853,9 @@ export async function POST(
       });
     }
 
-    // Actualizar estado de la cita según si se cerró la atención.
-    // - Si hay cierre: REALIZADA
-    // - Si no hay cierre: ATENDIDA
+    // Al registrar la atención, la cita queda en estado ATENDIDA.
     try {
-      const targetCodigo = hasCierre ? "REALIZADA" : "ATENDIDA";
+      const targetCodigo = "ATENDIDA";
       const targetEstado = await prisma.estados_cita.findFirst({
         where: {
           codigo: {

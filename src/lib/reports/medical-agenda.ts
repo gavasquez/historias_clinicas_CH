@@ -24,6 +24,7 @@ interface MedicalAgendaRow {
   documento: string;
   estado: string | null;
   tipo: string | null;
+  quien_agenda: string | null;
 }
 
 function estadoPdfFill(estado: string | null): string | null {
@@ -36,7 +37,9 @@ function estadoPdfFill(estado: string | null): string | null {
   if (!norm) return "#f1f5f9";
   if (norm.includes("PROGRAM")) return "#e0f2fe";
   if (norm.includes("CONFIRM")) return "#d1fae5";
-  if (norm.includes("ATEND") || norm.includes("REALIZ")) return "#dcfce7";
+  if (norm.includes("ATEND") && norm.includes("SIN CITA")) return "#e2e8f0";
+  if (norm.includes("ATEND")) return "#c7d2fe";
+  if (norm.includes("REALIZ")) return "#dcfce7";
   if (norm.includes("NO ASISTE")) return "#fef3c7";
   if (norm.includes("CANCEL") && norm.includes("PACIENT")) return "#ffedd5";
   if (norm.includes("CANCEL") && (norm.includes("INSTITUC") || norm.includes("PROFESION"))) return "#fee2e2";
@@ -64,6 +67,7 @@ function buildContent(data: ReportData): any[] {
       { text: "Sede", bold: true, fillColor: "#f1f5f9", color: "#334155" },
       { text: "Paciente", bold: true, fillColor: "#f1f5f9", color: "#334155" },
       { text: "Estado", bold: true, fillColor: "#f1f5f9", color: "#334155" },
+      { text: "Quién agenda", bold: true, fillColor: "#f1f5f9", color: "#334155" },
     ],
   ];
 
@@ -80,6 +84,7 @@ function buildContent(data: ReportData): any[] {
         text: row.estado ?? "Atendido sin cita",
         fillColor: estadoPdfFill(row.estado),
       },
+      row.quien_agenda ?? "No registrado",
     ]);
   }
 
@@ -87,10 +92,11 @@ function buildContent(data: ReportData): any[] {
     tableBody.push([
       {
         text: "No se encontraron registros para los filtros seleccionados.",
-        colSpan: 8,
+        colSpan: 9,
         alignment: "center",
         color: "#64748b",
       },
+      "",
       "",
       "",
       "",
@@ -103,7 +109,7 @@ function buildContent(data: ReportData): any[] {
 
   return [
     {
-      text: "AGENDA MÉDICA",
+      text: "ATENCIÓN NO PROGRAMADA",
       fontSize: 14,
       bold: true,
       color: "#003366",
@@ -139,7 +145,7 @@ function buildContent(data: ReportData): any[] {
     {
       table: {
         headerRows: 1,
-        widths: ["auto", "auto", "auto", "auto", "*", "*", "*", "auto"],
+        widths: ["auto", "auto", "auto", "auto", "*", "*", "*", "auto", "*"],
         body: tableBody,
       },
       layout: {
@@ -158,7 +164,7 @@ function buildContent(data: ReportData): any[] {
 
 export const medicalAgendaReport: ReportDefinition = {
   id: "agenda-medica",
-  name: "Agenda Médica",
+  name: "Atención no programada",
   code: "FO-BI-AGM",
   version: "01",
   vigencia: "Septiembre 2026",

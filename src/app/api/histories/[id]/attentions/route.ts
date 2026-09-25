@@ -241,6 +241,7 @@ export async function POST(
       data: {
         id_paciente: historia.id_paciente,
         id_profesional: profesional.id_profesional,
+        id_usuario_agenda: Number(auth.user.id),
         id_sede: idSedeNum,
         id_tipo_cita: null,
         id_estado_cita: null,

@@ -390,6 +390,7 @@ export async function POST(request: NextRequest) {
       data: {
         id_paciente: idPacienteNum,
         id_profesional: idProfesionalNum,
+        id_usuario_agenda: Number(auth.user.id),
         id_sede: idSedeValid,
         id_tipo_cita:
           idTipoCitaNum && Number.isInteger(idTipoCitaNum) && idTipoCitaNum > 0
