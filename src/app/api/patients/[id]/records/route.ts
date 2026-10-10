@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAnyPermission } from "@/lib/auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["HISTORIAS_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const id = Number(resolvedParams.id);
 
@@ -27,6 +31,7 @@ export async function GET(
           include: {
             tipos_atencion: true,
             modalidades_atencion: true,
+            sedes: true,
             citas: {
               include: {
                 sedes: true,
@@ -110,16 +115,16 @@ export async function GET(
           last_attention_tipo: lastAttention?.tipos_atencion?.descripcion ?? null,
           last_attention_modalidad: lastAttention?.modalidades_atencion?.descripcion ?? null,
           last_attention_sede:
-            lastAttention?.citas?.sedes?.nombre ?? h.profesionales_salud?.sedes?.nombre ?? null,
+            lastAttention?.sedes?.nombre ??
+            lastAttention?.citas?.sedes?.nombre ??
+            h.profesionales_salud?.sedes?.nombre ??
+            null,
           last_attention_seguimiento:
             (lastAttention as any)?.hc_atencion_cierre?.cierre_seguimiento === false
               ? true
-              : (lastAttention as any)?.hc_atencion_cierre?.cierre_seguimiento === true &&
-                (lastAttention as any)?.hc_atencion_cierre?.seguimiento_efectivo === true
-                ? true
-                : (lastAttention as any)?.hc_atencion_cierre?.cierre_seguimiento === true
-                  ? false
-                  : null,
+              : (lastAttention as any)?.hc_atencion_cierre?.cierre_seguimiento === true
+                ? false
+                : null,
           last_attention_seguimiento_opcion: lastAttention?.hc_atencion_cierre?.seguimiento_opcion ?? null,
           last_attention_motivo_consulta: lastAttention?.hc_anamnesis_atencion?.motivo_consulta ?? null,
           last_attention_principal_cie10_codigo: lastAttentionPrincipalCie10Codigo,
@@ -140,6 +145,22 @@ export async function POST(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR"]);
+    if (auth instanceof NextResponse) return auth;
+
+    const idUsuario = Number(auth.user.id);
+    const profesional = await prisma.profesionales_salud.findFirst({
+      where: { id_usuario: idUsuario, activo: true },
+      select: { id_profesional: true },
+    });
+
+    if (!profesional?.id_profesional) {
+      return NextResponse.json(
+        { message: "El usuario autenticado no tiene un profesional de salud activo asociado." },
+        { status: 400 },
+      );
+    }
+
     const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
     const idPaciente = Number(resolvedParams.id);
@@ -151,7 +172,6 @@ export async function POST(
     const body = await request.json();
     const {
       id_tipo_historia,
-      id_profesional_responsable,
       id_historia_vinculada,
       motivo_consulta,
       enfermedad_actual,
@@ -201,10 +221,7 @@ export async function POST(
       data: {
         id_paciente: idPaciente,
         id_tipo_historia: idTipoHistoriaNum,
-        id_profesional_responsable:
-          id_profesional_responsable != null && String(id_profesional_responsable).trim() !== ""
-            ? Number(id_profesional_responsable)
-            : null,
+        id_profesional_responsable: profesional.id_profesional,
         id_historia_vinculada: idHistoriaVinculadaNum,
         motivo_consulta: motivo_consulta ?? null,
         enfermedad_actual: enfermedad_actual ?? null,

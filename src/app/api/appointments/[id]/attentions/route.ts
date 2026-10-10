@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { requireAnyPermission } from "@/lib/auth";
+import { resolveClinicalHistoryStatus } from "@/lib/clinical-history-status";
+import { resolveAcompananteAtencion } from "@/lib/acompanante-atencion";
 
 function normalizeDateOnly(input: unknown): Date | null {
   if (input === null || input === undefined) return null;
@@ -11,8 +13,24 @@ function normalizeDateOnly(input: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === "string" && v.trim().length > 0;
+async function resolveAppointmentAttentionType(cita: {
+  id_tipo_cita: number | null;
+  tipos_atencionId_tipo_atencion: number | null;
+}) {
+  if (cita.tipos_atencionId_tipo_atencion) return cita.tipos_atencionId_tipo_atencion;
+  if (!cita.id_tipo_cita) return null;
+
+  const tipoCita = await prisma.tipos_cita.findUnique({
+    where: { id_tipo_cita: cita.id_tipo_cita },
+    select: { codigo: true },
+  });
+  if (!tipoCita?.codigo) return null;
+
+  const tipoAtencion = await prisma.tipos_atencion.findFirst({
+    where: { codigo: { equals: tipoCita.codigo, mode: "insensitive" } },
+    select: { id_tipo_atencion: true },
+  });
+  return tipoAtencion?.id_tipo_atencion ?? null;
 }
 
 function normalizeOptionalBoolean(input: unknown): boolean | null {
@@ -20,26 +38,6 @@ function normalizeOptionalBoolean(input: unknown): boolean | null {
   if (input === false) return false;
   if (input === "SI" || input === "SÍ") return true;
   if (input === "NO") return false;
-  return null;
-}
-
-function resolveHistoriaEstadoFromSeguimiento(input: {
-  seguimientoOpcion: string;
-  seguimientoEfectivo: boolean | null;
-  cierreSeguimiento: boolean | null;
-}): "Finalizado" | "Seguimiento" | null {
-  const opt = String(input.seguimientoOpcion ?? "").trim().toUpperCase();
-  if (!opt) return null;
-
-  // Si hay seguimiento efectivo y cierre de seguimiento, la atención queda en Seguimiento
-  if (input.seguimientoEfectivo === true && input.cierreSeguimiento === true) {
-    return "Seguimiento";
-  }
-  // Si solo hay cierre de seguimiento sin seguimiento efectivo, se finaliza
-  if (input.cierreSeguimiento === true) return "Finalizado";
-  if (input.cierreSeguimiento === false) {
-    return "Seguimiento";
-  }
   return null;
 }
 
@@ -62,7 +60,6 @@ export async function POST(
       );
     }
 
-    const prismaAny = prisma as any;
     const resolvedParams = await (context as any).params;
     const idCita = Number(resolvedParams.id);
 
@@ -105,6 +102,16 @@ export async function POST(
       return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
     }
 
+    const acompananteProvided =
+      body !== null && typeof body === "object" && "acompanante" in (body as object);
+    const acompananteRes = acompananteProvided
+      ? await resolveAcompananteAtencion((body as any).acompanante, cita.id_paciente)
+      : { data: null };
+    if (acompananteRes.error) {
+      return NextResponse.json({ message: acompananteRes.error }, { status: 400 });
+    }
+    const acompananteData = acompananteRes.data;
+
     // Validar que médicos solo atiendan sus propias citas
     if (roleName && roleName !== "administrador" && Number.isInteger(idUsuario) && idUsuario > 0) {
       const profesional = await prisma.profesionales_salud.findFirst({
@@ -115,7 +122,14 @@ export async function POST(
         select: { id_profesional: true },
       });
 
-      if (profesional && profesional.id_profesional !== cita.id_profesional) {
+      if (!profesional?.id_profesional) {
+        return NextResponse.json(
+          { message: "El usuario autenticado no tiene un profesional de salud activo asociado." },
+          { status: 403 },
+        );
+      }
+
+      if (profesional.id_profesional !== cita.id_profesional) {
         return NextResponse.json(
           { message: "Solo puede atender citas asignadas a usted" },
           { status: 403 },
@@ -123,10 +137,10 @@ export async function POST(
       }
     }
 
-    const idTipoAtencionNum = cita.id_tipo_cita ? Number(cita.id_tipo_cita) : NaN;
-    if (!Number.isInteger(idTipoAtencionNum) || idTipoAtencionNum <= 0) {
+    const idTipoAtencionNum = await resolveAppointmentAttentionType(cita);
+    if (!idTipoAtencionNum) {
       return NextResponse.json(
-        { message: "La cita no tiene tipo de cita para determinar el tipo de atención." },
+        { message: "La cita no tiene un tipo de atención válido configurado." },
         { status: 400 },
       );
     }
@@ -169,26 +183,6 @@ export async function POST(
           where: { id_historia: existingAttention.id_historia },
         })
       : null;
-
-    if (!historia) {
-      historia = await prismaAny.historias_clinicas.create({
-        data: {
-          id_paciente: cita.id_paciente,
-          id_tipo_historia: tipoHistoria.id_tipo_historia,
-          id_profesional_responsable: cita.id_profesional,
-          estado: "Finalizado",
-          id_historia_vinculada: (cita as any)?.id_historia_vinculada ?? null,
-          motivo_consulta: anamnesisMotivoTrimEarly || null,
-        },
-      });
-    }
-
-    if (!historia?.id_historia) {
-      return NextResponse.json(
-        { message: "No se pudo resolver la historia clínica para registrar la atención." },
-        { status: 500 },
-      );
-    }
 
     const tipoAtencion = await prisma.tipos_atencion.findUnique({
       where: { id_tipo_atencion: idTipoAtencionNum },
@@ -419,6 +413,30 @@ export async function POST(
       );
     }
 
+    const diagnosticosEfectivos = hasNewDiagnoses ? diagnosticosCreateRaw : existingDiagnoses;
+    if (diagnosticosEfectivos.filter((diagnostico) => diagnostico.es_principal).length !== 1) {
+      return NextResponse.json(
+        { message: "Debe seleccionar exactamente un diagnóstico principal." },
+        { status: 400 },
+      );
+    }
+
+    const hasDiagnosticoSinConfirmacion = hasNewDiagnoses
+      ? diagnosticosCreateRaw.some(
+          (diagnostico) =>
+            !diagnostico.id_tipo_confirmacion && !diagnostico.codigo_confirmacion,
+        )
+      : existingDiagnoses.some((diagnostico) => !diagnostico.id_tipo_confirmacion);
+    if (hasDiagnosticoSinConfirmacion) {
+      return NextResponse.json(
+        {
+          message:
+            "Todos los diagnósticos deben tener un tipo de confirmación: CN, CR o ID.",
+        },
+        { status: 400 },
+      );
+    }
+
     const resolvedDiagnosticosCreateRaw = await (async () => {
       if (diagnosticosCreateRaw.length === 0) return [];
 
@@ -449,6 +467,29 @@ export async function POST(
       });
     })();
 
+    const idsConfirmacionDirectos = [
+      ...new Set(
+        resolvedDiagnosticosCreateRaw
+          .map((diagnostico) => diagnostico.id_tipo_confirmacion)
+          .filter((id): id is number => id !== null),
+      ),
+    ];
+    if (idsConfirmacionDirectos.length > 0) {
+      const confirmacionesValidas = await prisma.tipos_confirmacion_diagnostico.findMany({
+        where: {
+          id_tipo_confirmacion: { in: idsConfirmacionDirectos },
+          codigo: { in: ["CN", "CR", "ID"] },
+        },
+        select: { id_tipo_confirmacion: true },
+      });
+      if (confirmacionesValidas.length !== idsConfirmacionDirectos.length) {
+        return NextResponse.json(
+          { message: "Todos los diagnósticos deben usar confirmación CN, CR o ID." },
+          { status: 400 },
+        );
+      }
+    }
+
     // Solo un diagnóstico puede quedar como principal
     const diagnosticosCreate = (() => {
       if (resolvedDiagnosticosCreateRaw.length === 0) return [];
@@ -471,84 +512,6 @@ export async function POST(
           { status: 400 },
         );
       }
-    }
-
-    // Guardar también resumen en historias_clinicas (lo que se muestra en /patients/[id]/records)
-    // Solo actualiza campos cuando se envían con contenido.
-    try {
-      const historiaUpdateData: Record<string, any> = {};
-
-      const historiaMotivoActual = String((historia as any)?.motivo_consulta ?? "").trim();
-      if (!historiaMotivoActual && anamnesisMotivoTrim) {
-        historiaUpdateData.motivo_consulta = anamnesisMotivoTrim;
-      }
-
-      if (anamnesisEnfActualTrim) historiaUpdateData.enfermedad_actual = anamnesisEnfActualTrim;
-      if (antecedentesPersonalObsTrim) {
-        historiaUpdateData.antecedentes_personales = antecedentesPersonalObsTrim;
-      }
-      if (antecedentesFamiliarObsTrim) {
-        historiaUpdateData.antecedentes_familiares = antecedentesFamiliarObsTrim;
-      }
-
-      const cierreRawForEstado =
-        hc_atencion_cierre && typeof hc_atencion_cierre === "object" ? hc_atencion_cierre : null;
-      const cierreSegOpcionTrimForEstado = String(
-        (cierreRawForEstado as any)?.seguimiento_opcion ?? "",
-      ).trim();
-      const cierreSegEfectivoForEstado = normalizeOptionalBoolean(
-        (cierreRawForEstado as any)?.seguimiento_efectivo,
-      );
-      const cierreSegCierreForEstado = normalizeOptionalBoolean(
-        (cierreRawForEstado as any)?.cierre_seguimiento,
-      );
-
-      const resolvedEstado = resolveHistoriaEstadoFromSeguimiento({
-        seguimientoOpcion: cierreSegOpcionTrimForEstado,
-        seguimientoEfectivo: cierreSegEfectivoForEstado,
-        cierreSeguimiento: cierreSegCierreForEstado,
-      });
-      if (resolvedEstado) {
-        historiaUpdateData.estado = resolvedEstado;
-      }
-
-      if (Object.keys(historiaUpdateData).length > 0) {
-        historia = await prisma.historias_clinicas.update({
-          where: { id_historia: historia.id_historia },
-          data: historiaUpdateData,
-        });
-
-        // Si la historia actual está vinculada a otra, actualizamos ambas
-        if (historia.id_historia_vinculada) {
-          const idHistoriaVinculada = Number(historia.id_historia_vinculada);
-          if (Number.isInteger(idHistoriaVinculada) && idHistoriaVinculada > 0) {
-            try {
-              // La historia actual queda en seguimiento (porque ahora es la activa)
-              await prisma.historias_clinicas.update({
-                where: { id_historia: historia.id_historia },
-                data: { estado: "Seguimiento" },
-              });
-              
-              // La historia vinculada (madre) se finaliza
-              await prisma.historias_clinicas.update({
-                where: { id_historia: idHistoriaVinculada },
-                data: { estado: "Finalizado" },
-              });
-
-              // Actualizar cita asociada a la historia vinculada para que ya no esté en seguimiento
-              await prisma.citas.updateMany({
-                where: { id_historia_vinculada: idHistoriaVinculada },
-                data: { seguimiento: false },
-              });
-            } catch {
-              // ignore
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Error actualizando resumen de historia clinica", e);
-      // No interrumpimos el guardado de la atención
     }
 
     const hcSsrTrim = String(hc_ssr_contenido ?? "").trim();
@@ -673,12 +636,64 @@ export async function POST(
       );
     }
 
-    const atencion = existingAttention?.id_atencion
+    const resolvedEstado = resolveClinicalHistoryStatus({
+      seguimientoOpcion: cierreSegOpcionTrim,
+      cierreSeguimiento: cierreSegCierre,
+    });
+
+    const result = await prisma.$transaction(async (prisma) => {
+      if (!historia) {
+        historia = await prisma.historias_clinicas.create({
+          data: {
+            id_paciente: cita.id_paciente,
+            id_tipo_historia: tipoHistoria.id_tipo_historia,
+            id_profesional_responsable: cita.id_profesional,
+            estado: resolvedEstado ?? "Finalizado",
+            id_historia_vinculada: cita.id_historia_vinculada,
+            motivo_consulta: anamnesisMotivoTrim || null,
+            enfermedad_actual: anamnesisEnfActualTrim || null,
+            antecedentes_personales: antecedentesPersonalObsTrim || null,
+            antecedentes_familiares: antecedentesFamiliarObsTrim || null,
+          },
+        });
+      } else {
+        historia = await prisma.historias_clinicas.update({
+          where: { id_historia: historia.id_historia },
+          data: {
+            motivo_consulta: historia.motivo_consulta || anamnesisMotivoTrim || null,
+            enfermedad_actual: anamnesisEnfActualTrim || historia.enfermedad_actual,
+            antecedentes_personales:
+              antecedentesPersonalObsTrim || historia.antecedentes_personales,
+            antecedentes_familiares:
+              antecedentesFamiliarObsTrim || historia.antecedentes_familiares,
+            estado: resolvedEstado ?? historia.estado,
+          },
+        });
+      }
+
+      if (historia.id_historia_vinculada) {
+        const idHistoriaVinculada = historia.id_historia_vinculada;
+        historia = await prisma.historias_clinicas.update({
+          where: { id_historia: historia.id_historia },
+          data: { estado: "Seguimiento" },
+        });
+        await prisma.historias_clinicas.update({
+          where: { id_historia: idHistoriaVinculada },
+          data: { estado: "Finalizado" },
+        });
+        await prisma.citas.updateMany({
+          where: { id_historia_vinculada: idHistoriaVinculada },
+          data: { seguimiento: false },
+        });
+      }
+
+      const atencion = existingAttention?.id_atencion
       ? await prisma.atenciones_salud.update({
           where: { id_atencion: existingAttention.id_atencion },
           data: {
             id_historia: historia.id_historia,
             id_cita: cita.id_cita,
+            id_sede: cita.id_sede,
             id_profesional: cita.id_profesional,
             id_tipo_atencion: idTipoAtencionNum,
             id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
@@ -711,6 +726,7 @@ export async function POST(
           data: {
             id_historia: historia.id_historia,
             id_cita: cita.id_cita,
+            id_sede: cita.id_sede,
             id_profesional: cita.id_profesional,
             id_tipo_atencion: idTipoAtencionNum,
             id_modalidad_atencion: cita.id_modalidad_atencion ?? null,
@@ -822,6 +838,18 @@ export async function POST(
       } as any,
     });
 
+    if (acompananteProvided) {
+      if (acompananteData) {
+        await prisma.acompanante_atencion.upsert({
+          where: { id_atencion: idAtencion },
+          create: { id_atencion: idAtencion, ...acompananteData },
+          update: acompananteData,
+        });
+      } else {
+        await prisma.acompanante_atencion.deleteMany({ where: { id_atencion: idAtencion } });
+      }
+    }
+
     await prisma.hc_antecedentes_atencion.deleteMany({ where: { id_atencion: idAtencion } });
     if (antecedentesCreate.length > 0) {
       await prisma.hc_antecedentes_atencion.createMany({
@@ -853,47 +881,48 @@ export async function POST(
       });
     }
 
-    // Al registrar la atención, la cita queda en estado ATENDIDA.
-    try {
-      const targetCodigo = "ATENDIDA";
-      const targetEstado = await prisma.estados_cita.findFirst({
-        where: {
-          codigo: {
-            equals: targetCodigo,
-            mode: "insensitive",
-          },
+    const targetEstado = await prisma.estados_cita.findFirst({
+      where: {
+        codigo: {
+          equals: "REALIZADA",
+          mode: "insensitive",
         },
-        select: { id_estado_cita: true },
-      });
+      },
+      select: { id_estado_cita: true },
+    });
 
-      if (targetEstado?.id_estado_cita) {
-        await prisma.citas.update({
-          where: { id_cita: cita.id_cita },
-          data: {
-            id_estado_cita: targetEstado.id_estado_cita,
-            seguimiento: historia.estado === "Seguimiento",
-          },
-        });
-      } else {
-        // Si no hay cambio de estado, actualizar seguimiento basado en estado de historia
-        await prisma.citas.update({
-          where: { id_cita: cita.id_cita },
-          data: { seguimiento: historia.estado === "Seguimiento" },
-        });
-      }
-    } catch (e) {
-      console.error("Error actualizando estado de la cita tras registrar atención", e);
-      // No interrumpimos la creación de la atención si falla el update del estado
+    if (!targetEstado?.id_estado_cita) {
+      throw new Error("No está configurado el estado de cita REALIZADA.");
     }
 
-    return NextResponse.json(
-      { historia, atencion },
-      { status: existingAttention?.id_atencion ? 200 : 201 },
-    );
+    await prisma.citas.update({
+      where: { id_cita: cita.id_cita },
+      data: {
+        id_estado_cita: targetEstado.id_estado_cita,
+        seguimiento: historia.estado === "Seguimiento",
+      },
+    });
+
+      return { historia, atencion };
+    });
+
+    return NextResponse.json(result, {
+      status: existingAttention?.id_atencion ? 200 : 201,
+    });
   } catch (error) {
     console.error("Error registrando atención de la cita", error);
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          {
+            message: "La cita ya tiene una atención registrada.",
+            code: "APPOINTMENT_ALREADY_ATTENDED",
+          },
+          { status: 409 },
+        );
+      }
+
       if (error.code === "P2021") {
         let diagnostics: any = undefined;
         try {
@@ -1006,7 +1035,16 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const prismaAny = prisma as any;
+    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR"]);
+    if (auth instanceof NextResponse) return auth;
+
+    if (auth.user.role === "enfermera") {
+      return NextResponse.json(
+        { message: "Las enfermeras no tienen permiso para atender citas" },
+        { status: 403 },
+      );
+    }
+
     const resolvedParams = await (context as any).params;
     const idCita = Number(resolvedParams.id);
 
@@ -1042,10 +1080,23 @@ export async function PATCH(
       return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
     }
 
-    const idTipoAtencionNum = cita.id_tipo_cita ? Number(cita.id_tipo_cita) : NaN;
-    if (!Number.isInteger(idTipoAtencionNum) || idTipoAtencionNum <= 0) {
+    if (auth.user.role !== "administrador" && auth.user.role !== "super_admin") {
+      const profesional = await prisma.profesionales_salud.findFirst({
+        where: { id_usuario: Number(auth.user.id), activo: true },
+        select: { id_profesional: true },
+      });
+      if (!profesional?.id_profesional || profesional.id_profesional !== cita.id_profesional) {
+        return NextResponse.json(
+          { message: "Solo puede modificar atenciones de citas asignadas a usted" },
+          { status: 403 },
+        );
+      }
+    }
+
+    const idTipoAtencionNum = await resolveAppointmentAttentionType(cita);
+    if (!idTipoAtencionNum) {
       return NextResponse.json(
-        { message: "La cita no tiene tipo de cita para determinar el tipo de atención." },
+        { message: "La cita no tiene un tipo de atención válido configurado." },
         { status: 400 },
       );
     }
@@ -1095,9 +1146,90 @@ export async function PATCH(
       }
     }
 
+    const diagnosticosBorrador = diagnosticos === undefined
+      ? null
+      : (Array.isArray(diagnosticos) ? diagnosticos : [])
+          .map((d: any) => {
+            const codigoCie10 = String(d?.codigo_cie10 ?? "").trim();
+            if (!codigoCie10) return null;
+            return {
+              codigo_cie10: codigoCie10,
+              es_principal: d?.es_principal === true,
+              id_tipo_confirmacion:
+                d?.id_tipo_confirmacion === null || d?.id_tipo_confirmacion === undefined
+                  ? null
+                  : Number(d.id_tipo_confirmacion) || null,
+            };
+          })
+          .filter(Boolean) as Array<{
+            codigo_cie10: string;
+            es_principal: boolean;
+            id_tipo_confirmacion: number | null;
+          }>;
+
+    if (diagnosticosBorrador && diagnosticosBorrador.length === 0) {
+      return NextResponse.json(
+        { message: "El borrador debe conservar al menos un diagnóstico" },
+        { status: 400 },
+      );
+    }
+
+    if (diagnosticosBorrador) {
+      const principales = diagnosticosBorrador.filter((d) => d.es_principal).length;
+      if (principales > 1) {
+        return NextResponse.json(
+          { message: "Solo un diagnóstico puede ser principal" },
+          { status: 400 },
+        );
+      }
+
+      const codigos = [...new Set(diagnosticosBorrador.map((d) => d.codigo_cie10))];
+      const encontrados = await prisma.cie10.findMany({
+        where: { codigo: { in: codigos } },
+        select: { codigo: true },
+      });
+      const encontradosSet = new Set(encontrados.map((d) => d.codigo));
+      const faltantes = codigos.filter((codigo) => !encontradosSet.has(codigo));
+      if (faltantes.length > 0) {
+        return NextResponse.json(
+          { message: `Códigos CIE-10 inválidos: ${faltantes.join(", ")}` },
+          { status: 400 },
+        );
+      }
+
+      const idsConfirmacion = [
+        ...new Set(
+          diagnosticosBorrador
+            .map((diagnostico) => diagnostico.id_tipo_confirmacion)
+            .filter((id): id is number => id !== null),
+        ),
+      ];
+      if (idsConfirmacion.length > 0) {
+        const confirmaciones = await prisma.tipos_confirmacion_diagnostico.findMany({
+          where: { id_tipo_confirmacion: { in: idsConfirmacion } },
+          select: { id_tipo_confirmacion: true },
+        });
+        const confirmacionesSet = new Set(
+          confirmaciones.map((confirmacion) => confirmacion.id_tipo_confirmacion),
+        );
+        const confirmacionesFaltantes = idsConfirmacion.filter(
+          (id) => !confirmacionesSet.has(id),
+        );
+        if (confirmacionesFaltantes.length > 0) {
+          return NextResponse.json(
+            {
+              message: `Tipos de confirmación inválidos: ${confirmacionesFaltantes.join(", ")}`,
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
+    const atencionGuardada = await prisma.$transaction(async (prisma) => {
     if (!historia) {
       const motivoTrim = String(anamnesis_motivo_consulta ?? "").trim();
-      historia = await prismaAny.historias_clinicas.create({
+      historia = await prisma.historias_clinicas.create({
         data: {
           id_paciente: cita.id_paciente,
           id_tipo_historia: tipoHistoria.id_tipo_historia,
@@ -1109,7 +1241,43 @@ export async function PATCH(
       });
     }
 
+    const historiaUpdate: Prisma.historias_clinicasUpdateInput = {};
+    if (anamnesis_motivo_consulta !== undefined) {
+      historiaUpdate.motivo_consulta = String(anamnesis_motivo_consulta ?? "").trim() || null;
+    }
+    if (anamnesis_enfermedad_actual !== undefined) {
+      historiaUpdate.enfermedad_actual =
+        String(anamnesis_enfermedad_actual ?? "").trim() || null;
+    }
+    if (antecedentes !== undefined) {
+      const antecedentesArray = Array.isArray(antecedentes) ? antecedentes : [];
+      const personal = antecedentesArray.find(
+        (item: any) => String(item?.tipo_antecedente ?? "").trim().toUpperCase() === "PERSONAL",
+      );
+      const familiar = antecedentesArray.find(
+        (item: any) => String(item?.tipo_antecedente ?? "").trim().toUpperCase() === "FAMILIAR",
+      );
+      historiaUpdate.antecedentes_personales = String(personal?.observacion ?? "").trim() || null;
+      historiaUpdate.antecedentes_familiares = String(familiar?.observacion ?? "").trim() || null;
+    }
+    if (hc_atencion_cierre && typeof hc_atencion_cierre === "object") {
+      const estado = resolveClinicalHistoryStatus({
+        seguimientoOpcion: String((hc_atencion_cierre as any).seguimiento_opcion ?? ""),
+        cierreSeguimiento: normalizeOptionalBoolean(
+          (hc_atencion_cierre as any).cierre_seguimiento,
+        ),
+      });
+      if (estado) historiaUpdate.estado = estado;
+    }
+    if (Object.keys(historiaUpdate).length > 0) {
+      historia = await prisma.historias_clinicas.update({
+        where: { id_historia: historia.id_historia },
+        data: historiaUpdate,
+      });
+    }
+
     const scalarUpdate: Prisma.atenciones_saludUncheckedUpdateInput = {};
+    (scalarUpdate as any).id_sede = cita.id_sede;
 
     if (analisis !== undefined) scalarUpdate.analisis = String(analisis || "") || null;
     if (observacion_analisis !== undefined) scalarUpdate.observacion_analisis = String(observacion_analisis || "").trim() || null;
@@ -1145,6 +1313,7 @@ export async function PATCH(
             id_tipo_atencion: idTipoAtencionNum,
             id_modalidad_atencion: cita.id_modalidad_atencion,
             id_cita: idCita,
+            id_sede: cita.id_sede,
             ...scalarUpdate,
           } as any,
         });
@@ -1284,6 +1453,25 @@ export async function PATCH(
       });
     }
 
+    if (body !== null && typeof body === "object" && "acompanante" in (body as object)) {
+      const acompananteRes = await resolveAcompananteAtencion(
+        (body as any).acompanante,
+        cita.id_paciente,
+      );
+      if (acompananteRes.error) {
+        return NextResponse.json({ message: acompananteRes.error }, { status: 400 });
+      }
+      if (acompananteRes.data) {
+        await prisma.acompanante_atencion.upsert({
+          where: { id_atencion: idAtencion },
+          create: { id_atencion: idAtencion, ...acompananteRes.data },
+          update: acompananteRes.data,
+        });
+      } else {
+        await prisma.acompanante_atencion.deleteMany({ where: { id_atencion: idAtencion } });
+      }
+    }
+
     if (antecedentes !== undefined) {
       const antecedentesArray = Array.isArray(antecedentes) ? antecedentes : [];
       await prisma.hc_antecedentes_atencion.deleteMany({ where: { id_atencion: idAtencion } });
@@ -1338,32 +1526,31 @@ export async function PATCH(
       });
     }
 
-    if (diagnosticos !== undefined) {
-      const diagnosticosArray = Array.isArray(diagnosticos) ? diagnosticos : [];
+    if (diagnosticosBorrador) {
       await prisma.diagnosticos_atencion.deleteMany({ where: { id_atencion: idAtencion } });
-      const dxCreate = diagnosticosArray
-        .map((d: any) => {
-          const codigoTrim = String(d?.codigo_cie10 ?? "").trim();
-          if (!codigoTrim) return null;
-          return {
-            id_atencion: idAtencion,
-            codigo_cie10: codigoTrim,
-            es_principal: d?.es_principal === true,
-            id_tipo_confirmacion:
-              d?.id_tipo_confirmacion === null || d?.id_tipo_confirmacion === undefined
-                ? null
-                : Number(d?.id_tipo_confirmacion) || null,
-          };
-        })
-        .filter(Boolean) as any[];
-      if (dxCreate.length > 0) {
-        await prisma.diagnosticos_atencion.createMany({ data: dxCreate });
-      }
+      await prisma.diagnosticos_atencion.createMany({
+        data: diagnosticosBorrador.map((diagnostico) => ({
+          ...diagnostico,
+          id_atencion: idAtencion,
+        })),
+      });
     }
 
-    return NextResponse.json({ ok: true, atencion }, { status: 200 });
+      return atencion;
+    });
+
+    return NextResponse.json({ ok: true, atencion: atencionGuardada }, { status: 200 });
   } catch (error) {
     console.error("Error guardando borrador de atención", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        {
+          message: "La cita ya tiene una atención registrada.",
+          code: "APPOINTMENT_ALREADY_ATTENDED",
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { message: "No se pudo guardar el borrador de la atención" },
       { status: 500 },
@@ -1372,15 +1559,39 @@ export async function PATCH(
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
+    const auth = await requireAnyPermission(request, ["HISTORIAS_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const resolvedParams = await (context as any).params;
     const idCita = Number(resolvedParams.id);
 
     if (!Number.isInteger(idCita) || idCita <= 0) {
       return NextResponse.json({ message: "ID de cita inválido" }, { status: 400 });
+    }
+
+    const cita = await prisma.citas.findUnique({
+      where: { id_cita: idCita },
+      select: { id_profesional: true },
+    });
+    if (!cita) {
+      return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
+    }
+
+    if (auth.user.role !== "administrador" && auth.user.role !== "super_admin") {
+      const profesional = await prisma.profesionales_salud.findFirst({
+        where: { id_usuario: Number(auth.user.id), activo: true },
+        select: { id_profesional: true },
+      });
+      if (!profesional?.id_profesional || profesional.id_profesional !== cita.id_profesional) {
+        return NextResponse.json(
+          { message: "Solo puede consultar atenciones de citas asignadas a usted" },
+          { status: 403 },
+        );
+      }
     }
 
     const atencion = await prisma.atenciones_salud.findFirst({
@@ -1395,6 +1606,7 @@ export async function GET(
         hc_valoracion_sistemas_atencion: true,
         hc_antecedentes_atencion: true,
         hc_antecedentes_traumaticos_atencion: true,
+        acompanante_atencion: true,
         diagnosticos_atencion: {
           include: {
             cie10: true,

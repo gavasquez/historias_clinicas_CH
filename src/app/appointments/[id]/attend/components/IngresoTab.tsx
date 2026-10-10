@@ -1,8 +1,22 @@
 "use client";
 
 import React from "react";
+import {
+  CompanionSection,
+  EMPTY_COMPANION,
+} from "@/components/attention/companion-section";
 
-export function IngresoTab({ citaData, form, setForm }: { citaData: any; form: any; setForm: any }) {
+export function IngresoTab({
+  citaData,
+  form,
+  setForm,
+  idPaciente,
+}: {
+  citaData: any;
+  form: any;
+  setForm: any;
+  idPaciente?: number | string | null;
+}) {
   const now = React.useMemo(() => new Date(), []);
 
   return (
@@ -121,6 +135,14 @@ export function IngresoTab({ citaData, form, setForm }: { citaData: any; form: a
           </label>
         </div>
       </div>
+
+      <CompanionSection
+        idPaciente={citaData?.id_paciente ?? idPaciente}
+        value={form.acompanante ?? EMPTY_COMPANION}
+        onChange={(acompanante) =>
+          setForm((prev: any) => ({ ...prev, acompanante }))
+        }
+      />
     </div>
   );
 }

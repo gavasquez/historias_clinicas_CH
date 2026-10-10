@@ -386,6 +386,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tipoAtencion = idTipoCitaNum
+      ? await prisma.tipos_atencion.findFirst({
+          where: {
+            codigo: {
+              equals: (
+                await prisma.tipos_cita.findUnique({
+                  where: { id_tipo_cita: idTipoCitaNum },
+                  select: { codigo: true },
+                })
+              )?.codigo ?? "",
+              mode: "insensitive",
+            },
+          },
+          select: { id_tipo_atencion: true },
+        })
+      : null;
+
+    if (idTipoCitaNum && !tipoAtencion) {
+      return NextResponse.json(
+        { message: "El tipo de cita no tiene un tipo de atención equivalente configurado" },
+        { status: 400 },
+      );
+    }
+
     const cita = await prisma.citas.create({
       data: {
         id_paciente: idPacienteNum,
@@ -406,6 +430,7 @@ export async function POST(request: NextRequest) {
             : null,
         id_programa_salud: idProgramaSaludNum,
         id_tipo_historia: idTipoHistoriaNum,
+        tipos_atencionId_tipo_atencion: tipoAtencion?.id_tipo_atencion ?? null,
         fecha_hora_inicio: fechaInicio,
         fecha_hora_fin: fechaFin,
         seguimiento: seguimientoBool,

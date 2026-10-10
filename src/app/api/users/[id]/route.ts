@@ -139,7 +139,9 @@ export async function PUT(
     }
 
     if (typeof id_tipo_documento === "number") {
-      data.id_tipo_documento = id_tipo_documento > 0 ? id_tipo_documento : null;
+      data.tipos_documento = id_tipo_documento > 0
+        ? { connect: { id_tipo_documento } }
+        : { disconnect: true };
     }
 
     if (typeof numero_documento === "string") {

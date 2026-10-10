@@ -74,12 +74,13 @@ export function AttentionDiagnosesSection({
       setError(null);
       const results = await searchCie10(cie10Query, 20);
       setCie10Results(results);
-    } catch (err: any) {
-      const backendMessage = err?.response?.data?.message;
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: unknown } }; message?: string };
+      const backendMessage = error.response?.data?.message;
       setError(
         typeof backendMessage === "string" && backendMessage.trim().length > 0
           ? backendMessage
-          : err?.message || "Error buscando en el catálogo CIE-10.",
+          : error.message || "Error buscando en el catálogo CIE-10.",
       );
     } finally {
       setCie10Loading(false);
@@ -136,18 +137,25 @@ export function AttentionDiagnosesSection({
                   <span className="font-semibold">Nombre:</span> {d.cie10_nombre || "-"}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-700">
-                  <span className="font-semibold">Tipo:</span>
+                  <span className="font-semibold">Tipo obligatorio:</span>
                   {confirmationOptions.map((opt) => (
                     <label key={opt.codigo} className="inline-flex items-center gap-2">
                       <input
-                        type="checkbox"
-                        checked={(d.codigo_confirmacion ?? null) === (opt.codigo as any)}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
+                        type="radio"
+                        name={`confirmacion-${idx}-${d.codigo_cie10}`}
+                        checked={
+                          (d.codigo_confirmacion ?? null) ===
+                          (opt.codigo as DiagnosisDraft["codigo_confirmacion"])
+                        }
+                        onChange={() => {
                           setDiagnosticosDraft((prev) =>
                             prev.map((x, i) =>
                               i === idx
-                                ? { ...x, codigo_confirmacion: checked ? (opt.codigo as any) : null }
+                                ? {
+                                    ...x,
+                                    codigo_confirmacion:
+                                      opt.codigo as DiagnosisDraft["codigo_confirmacion"],
+                                  }
                                 : x,
                             ),
                           );

@@ -15,6 +15,23 @@ model acompanantes {
   telefono              String?   @db.VarChar(50)
   relacion_con_paciente String?   @db.VarChar(100)
   pacientes             pacientes @relation(fields: [id_paciente], references: [id_paciente], onDelete: Cascade, onUpdate: NoAction)
+  acompanante_atencion  acompanante_atencion[]
+}
+
+model acompanante_atencion {
+  id_acompanante_atencion Int              @id @default(autoincrement())
+  id_atencion             Int              @unique
+  id_acompanante          Int?
+  nombre                  String?          @db.VarChar(150)
+  relacion_con_paciente   String?          @db.VarChar(100)
+  telefono                String?          @db.VarChar(50)
+  observacion             String?
+  fecha_creacion          DateTime         @default(now()) @db.Timestamp(6)
+  atenciones_salud        atenciones_salud @relation(fields: [id_atencion], references: [id_atencion], onDelete: Cascade, onUpdate: NoAction)
+  acompanantes            acompanantes?    @relation(fields: [id_acompanante], references: [id_acompanante], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([id_atencion], map: "idx_acompanante_atencion")
+  @@index([id_acompanante], map: "idx_acompanante_atencion_acomp")
 }
 
 model archivos_adjuntos {
@@ -59,6 +76,7 @@ model atenciones_salud {
   id_tipo_atencion                      Int?
   id_modalidad_atencion                 Int?
   id_cita                               Int?
+  id_sede                               Int?
   fecha_hora                            DateTime                              @default(now()) @db.Timestamp(6)
   analisis                              String?
   observacion_analisis                  String?
@@ -77,6 +95,7 @@ model atenciones_salud {
   hc_antecedentes_atencion              hc_antecedentes_atencion[]
   hc_antecedentes_traumaticos_atencion  hc_antecedentes_traumaticos_atencion?
   hc_atencion_cierre                    hc_atencion_cierre?
+  acompanante_atencion                  acompanante_atencion?
   hc_ssr_atencion                       hc_ssr_atencion?
   hc_habitos_atencion                   hc_habitos_atencion?
   hc_tamizajes_atencion                 hc_tamizajes_atencion?
@@ -87,6 +106,7 @@ model atenciones_salud {
   profesionales_salud                   profesionales_salud?                  @relation(fields: [id_profesional], references: [id_profesional], onDelete: NoAction, onUpdate: NoAction)
   tipos_atencion                        tipos_atencion?                       @relation(fields: [id_tipo_atencion], references: [id_tipo_atencion], onDelete: NoAction, onUpdate: NoAction)
   citas                                 citas?                                @relation(fields: [id_cita], references: [id_cita], onDelete: NoAction, onUpdate: NoAction, map: "fk_atencion_cita")
+  sedes                                 sedes?                                @relation(fields: [id_sede], references: [id_sede], onDelete: NoAction, onUpdate: NoAction)
   certificados_medicos                  certificados_medicos[]
   consentimientos_paciente              consentimientos_paciente[]
   desistimientos_programa               desistimientos_programa[]
@@ -96,6 +116,8 @@ model atenciones_salud {
   formulas_medicas                      formulas_medicas[]
   recomendaciones_medicas               recomendaciones_medicas[]
   rutas_activadas_atencion              rutas_activadas_atencion[]
+
+  @@index([id_sede], map: "idx_atenciones_salud_sede")
 }
 
 model hc_anamnesis_atencion {
@@ -727,6 +749,7 @@ model sedes {
   ciudad                       String?                        @db.VarChar(100)
   departamento                 String?                        @db.VarChar(100)
   citas                        citas[]
+  atenciones_salud             atenciones_salud[]
   desistimientos_programa      desistimientos_programa[]
   pacientes                    pacientes[]
   profesionales_salud          profesionales_salud[]

@@ -19,6 +19,12 @@ import {
   AttentionDiagnosesSection,
   type DiagnosisDraft,
 } from "@/app/appointments/[id]/attend/components/AttentionDiagnosesSection";
+import {
+  CompanionSection,
+  EMPTY_COMPANION,
+  buildAcompanantePayload,
+  type CompanionFormValue,
+} from "@/components/attention/companion-section";
 
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
@@ -92,6 +98,7 @@ export default function NewAttentionRecordDirectPage() {
   const [idHistoriaVinculada, setIdHistoriaVinculada] = useState<string>("");
 
   const [diagnosticosDraft, setDiagnosticosDraft] = useState<DiagnosisDraft[]>([]);
+  const [acompanante, setAcompanante] = useState<CompanionFormValue>(EMPTY_COMPANION);
 
   const [activeTab, setActiveTab] = useState<MiniTabKey>("NOTA_ATENCION");
 
@@ -215,7 +222,16 @@ export default function NewAttentionRecordDirectPage() {
     if (!recomendaciones.trim()) missing.push("Recomendaciones");
     if (seguimiento === "SI" && !seguimientoOpcion.trim()) missing.push("Opción de seguimiento");
     if (shouldRequireHistoriaVinculada && !idHistoriaVinculada.trim()) missing.push("Historia en seguimiento a vincular");
-    if (diagnosticosDraft.length === 0) missing.push("Al menos un diagnóstico CIE-10");
+    if (diagnosticosDraft.length === 0) {
+      missing.push("Al menos un diagnóstico CIE-10");
+    } else {
+      if (diagnosticosDraft.filter((diagnostico) => diagnostico.es_principal).length !== 1) {
+        missing.push("Exactamente un diagnóstico principal");
+      }
+      if (diagnosticosDraft.some((diagnostico) => !diagnostico.codigo_confirmacion)) {
+        missing.push("Tipo de confirmación CN, CR o ID para cada diagnóstico");
+      }
+    }
     return missing;
   }, [
     fechaHora,
@@ -302,40 +318,14 @@ export default function NewAttentionRecordDirectPage() {
         throw new Error("Fecha de atención inválida");
       }
 
-      // 1) Crear historia clínica (tipo: REG_ATENCION_SALUD)
-      const tiposHistoriaRes = await apiClient.get("/catalogs/history-types");
-      const tiposHistoria = (tiposHistoriaRes.data?.data ?? tiposHistoriaRes.data ?? []) as any[];
-      const found = tiposHistoria.find((t) => String(t?.codigo ?? "") === "REG_ATENCION_SALUD");
-      const idTipoHistoria = found?.id_tipo_historia;
-      if (!idTipoHistoria) {
-        throw new Error("No se encontró el tipo de historia REG_ATENCION_SALUD en el catálogo");
-      }
-
-      const payload = {
-        id_tipo_historia: Number(idTipoHistoria),
-        id_profesional_responsable: profesionalData?.id_profesional
-          ? Number(profesionalData.id_profesional)
-          : undefined,
-        id_historia_vinculada: shouldRequireHistoriaVinculada
-          ? Number(idHistoriaVinculada)
-          : undefined,
-        motivo_consulta: motivoAtencion,
-      };
-
-      const historiaRes = await apiClient.post(`/patients/${idPaciente}/records`, payload);
-
-      const historia = historiaRes.data;
-      const idHistoria = historia?.id_historia;
-      if (!idHistoria) {
-        throw new Error("No se pudo crear la historia clínica (id_historia inválido)");
-      }
-
-      // 2) Crear atención (sin cita) con fecha/hora indicada
-      await apiClient.post(`/histories/${idHistoria}/attentions`, {
+      const response = await apiClient.post(`/patients/${idPaciente}/attention-records`, {
         fecha_hora: dt.toISOString(),
         id_tipo_atencion: Number(idTipoAtencion),
         id_modalidad_atencion: Number(idModalidadAtencion),
         id_sede: idSede ? Number(idSede) : null,
+        id_historia_vinculada: shouldRequireHistoriaVinculada
+          ? Number(idHistoriaVinculada)
+          : null,
         motivo_atencion: motivoAtencion,
         observacion_analisis: observacionAnalisis,
         analisis,
@@ -350,10 +340,12 @@ export default function NewAttentionRecordDirectPage() {
         diagnosticos: diagnosticosDraft.map((d) => ({
           codigo_cie10: d.codigo_cie10,
           es_principal: d.es_principal,
+          codigo_confirmacion: d.codigo_confirmacion,
         })),
+        acompanante: buildAcompanantePayload(acompanante),
       });
 
-      return { idHistoria };
+      return { idHistoria: response.data?.historia?.id_historia };
     },
     onSuccess: (res: any) => {
       setError(null);
@@ -947,6 +939,14 @@ export default function NewAttentionRecordDirectPage() {
 
           {activeTab === "NOTA_ATENCION" && (
             <div className="space-y-3">
+              <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">DATOS DEL INGRESO</div>
+
+              <CompanionSection
+                idPaciente={idPaciente}
+                value={acompanante}
+                onChange={setAcompanante}
+              />
+
               <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">NOTA DE ATENCIÓN</div>
 
               <div>

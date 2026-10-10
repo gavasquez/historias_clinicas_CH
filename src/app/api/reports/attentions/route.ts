@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
         },
         tipos_atencion: true,
         modalidades_atencion: true,
+        sedes: true,
         historias_clinicas: {
           include: {
             pacientes: true,
@@ -119,7 +120,7 @@ export async function GET(request: NextRequest) {
       tipo: row.tipos_atencion?.descripcion ?? null,
       modalidad_codigo: row.modalidades_atencion?.codigo ?? null,
       modalidad: row.modalidades_atencion?.descripcion ?? null,
-      sede: row.citas?.sedes?.nombre ?? null,
+      sede: row.sedes?.nombre ?? row.citas?.sedes?.nombre ?? null,
     }));
 
     const byTipo: Record<string, number> = {};

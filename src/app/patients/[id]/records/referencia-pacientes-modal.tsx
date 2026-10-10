@@ -121,7 +121,7 @@ const emptyMeta: ReferenciaPacientesMeta = {
   firmas: { remite: { nombre: "", cargo: "", cedula: "" }, recibe: { nombre: "", cargo: "", cedula: "" } },
 };
 
-export function ReferenciaPacientesModal({ isOpen, onClose, patient, historyId, report }: Props) {
+export function ReferenciaPacientesModal({ isOpen, onClose, patientId, patient, historyId, report }: Props) {
   const [activeTab, setActiveTab] = useState<"formulario" | "vista">("formulario");
   const [formData, setFormData] = useState<ReferenciaPacientesMeta>(emptyMeta);
   const [diagnosticosDraft, setDiagnosticosDraft] = useState<DiagnosisDraft[]>([]);

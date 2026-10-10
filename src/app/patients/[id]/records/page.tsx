@@ -957,9 +957,7 @@ export default function PatientRecordsPage() {
                               </td>
                               <td className={`px-3 py-2 ${String(h.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 {(() => {
-                                  const seguimientoValue = typeof h.last_attention_seguimiento === "boolean"
-                                    ? (h.last_attention_seguimiento ? "SI" : "NO")
-                                    : (h.estado === "Seguimiento" ? "SI" : "NO");
+                                  const seguimientoValue = h.estado === "Seguimiento" ? "SI" : "NO";
                                   const isSeguimiento = seguimientoValue === "SI";
                                   return (
                                     <span
@@ -1110,9 +1108,7 @@ export default function PatientRecordsPage() {
                               </td>
                               <td className={`px-3 py-2 ${String(child.estado ?? "").trim().toLowerCase() === "anulado" ? "bg-rose-100" : ""}`}>
                                 {(() => {
-                                  const seguimientoValue = typeof child.last_attention_seguimiento === "boolean"
-                                    ? (child.last_attention_seguimiento ? "SI" : "NO")
-                                    : (child.estado === "Seguimiento" ? "SI" : "NO");
+                                  const seguimientoValue = child.estado === "Seguimiento" ? "SI" : "NO";
                                   const isSeguimiento = seguimientoValue === "SI";
                                   return (
                                     <span
@@ -1140,6 +1136,20 @@ export default function PatientRecordsPage() {
                                     title="Ver detalle"
                                   >
                                     Ver
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenReportsModal(
+                                        child.id_historia,
+                                        child.tipo_historia_codigo,
+                                      );
+                                    }}
+                                    className="cursor-pointer rounded-md border border-sky-300 bg-white px-2 py-1 text-[11px] font-medium text-sky-700 shadow-sm hover:bg-sky-50"
+                                    title="Ver reportes disponibles"
+                                  >
+                                    Reportes
                                   </button>
                                   <button
                                     type="button"
@@ -1674,6 +1684,21 @@ export default function PatientRecordsPage() {
                                   <div>
                                     <p className="text-[10px] font-semibold uppercase text-slate-500">Plan de manejo</p>
                                     <p>{a.hc_atencion_cierre.conducta_plan_estudio_manejo}</p>
+                                  </div>
+                                )}
+
+                                {a.acompanante_atencion && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase text-slate-500">Acompañante</p>
+                                    <p className="text-[11px] text-slate-700">
+                                      {a.acompanante_atencion.nombre}
+                                      {a.acompanante_atencion.relacion_con_paciente
+                                        ? ` · ${a.acompanante_atencion.relacion_con_paciente}`
+                                        : ""}
+                                      {a.acompanante_atencion.telefono
+                                        ? ` · ${a.acompanante_atencion.telefono}`
+                                        : ""}
+                                    </p>
                                   </div>
                                 )}
 

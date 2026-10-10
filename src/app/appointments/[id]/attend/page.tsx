@@ -24,6 +24,12 @@ import { apiClient } from "@/lib/api";
 import { getEstadoCitaBadgeClasses } from "@/lib/appointment-status";
 
 import { IngresoTab } from "./components/IngresoTab";
+import {
+  CompanionSection,
+  EMPTY_COMPANION,
+  buildAcompanantePayload,
+  type CompanionFormValue,
+} from "@/components/attention/companion-section";
 import { AnamnesisTab } from "./components/AnamnesisTab";
 import { AntecedentesTab } from "./components/AntecedentesTab";
 import { DiagnosticosTab } from "./components/DiagnosticosTab";
@@ -272,6 +278,7 @@ function buildAttendPayload(input: AttendPayloadInput) {
     caso_accidente_intoxicacion_violencia: casoBool,
     fecha_ocurrencia_evento: casoBool ? form.fecha_ocurrencia_evento || undefined : undefined,
     lugar_ocurrencia_evento: casoBool ? form.lugar_ocurrencia_evento || undefined : undefined,
+    acompanante: buildAcompanantePayload(form.acompanante),
   };
 }
 
@@ -436,6 +443,17 @@ function isTabComplete(input: {
       return { ok: false, message: "Debe agregar al menos un diagnóstico." };
     }
 
+    if (diagnosticosDraft.filter((diagnostico) => diagnostico.es_principal).length !== 1) {
+      return { ok: false, message: "Debe seleccionar exactamente un diagnóstico principal." };
+    }
+
+    if (diagnosticosDraft.some((diagnostico) => !diagnostico.codigo_confirmacion)) {
+      return {
+        ok: false,
+        message: "Todos los diagnósticos deben tener un tipo de confirmación: CN, CR o ID.",
+      };
+    }
+
     if (isRegAtencionSalud && !simpleForm.recomendaciones.trim()) {
       return { ok: false, message: "Debe diligenciar las recomendaciones." };
     }
@@ -493,6 +511,7 @@ interface AttentionFormState {
   fecha_ocurrencia_evento: string;
   lugar_ocurrencia_evento: string;
   notificacion_otro_cual: string;
+  acompanante: CompanionFormValue;
 }
 
 interface AntecedenteDraft {
@@ -648,6 +667,7 @@ export default function AttendAppointmentPage() {
     fecha_ocurrencia_evento: "",
     lugar_ocurrencia_evento: "",
     notificacion_otro_cual: "",
+    acompanante: EMPTY_COMPANION,
   });
 
   // Estados para el formulario simplificado (REG_ATENCION_SALUD)
@@ -972,6 +992,22 @@ export default function AttendAppointmentPage() {
             naturaleza_lesion: prevTra.naturaleza_lesion.trim() ? prevTra.naturaleza_lesion : nextNaturalezaLesion,
             fecha_ocurrencia: prevTra.fecha_ocurrencia.trim() ? prevTra.fecha_ocurrencia : nextFechaOcurrencia,
             secuelas: prevTra.secuelas.trim() ? prevTra.secuelas : nextSecuelas,
+          }));
+        }
+
+        const acomp = lastAttention?.acompanante_atencion;
+        if (acomp) {
+          setForm((prev) => ({
+            ...prev,
+            acompanante: prev.acompanante?.viene_acompanado
+              ? prev.acompanante
+              : {
+                  viene_acompanado: "SI" as const,
+                  id_acompanante: acomp.id_acompanante ? String(acomp.id_acompanante) : "",
+                  nombre: String(acomp.nombre ?? ""),
+                  relacion_con_paciente: String(acomp.relacion_con_paciente ?? ""),
+                  telefono: String(acomp.telefono ?? ""),
+                },
           }));
         }
       } catch {
@@ -1539,7 +1575,7 @@ export default function AttendAppointmentPage() {
 
         <div className="min-h-[520px]">
           {activeTab === "INGRESO" && (
-            <IngresoTab citaData={citaData} form={form} setForm={setForm} />
+            <IngresoTab citaData={citaData} form={form} setForm={setForm} idPaciente={citaData?.id_paciente} />
           )}
 
           {activeTab === "ANAMNESIS" && <AnamnesisTab form={form} setForm={setForm} />}
@@ -1573,6 +1609,16 @@ export default function AttendAppointmentPage() {
 
           {activeTab === "NOTA_ATENCION" && (
             <div className="space-y-3">
+              <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">DATOS DEL INGRESO</div>
+
+              <CompanionSection
+                idPaciente={citaData?.id_paciente}
+                value={form.acompanante ?? EMPTY_COMPANION}
+                onChange={(acompanante) =>
+                  setForm((prev) => ({ ...prev, acompanante }))
+                }
+              />
+
               <div className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">NOTA DE ATENCIÓN</div>
 
               <div>

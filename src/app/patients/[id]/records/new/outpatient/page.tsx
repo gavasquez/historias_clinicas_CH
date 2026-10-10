@@ -27,6 +27,11 @@ import { ExamenFisicoTab } from "@/app/appointments/[id]/attend/components/Exame
 import { RevisionPorSistemasTab } from "@/app/appointments/[id]/attend/components/RevisionPorSistemasTab";
 import { AttendTabs, type AttendTabKey, type SimpleAttendTabKey } from "@/app/appointments/[id]/attend/components/Tabs";
 import type { DiagnosisDraft } from "@/app/appointments/[id]/attend/components/AttentionDiagnosesSection";
+import {
+  EMPTY_COMPANION,
+  buildAcompanantePayload,
+  type CompanionFormValue,
+} from "@/components/attention/companion-section";
 
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
@@ -68,6 +73,7 @@ type AttentionFormState = {
   fecha_ocurrencia_evento: string;
   lugar_ocurrencia_evento: string;
   notificacion_otro_cual: string;
+  acompanante: CompanionFormValue;
 };
 
 type SelectOption = {
@@ -288,6 +294,17 @@ function isTabComplete(input: {
     if (!attentionId && diagnosticosDraft.length === 0) {
       return { ok: false, message: "Debe agregar al menos un diagnóstico." };
     }
+    if (diagnosticosDraft.length > 0) {
+      if (diagnosticosDraft.filter((diagnostico) => diagnostico.es_principal).length !== 1) {
+        return { ok: false, message: "Debe seleccionar exactamente un diagnóstico principal." };
+      }
+      if (diagnosticosDraft.some((diagnostico) => !diagnostico.codigo_confirmacion)) {
+        return {
+          ok: false,
+          message: "Todos los diagnósticos deben tener un tipo de confirmación: CN, CR o ID.",
+        };
+      }
+    }
     return { ok: true };
   }
 
@@ -378,6 +395,7 @@ export default function OutpatientAttendPage() {
     fecha_ocurrencia_evento: "",
     lugar_ocurrencia_evento: "",
     notificacion_otro_cual: "",
+    acompanante: EMPTY_COMPANION,
   });
 
   const [observacionAntecedentesPersonal, setObservacionAntecedentesPersonal] = useState("");
@@ -528,7 +546,7 @@ export default function OutpatientAttendPage() {
         analisis: form.analisis || undefined,
         hc_atencion_cierre: {
           conducta_plan_estudio_manejo: form.conducta_plan_estudio_manejo || undefined,
-          atencion_recomendaciones: form.atencion_recomendaciones || undefined,
+          recomendaciones: form.atencion_recomendaciones || undefined,
           certificado_emitido: form.certificado_emitido || undefined,
           certificado_opcion: form.certificado_opcion || undefined,
           certificado_recomendaciones: form.certificado_recomendaciones || undefined,
@@ -595,6 +613,7 @@ export default function OutpatientAttendPage() {
         lugar_ocurrencia_evento:
           form.caso_accidente_intoxicacion_violencia === "SI" ? form.lugar_ocurrencia_evento || undefined : undefined,
         notificacion_otro_cual: form.notificacion_otro_cual || undefined,
+        acompanante: buildAcompanantePayload(form.acompanante),
       };
 
       return apiClient.post(`/patients/${idPaciente}/outpatient-attentions`, payload);
@@ -1394,7 +1413,7 @@ export default function OutpatientAttendPage() {
           )}
 
           <div className="min-h-[520px]">
-            {activeTab === "INGRESO" && <IngresoTab citaData={headerCitaLikeData} form={form} setForm={setForm} />}
+            {activeTab === "INGRESO" && <IngresoTab citaData={headerCitaLikeData} form={form} setForm={setForm} idPaciente={idPaciente} />}
             {activeTab === "ANAMNESIS" && <AnamnesisTab form={form} setForm={setForm} />}
 
             {activeTab === "ANTECEDENTES" && (

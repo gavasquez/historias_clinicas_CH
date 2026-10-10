@@ -63,6 +63,7 @@ export async function GET(
             hc_tamizajes_atencion: true,
             hc_examen_fisico_atencion: true,
             hc_valoracion_sistemas_atencion: true,
+            acompanante_atencion: true,
             certificados_medicos: {
               include: {
                 usuarios: { select: { nombre_completo: true } },
