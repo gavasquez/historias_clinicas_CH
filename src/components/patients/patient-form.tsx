@@ -11,6 +11,7 @@ import type {
   Departamento,
   Ciudad,
 } from "@/services/catalogs";
+import { toTitleCase } from "@/lib/format-text";
 
 export type PatientFormMode = "create" | "edit";
 
@@ -113,6 +114,7 @@ export function PatientForm(props: PatientFormProps) {
           </label>
           <input
             type="text"
+            maxLength={11}
             value={form.numero_documento}
             onChange={(e) => onChange("numero_documento", e.target.value)}
             placeholder="Ej: 1234567890"
@@ -131,7 +133,7 @@ export function PatientForm(props: PatientFormProps) {
           <input
             type="text"
             value={form.nombres}
-            onChange={(e) => onChange("nombres", e.target.value)}
+            onChange={(e) => onChange("nombres", e.target.value.toUpperCase())}
             placeholder="Nombres del paciente"
             className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
@@ -148,7 +150,7 @@ export function PatientForm(props: PatientFormProps) {
           <input
             type="text"
             value={form.apellidos}
-            onChange={(e) => onChange("apellidos", e.target.value)}
+            onChange={(e) => onChange("apellidos", e.target.value.toUpperCase())}
             placeholder="Apellidos del paciente"
             className="h-8 rounded-md border border-slate-300 px-2 text-xs shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
@@ -206,7 +208,7 @@ export function PatientForm(props: PatientFormProps) {
             <option value="">Seleccione departamento</option>
             {(departamentos ?? []).map((dep) => (
               <option key={dep.id_departamento} value={dep.id_departamento}>
-                {dep.nombre}
+                {toTitleCase(dep.nombre)}
               </option>
             ))}
           </select>
@@ -233,7 +235,7 @@ export function PatientForm(props: PatientFormProps) {
             </option>
             {(ciudades ?? []).map((c) => (
               <option key={c.id_ciudad} value={c.id_ciudad}>
-                {c.nombre}
+                {toTitleCase(c.nombre)}
               </option>
             ))}
           </select>
@@ -324,7 +326,7 @@ export function PatientForm(props: PatientFormProps) {
             </option>
             {(programas ?? []).map((p) => (
               <option key={p.id_programa_academico} value={p.id_programa_academico}>
-                {p.nombre}
+                {toTitleCase(p.nombre)}
               </option>
             ))}
           </select>

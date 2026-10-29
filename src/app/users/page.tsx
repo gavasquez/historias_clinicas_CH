@@ -9,7 +9,7 @@ import { fetchUsers, markUserAsProfessional, toggleUserActive } from "@/services
 import type { UserListItem } from "@/types/users";
 import Swal from "sweetalert2";
 import axios from "axios";
-import { Edit, User, Key, Power, PowerOff } from "lucide-react";
+import { Edit, UserPlus, UserCheck, Key, Power, PowerOff } from "lucide-react";
 
 export default function UsersPage() {
   const [search, setSearch] = useState("");
@@ -293,7 +293,11 @@ export default function UsersPage() {
                             }
                             title={u.profesional ? "Ver profesional" : "Crear profesional"}
                           >
-                            <User className="h-4 w-4" />
+                            {u.profesional ? (
+                              <UserCheck className="h-4 w-4" />
+                            ) : (
+                              <UserPlus className="h-4 w-4" />
+                            )}
                           </button>
 
                           {(session?.user as any)?.role === "super_admin" && (

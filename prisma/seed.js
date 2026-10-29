@@ -174,6 +174,7 @@ async function main() {
     { codigo: "TI", descripcion: "Tarjeta de identidad" },
     { codigo: "RC", descripcion: "Registro civil" },
     { codigo: "PT", descripcion: "Pasaporte" },
+    { codigo: "CE", descripcion: "Cédula de extranjería" },
     { codigo: "OTRO", descripcion: "Otro tipo de documento" },
   ];
 
@@ -1056,6 +1057,48 @@ async function main() {
   }
 
   */
+
+  // Normalizar capitalización de catálogos para no guardar nombres en mayúsculas sostenidas
+  const ACRONYMS = new Set([
+    "D.C.", "ORI", "SIG", "TIC", "CTIC", "DAVA", "EPS", "EPSI", "SOS",
+    "AIC", "SISBEN", "RIPS", "CIE", "UPC", "ITS", "SSR", "ESE", "NIIF",
+    "UCI", "UTI", "CTEL", "IOT",
+  ]);
+  const toTitleCase = (value) =>
+    String(value ?? "")
+      .trim()
+      .split(/\s+/)
+      .map((word) => {
+        if (/[a-záéíóúñü]/.test(word)) return word;
+        if (word.includes(".") || ACRONYMS.has(word.toUpperCase().replace(/[()-]/g, ""))) return word;
+        return word
+          .toLowerCase()
+          .split(/([-/()])/)
+          .map((part) =>
+            /^[a-záéíóúñü0-9]/i.test(part) ? part.charAt(0).toUpperCase() + part.slice(1) : part,
+          )
+          .join("");
+      })
+      .join(" ");
+
+  for (const [model, pkField] of [
+    ["departamentos", "id_departamento"],
+    ["ciudades", "id_ciudad"],
+    ["programas_academicos", "id_programa_academico"],
+    ["eps", "id_eps"],
+    ["sedes", "id_sede"],
+  ]) {
+    const rows = await prisma[model].findMany();
+    for (const row of rows) {
+      const normalized = toTitleCase(row.nombre);
+      if (normalized && normalized !== row.nombre) {
+        await prisma[model].update({
+          where: { [pkField]: row[pkField] },
+          data: { nombre: normalized },
+        });
+      }
+    }
+  }
 
   console.log(
     "Seed completado: roles, permisos, roles_permisos, catálogos (documentos, géneros, estados civiles, tipos usuario, sedes, eps, programas, tipos sangre, especialidades, modalidades, estados_cita, tipos_cita, departamentos, ciudades)"

@@ -122,10 +122,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       if (moduleName === "dashboard") return true;
 
-      // Regla especial para Profesionales:
-      // - Visible si el usuario NO es "medico" y tiene módulo "profesionales" o (compatibilidad) "citas".
+      // Regla para Profesionales:
+      // - medico: solo ve su propio perfil (requiere profesional vinculado).
+      // - otros roles: visible con módulo "profesionales" o (compatibilidad) "citas".
       if (item.key === "professionals") {
-        if (roleName === "medico") return false;
+        if (roleName === "medico") {
+          return !!(myProfessional as any)?.id_profesional;
+        }
         return modules.has("profesionales") || modules.has("citas");
       }
 
@@ -166,11 +169,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="flex flex-1 flex-col gap-1 text-sm">
           {allowedNavItems.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.href;
+            const idProf = (myProfessional as any)?.id_profesional;
+            const isMedicoOwnProfile = item.key === "professionals" && roleName === "medico" && !!idProf;
+            const href = isMedicoOwnProfile ? `/professionals/${idProf}` : item.href;
+            const label = isMedicoOwnProfile ? "Mi perfil profesional" : item.label;
+            const active = pathname === href;
             return (
               <button
-                key={`${item.href}-${item.label}`}
-                onClick={() => router.push(item.href)}
+                key={`${item.key}-${item.label}`}
+                onClick={() => router.push(href)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-sky-50 cursor-pointer ${
                   active
                     ? "bg-sky-100 text-sky-700"

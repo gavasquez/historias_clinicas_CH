@@ -27,7 +27,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "El archivo debe ser formato CSV" }, { status: 400 });
     }
 
-    const text = await file.text();
+    const buffer = await file.arrayBuffer();
+    let text: string;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+    } catch {
+      // Excel en Windows exporta CSV como Windows-1252/Latin-1
+      text = new TextDecoder("windows-1252").decode(buffer);
+    }
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // quitar BOM
+
     const lines = text.split("\n").filter((line) => line.trim());
 
     if (lines.length < 2) {
@@ -99,6 +108,10 @@ export async function POST(req: NextRequest) {
           throw new Error(`Faltan campos obligatorios: ${missingFields.join(", ")}`);
         }
 
+        if (String(row.numero_documento).trim().length > 11) {
+          throw new Error("El número de documento no puede tener más de 11 caracteres");
+        }
+
         // Mapear tipos de documento
         const tipoDocMap: { [key: string]: string } = {
           "P": "PT",
@@ -106,6 +119,8 @@ export async function POST(req: NextRequest) {
           "T": "TI",
           "R": "RC",
           "PPT": "PT", // PPT también mapea a PT (Pasaporte)
+          "E": "CE", // Extranjero -> Cédula de extranjería
+          "CE": "CE",
         };
         row.tipo_documento = tipoDocMap[row.tipo_documento.toUpperCase()] || row.tipo_documento.toUpperCase();
 

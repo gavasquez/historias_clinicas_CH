@@ -164,6 +164,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (numeroDocumentoTrim.length > 11) {
+      return NextResponse.json(
+        { message: "El número de documento no puede tener más de 11 caracteres" },
+        { status: 400 },
+      );
+    }
+
     const contactoNombreTrim = String(contacto_emergencia_nombre ?? "").trim();
 
     const result = await prisma.$transaction(async (tx) => {
@@ -173,8 +180,8 @@ export async function POST(request: NextRequest) {
         data: {
           id_tipo_documento: idTipoDocumentoNum,
           numero_documento: numeroDocumentoTrim,
-          nombres,
-          apellidos,
+          nombres: String(nombres).trim().toUpperCase(),
+          apellidos: String(apellidos).trim().toUpperCase(),
           fecha_nacimiento: new Date(fecha_nacimiento),
           id_genero: toNullableInt(id_genero),
           id_estado_civil: toNullableInt(id_estado_civil),

@@ -4,7 +4,8 @@ import { z } from "zod";
   id_tipo_documento: z.number().int().positive("El tipo de documento es obligatorio"),
   numero_documento: z
     .string()
-    .min(3, "El documento debe tener al menos 3 caracteres"),
+    .min(3, "El documento debe tener al menos 3 caracteres")
+    .max(11, "El documento no puede tener más de 11 caracteres"),
   nombres: z.string().min(1, "Los nombres son obligatorios"),
   apellidos: z.string().min(1, "Los apellidos son obligatorios"),
   fecha_nacimiento: z.string().min(1, "La fecha de nacimiento es obligatoria"),

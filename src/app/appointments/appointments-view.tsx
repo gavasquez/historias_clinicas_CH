@@ -249,13 +249,21 @@ export function AppointmentsView() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/professionals")}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-          >
-            Ver profesionales
-          </button>
+          {(roleName !== "medico" || idProfesionalAutenticado) && (
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  roleName === "medico" && idProfesionalAutenticado
+                    ? `/professionals/${idProfesionalAutenticado}`
+                    : "/professionals",
+                )
+              }
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+            >
+              {roleName === "medico" ? "Mi perfil profesional" : "Ver profesionales"}
+            </button>
+          )}
           <button
             type="button"
             disabled={!canCreateEdit}

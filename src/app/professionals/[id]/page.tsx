@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
 import { getProfessionalById } from "@/services/professionals";
@@ -114,12 +115,16 @@ export default function ProfessionalDetailPage() {
 
   const isMedico = data?.role === "medico";
 
+  const { data: session } = useSession();
+  const viewerIsMedico = ((session?.user as any)?.role as string | undefined) === "medico";
+  const canManageAvailability = isMedico && !viewerIsMedico;
+
   // Redirigir a pestaña "datos" si el usuario está en una pestaña no permitida
   useEffect(() => {
-    if (!isMedico && (activeTab === "disponibilidad" || activeTab === "citas")) {
+    if ((activeTab === "disponibilidad" && !canManageAvailability) || (activeTab === "citas" && !isMedico)) {
       setActiveTab("datos");
     }
-  }, [isMedico, activeTab]);
+  }, [isMedico, canManageAvailability, activeTab]);
 
   const {
     data: appointments,
@@ -275,7 +280,7 @@ export default function ProfessionalDetailPage() {
             >
               Datos
             </button>
-            {isMedico && (
+            {canManageAvailability && (
               <button
                 type="button"
                 onClick={() => setActiveTab("disponibilidad")}

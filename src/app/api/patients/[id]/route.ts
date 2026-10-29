@@ -127,11 +127,17 @@ export async function PUT(
           { status: 400 },
         );
       }
+      if (numeroDocumentoTrim.length > 11) {
+        return NextResponse.json(
+          { message: "El número de documento no puede tener más de 11 caracteres" },
+          { status: 400 },
+        );
+      }
       updateData.numero_documento = numeroDocumentoTrim;
     }
 
-    if (nombres !== undefined) updateData.nombres = nombres;
-    if (apellidos !== undefined) updateData.apellidos = apellidos;
+    if (nombres !== undefined) updateData.nombres = String(nombres).trim().toUpperCase();
+    if (apellidos !== undefined) updateData.apellidos = String(apellidos).trim().toUpperCase();
     if (fecha_nacimiento !== undefined) {
       if (!fecha_nacimiento) {
         return NextResponse.json(
