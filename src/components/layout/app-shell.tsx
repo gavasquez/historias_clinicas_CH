@@ -32,6 +32,7 @@ type MyPermission = {
 };
 
 type PermissionsResponse = {
+  roleName?: string | null;
   roleDescription: string | null;
   data: MyPermission[];
 };
@@ -58,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (!res.ok) return { roleDescription: null, data: [] };
       const json = await res.json();
       return {
+        roleName: json.roleName ?? null,
         roleDescription: json.roleDescription ?? null,
         data: Array.isArray(json?.data) ? (json.data as MyPermission[]) : [],
       };
@@ -93,11 +95,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [userData?.password_reset_required, pathname, router]);
 
   const myPermissions = permissionsData?.data ?? [];
-  const roleDescription = permissionsData?.roleDescription ?? (roleName === "super_admin" ? "Super Administrador" : "Usuario del sistema");
+  const effectiveRole = roleName ?? permissionsData?.roleName ?? undefined;
+  const roleDescription = permissionsData?.roleDescription ?? (effectiveRole === "super_admin" ? "Super Administrador" : "Usuario del sistema");
 
   const allowedNavItems = useMemo(() => {
-    if (!roleName) return navItems;
-    if (roleName === "super_admin") return navItems;
+    if (!effectiveRole) return navItems;
+    if (effectiveRole === "super_admin") return navItems;
 
     const modules = new Set(
       (myPermissions ?? [])
@@ -126,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       // - medico: solo ve su propio perfil (requiere profesional vinculado).
       // - otros roles: visible con módulo "profesionales" o (compatibilidad) "citas".
       if (item.key === "professionals") {
-        if (roleName === "medico") {
+        if (effectiveRole === "medico") {
           return !!(myProfessional as any)?.id_profesional;
         }
         return modules.has("profesionales") || modules.has("citas");
@@ -134,7 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       return modules.has(moduleName);
     });
-  }, [roleName, myPermissions]);
+  }, [effectiveRole, myPermissions, myProfessional]);
 
   const userName = session?.user?.name ?? "Usuario";
 
@@ -170,7 +173,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {allowedNavItems.map((item) => {
             const Icon = item.icon;
             const idProf = (myProfessional as any)?.id_profesional;
-            const isMedicoOwnProfile = item.key === "professionals" && roleName === "medico" && !!idProf;
+            const isMedicoOwnProfile = item.key === "professionals" && effectiveRole === "medico" && !!idProf;
             const href = isMedicoOwnProfile ? `/professionals/${idProf}` : item.href;
             const label = isMedicoOwnProfile ? "Mi perfil profesional" : item.label;
             const active = pathname === href;
@@ -185,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 }`}
               >
                 <Icon className="h-4 w-4" />
-                <span>{item.label}</span>
+                <span>{label}</span>
               </button>
             );
           })}

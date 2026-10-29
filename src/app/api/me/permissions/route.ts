@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
+      roleName,
       roleDescription: role.descripcion ?? null,
       data: permisos.map((p) => p.permisos),
     });
