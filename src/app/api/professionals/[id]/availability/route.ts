@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseDateOnlyToUtc, parseTimeToUtcDate, timeFromUtcDate } from "@/lib/date-time";
-import { requireAuth } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 
 const DEFAULT_CAPACIDAD_SIMULTANEA = 1;
 
@@ -22,7 +22,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAnyPermission(request, ["PROFESIONALES_VER"]);
     if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;
@@ -76,7 +76,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAnyPermission(request, ["DISPONIBILIDAD_GESTIONAR"]);
     if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;

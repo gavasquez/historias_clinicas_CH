@@ -26,5 +26,6 @@ export interface ReportDefinition {
   code: string;
   version: string;
   vigencia: string;
+  headerExtra?: (data: ReportData) => string[];
   buildContent: (data: ReportData) => any[];
 }

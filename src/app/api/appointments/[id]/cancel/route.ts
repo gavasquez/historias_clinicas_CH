@@ -23,6 +23,14 @@ export async function POST(
       return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
     }
 
+    // Enfermera solo puede cancelar citas que ella agendó
+    if (auth.user.role === "enfermera" && cita.id_usuario_agenda !== Number(auth.user.id)) {
+      return NextResponse.json(
+        { message: "Solo puede cancelar citas agendadas por usted" },
+        { status: 403 },
+      );
+    }
+
     // Leer código de estado opcional desde el body para permitir elegir motivo de cancelación.
     // Si no viene, usamos CANCELADA_INST como valor por defecto.
     let codigoEstado = "CANCELADA_INST";

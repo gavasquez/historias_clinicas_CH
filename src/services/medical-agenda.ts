@@ -25,6 +25,13 @@ export interface MedicalAgendaRow {
   tipo: string | null;
   quien_agenda: string | null;
   fecha_hora_inicio: string;
+  fecha_nacimiento: string | null;
+  edad: number | null;
+  tipo_documento: string | null;
+  telefono: string | null;
+  programa: string | null;
+  tipo_atencion: string | null;
+  asistio: string;
 }
 
 export interface MedicalAgendaStats {

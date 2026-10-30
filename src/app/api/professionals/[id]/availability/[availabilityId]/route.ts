@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseDateOnlyToUtc, parseTimeToUtcDate, timeFromUtcDate } from "@/lib/date-time";
-import { requireAuth } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 
 const DEFAULT_CAPACIDAD_SIMULTANEA = 1;
 
@@ -24,7 +24,7 @@ export async function DELETE(
     | { params: { id: string; availabilityId: string } },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAnyPermission(request, ["DISPONIBILIDAD_GESTIONAR"]);
     if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;
@@ -75,7 +75,7 @@ export async function PUT(
     | { params: { id: string; availabilityId: string } },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAnyPermission(request, ["DISPONIBILIDAD_GESTIONAR"]);
     if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;

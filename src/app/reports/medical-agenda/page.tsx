@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
+import { formatDateInZone } from "@/lib/date-time";
 import { getEstadoCitaBadgeClasses } from "@/lib/appointment-status";
 import { fetchSedes, type Sede } from "@/services/catalogs";
 import {
@@ -34,7 +35,7 @@ function formatDateRange(from: string, to: string) {
 }
 
 export default function MedicalAgendaReportPage() {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => formatDateInZone(new Date()), []);
   const [from, setFrom] = useState<string>(today);
   const [to, setTo] = useState<string>(today);
   const [medico, setMedico] = useState<string>("");
@@ -107,10 +108,10 @@ export default function MedicalAgendaReportPage() {
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
-              Atención no programada
+              Agenda médica
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Consulta y exporta las atenciones no programadas por profesional, rango de fechas, sede y día.
+              Consulta y exporta la agenda de los médicos por profesional, rango de fechas, sede y día.
             </p>
           </div>
 
@@ -272,13 +273,20 @@ export default function MedicalAgendaReportPage() {
                 <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Fecha</th>
-                    <th className="px-3 py-2">Día</th>
                     <th className="px-3 py-2">Hora inicio</th>
                     <th className="px-3 py-2">Hora fin</th>
+                    <th className="px-3 py-2">Paciente</th>
+                    <th className="px-3 py-2">Fecha nacimiento</th>
+                    <th className="px-3 py-2">Edad</th>
+                    <th className="px-3 py-2">Tipo ID</th>
+                    <th className="px-3 py-2">Documento</th>
+                    <th className="px-3 py-2">Teléfono</th>
+                    <th className="px-3 py-2">Programa</th>
+                    <th className="px-3 py-2">Tipo de atención</th>
                     <th className="px-3 py-2">Médico</th>
                     <th className="px-3 py-2">Sede</th>
-                    <th className="px-3 py-2">Paciente</th>
                     <th className="px-3 py-2">Estado</th>
+                    <th className="px-3 py-2">Asistió</th>
                     <th className="px-3 py-2">Quién agenda</th>
                   </tr>
                 </thead>
@@ -286,15 +294,34 @@ export default function MedicalAgendaReportPage() {
                   {rows.map((row) => (
                     <tr key={row.id_cita} className="hover:bg-slate-50">
                       <td className="px-3 py-2 whitespace-nowrap">{row.fecha}</td>
-                      <td className="px-3 py-2">{row.dia_nombre}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{row.hora}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{row.hora_fin ?? "-"}</td>
+                      <td className="px-3 py-2">{row.paciente}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{row.fecha_nacimiento ?? "-"}</td>
+                      <td className="px-3 py-2 text-center">{row.edad ?? "-"}</td>
+                      <td className="px-3 py-2">{row.tipo_documento ?? "-"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{row.documento ?? "-"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{row.telefono ?? "-"}</td>
+                      <td className="px-3 py-2">{row.programa ?? "-"}</td>
+                      <td className="px-3 py-2">{row.tipo_atencion ?? "-"}</td>
                       <td className="px-3 py-2">{row.profesional}</td>
                       <td className="px-3 py-2">{row.sede ?? "No registrada"}</td>
-                      <td className="px-3 py-2">{row.paciente}</td>
                       <td className="px-3 py-2">
                         <span className={getEstadoCitaBadgeClasses(row.estado)}>
                           {row.estado ?? "Atendido sin cita"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={
+                            row.asistio === "Sí"
+                              ? "rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700"
+                              : row.asistio === "No"
+                                ? "rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                                : "rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                          }
+                        >
+                          {row.asistio ?? "-"}
                         </span>
                       </td>
                       <td className="px-3 py-2">{row.quien_agenda ?? "No registrado"}</td>

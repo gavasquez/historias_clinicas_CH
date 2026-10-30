@@ -29,7 +29,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR"]);
+    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR", "ATENCION_SIN_CITA"]);
     if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await context.params;

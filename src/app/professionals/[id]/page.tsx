@@ -21,6 +21,7 @@ import type {
   ProfessionalAvailabilityCreateInput,
 } from "@/types/professional-availability";
 import { getEstadoCitaBadgeClasses } from "@/lib/appointment-status";
+import { formatDateInZone } from "@/lib/date-time";
 import Swal from "sweetalert2";
 
 export default function ProfessionalDetailPage() {
@@ -30,7 +31,7 @@ export default function ProfessionalDetailPage() {
 
   const queryClient = useQueryClient();
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => formatDateInZone(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
   const [activeTab, setActiveTab] = useState<"datos" | "disponibilidad" | "citas">("datos");
@@ -117,7 +118,28 @@ export default function ProfessionalDetailPage() {
 
   const { data: session } = useSession();
   const viewerIsMedico = ((session?.user as any)?.role as string | undefined) === "medico";
-  const canManageAvailability = isMedico && !viewerIsMedico;
+
+  const { data: permissionsData } = useQuery({
+    queryKey: ["me-permissions"],
+    queryFn: async () => {
+      const res = await fetch("/api/me/permissions");
+      if (!res.ok) return { data: [] };
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const myPermissions = permissionsData?.data ?? [];
+  const canGestionarCitas = myPermissions.some(
+    (p: { codigo?: string }) => p.codigo === "CITAS_GESTIONAR",
+  );
+  const canGestionarDisponibilidad = myPermissions.some(
+    (p: { codigo?: string }) => p.codigo === "DISPONIBILIDAD_GESTIONAR",
+  );
+
+  // Solo se gestiona disponibilidad de profesionales agendables (médicos)
+  // y solo quien tenga el permiso DISPONIBILIDAD_GESTIONAR
+  const canManageAvailability = isMedico && canGestionarDisponibilidad;
 
   // Redirigir a pestaña "datos" si el usuario está en una pestaña no permitida
   useEffect(() => {
@@ -933,13 +955,15 @@ export default function ProfessionalDetailPage() {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="h-8 rounded-md border border-slate-300 px-2 text-[11px] text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
-              <button
-                type="button"
-                onClick={() => router.push(`/appointments/new?profesionalId=${id}`)}
-                className="rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-sky-700"
-              >
-                Nueva cita
-              </button>
+              {canGestionarCitas && (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/appointments/new?profesionalId=${id}`)}
+                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                >
+                  Nueva cita
+                </button>
+              )}
             </div>
           </div>
 

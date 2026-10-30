@@ -108,7 +108,31 @@ export function unifiedForm(sections: { title: string; content: any }[]): any {
   };
 }
 
-function buildHeader(def: ReportDefinition, currentPage: number, pageCount: number) {
+function buildHeader(def: ReportDefinition, currentPage: number, pageCount: number, data?: ReportData) {
+  const metaRows: any[] = [
+    [
+      { text: `Código: ${def.code}`, fontSize: 8, color: "#374151" },
+      { text: `Versión: ${def.version}`, fontSize: 8, color: "#374151" },
+      { text: `Página: ${currentPage} de ${pageCount}`, fontSize: 8, color: "#374151" },
+      {
+        text: `Vigencia: ${def.vigencia}`,
+        fontSize: 8,
+        color: "#374151",
+        alignment: "right",
+      },
+    ],
+  ];
+
+  const extra = def.headerExtra && data ? def.headerExtra(data) : [];
+  if (extra.length > 0) {
+    metaRows.push([
+      { text: extra[0] ?? "", fontSize: 8, color: "#374151" },
+      { text: extra[1] ?? "", fontSize: 8, color: "#374151" },
+      { text: extra[2] ?? "", fontSize: 8, color: "#374151" },
+      { text: extra[3] ?? "", fontSize: 8, color: "#374151", alignment: "right" },
+    ]);
+  }
+
   const headerContent = {
     columns: [
       {
@@ -119,24 +143,12 @@ function buildHeader(def: ReportDefinition, currentPage: number, pageCount: numb
       },
       {
         stack: [
-          { text: "Bienestar Institucional", fontSize: 14, bold: true, color: "#003366" },
+          { text: "GESTIÓN DE BIENESTAR INSTITUCIONAL", fontSize: 14, bold: true, color: "#003366" },
           { text: def.name, fontSize: 13, bold: true, margin: [0, 2, 0, 6], color: "#1f2937" },
           {
             table: {
               widths: ["*", "*", "*", "*"],
-              body: [
-                [
-                  { text: `Código: ${def.code}`, fontSize: 8, color: "#374151" },
-                  { text: `Versión: ${def.version}`, fontSize: 8, color: "#374151" },
-                  { text: `Página: ${currentPage} de ${pageCount}`, fontSize: 8, color: "#374151" },
-                  {
-                    text: `Vigencia: ${def.vigencia}`,
-                    fontSize: 8,
-                    color: "#374151",
-                    alignment: "right",
-                  },
-                ],
-              ],
+              body: metaRows,
             },
             layout: "noBorders",
           },
@@ -249,7 +261,7 @@ export function buildDocDefinition(def: ReportDefinition, data: ReportData) {
     pageSize: "LETTER",
     pageMargins: [40, 140, 40, data.issuedBy?.nombre_completo ? 190 : 100],
     defaultStyle: { font: "Roboto", fontSize: 10, lineHeight: 1.25 },
-    header: (currentPage: number, pageCount: number) => buildHeader(def, currentPage, pageCount),
+    header: (currentPage: number, pageCount: number) => buildHeader(def, currentPage, pageCount, data),
     footer: (currentPage: number, pageCount: number) => buildFooter(currentPage, pageCount, data),
     content: def.buildContent(data),
     styles: {

@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
     const page = Math.max(Number(pageParam) || 1, 1);
     const skip = (page - 1) * PAGE_SIZE;
 
-    // Obtener el profesional del usuario autenticado si es médico/profesional
+    // Obtener el profesional del usuario autenticado si es médico (ve solo su agenda)
     let idProfesionalAutenticado: number | null = null;
-    if (roleName && roleName !== "enfermera" && roleName !== "administrador" && Number.isInteger(idUsuario) && idUsuario > 0) {
+    if (roleName === "medico" && Number.isInteger(idUsuario) && idUsuario > 0) {
       const profesional = await prisma.profesionales_salud.findFirst({
         where: {
           id_usuario: idUsuario,
@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
       ...(idProfesionalAutenticado
         ? { id_profesional: idProfesionalAutenticado }
         : {}),
+      // Enfermera solo ve las citas que ella agendó
+      ...(roleName === "enfermera" ? { id_usuario_agenda: idUsuario } : {}),
       ...(profesional
         ? {
             profesionales_salud: {

@@ -34,6 +34,14 @@ export async function GET(
       return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
     }
 
+    // Enfermera solo puede ver citas que ella agendó
+    if (auth.user.role === "enfermera" && cita.id_usuario_agenda !== Number(auth.user.id)) {
+      return NextResponse.json(
+        { message: "Solo puede gestionar citas agendadas por usted" },
+        { status: 403 },
+      );
+    }
+
     // Obtener la última atención asociada a esta cita (si existe)
     const ultimaAtencion = await prisma.atenciones_salud.findFirst({
       where: { id_cita: cita.id_cita },
@@ -91,6 +99,20 @@ export async function PUT(
 
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ message: "ID de cita inválido" }, { status: 400 });
+    }
+
+    // Enfermera solo puede modificar citas que ella agendó
+    if (auth.user.role === "enfermera") {
+      const cita = await prisma.citas.findUnique({
+        where: { id_cita: id },
+        select: { id_usuario_agenda: true },
+      });
+      if (cita?.id_usuario_agenda !== Number(auth.user.id)) {
+        return NextResponse.json(
+          { message: "Solo puede modificar citas agendadas por usted" },
+          { status: 403 },
+        );
+      }
     }
 
     const body = await request.json();

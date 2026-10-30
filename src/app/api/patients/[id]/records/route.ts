@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAnyPermission } from "@/lib/auth";
+import { hasPermission, requireAnyPermission } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
@@ -145,7 +145,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR"]);
+    const auth = await requireAnyPermission(request, ["HISTORIAS_REGISTRAR", "ATENCION_SIN_CITA"]);
     if (auth instanceof NextResponse) return auth;
 
     const idUsuario = Number(auth.user.id);
@@ -185,6 +185,21 @@ export async function POST(
         { message: "El tipo de historia clínica es obligatorio y debe ser un entero positivo" },
         { status: 400 },
       );
+    }
+
+    // Quien no tenga HISTORIAS_REGISTRAR solo puede crear REG_ATENCION_SALUD
+    const canRegistrarHistoria = await hasPermission(auth.user.role, "HISTORIAS_REGISTRAR");
+    if (!canRegistrarHistoria) {
+      const tipoHistoria = await prisma.tipos_historia_clinica.findUnique({
+        where: { id_tipo_historia: idTipoHistoriaNum },
+        select: { codigo: true },
+      });
+      if (tipoHistoria?.codigo !== "REG_ATENCION_SALUD") {
+        return NextResponse.json(
+          { message: "Solo puede crear historias de tipo Registro de Atención de Salud." },
+          { status: 403 },
+        );
+      }
     }
 
     const idHistoriaVinculadaNum =

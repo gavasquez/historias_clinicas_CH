@@ -31,9 +31,9 @@ export default function ReportsPage() {
 
           <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase text-slate-500">Reporte</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-900">Atención no programada</h2>
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">Agenda médica</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Atenciones no programadas con filtros por profesional, sede, rango de fechas y día. Exportación Excel y PDF.
+              Agenda de los médicos con filtros por profesional, sede, rango de fechas y día. Exportación Excel y PDF.
             </p>
             <div className="mt-auto pt-4">
               <Link

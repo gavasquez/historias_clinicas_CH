@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { hasPermission, requireAnyPermission, requireAuth } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAnyPermission(request, ["PROFESIONALES_VER"]);
     if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;
@@ -85,6 +85,22 @@ export async function PUT(
 
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ message: "ID de profesional inválido" }, { status: 400 });
+    }
+
+    // DISPONIBILIDAD_GESTIONAR edita a cualquier profesional;
+    // el resto solo puede editar su propio perfil
+    const canGestionar = await hasPermission(auth.user.role, "DISPONIBILIDAD_GESTIONAR");
+    if (!canGestionar) {
+      const propio = await prisma.profesionales_salud.findFirst({
+        where: { id_usuario: Number(auth.user.id), activo: true },
+        select: { id_profesional: true },
+      });
+      if (propio?.id_profesional !== id) {
+        return NextResponse.json(
+          { message: "Solo puede editar su propio perfil de profesional" },
+          { status: 403 },
+        );
+      }
     }
 
     const body = await request.json();

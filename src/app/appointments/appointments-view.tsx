@@ -178,6 +178,9 @@ export function AppointmentsView() {
   const canCreateEdit = myPermissions.some(
     (p: { codigo?: string }) => p.codigo === "CITAS_GESTIONAR",
   );
+  const canRegistrarHistoria = myPermissions.some(
+    (p: { codigo?: string }) => p.codigo === "HISTORIAS_REGISTRAR",
+  );
 
   const { data: tiposCita } = useQuery<TipoCita[]>({
     queryKey: ["tipos-cita"],
@@ -457,11 +460,13 @@ export function AppointmentsView() {
                         const canAttendByRole = (() => {
                           // Enfermera no puede atender citas
                           if (roleName === "enfermera") return false;
-                          // Médico/profesional solo puede atender sus propias citas
-                          if (roleName && roleName !== "administrador" && idProfesionalAutenticado) {
+                          // Requiere permiso para registrar historias clínicas
+                          if (!canRegistrarHistoria) return false;
+                          // Médico solo puede atender sus propias citas
+                          if (roleName === "medico" && idProfesionalAutenticado) {
                             return cita.id_profesional === idProfesionalAutenticado;
                           }
-                          // Administrador puede atender todas
+                          // super_admin puede atender todas
                           return true;
                         })();
                         

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
+import { formatDateInZone } from "@/lib/date-time";
 import {
   buildAppointmentReportCsvUrl,
   fetchAppointmentReport,
@@ -31,7 +32,7 @@ function formatDateTime(value: string) {
 }
 
 export default function AppointmentReportsPage() {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => formatDateInZone(new Date()), []);
   const [from, setFrom] = useState<string>(today);
   const [to, setTo] = useState<string>(today);
   const [profesional, setProfesional] = useState<string>("");

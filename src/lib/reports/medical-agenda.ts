@@ -25,27 +25,28 @@ interface MedicalAgendaRow {
   estado: string | null;
   tipo: string | null;
   quien_agenda: string | null;
+  fecha_nacimiento: string | null;
+  edad: number | null;
+  tipo_documento: string | null;
+  telefono: string | null;
+  programa: string | null;
+  tipo_atencion: string | null;
+  asistio: string;
 }
 
-function estadoPdfFill(estado: string | null): string | null {
-  const norm = String(estado ?? "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase();
-
-  if (!norm) return "#f1f5f9";
-  if (norm.includes("PROGRAM")) return "#e0f2fe";
-  if (norm.includes("CONFIRM")) return "#d1fae5";
-  if (norm.includes("ATEND") && norm.includes("SIN CITA")) return "#e2e8f0";
-  if (norm.includes("ATEND")) return "#c7d2fe";
-  if (norm.includes("REALIZ")) return "#dcfce7";
-  if (norm.includes("NO ASISTE")) return "#fef3c7";
-  if (norm.includes("CANCEL") && norm.includes("PACIENT")) return "#ffedd5";
-  if (norm.includes("CANCEL") && (norm.includes("INSTITUC") || norm.includes("PROFESION"))) return "#fee2e2";
-  if (norm.includes("REPROGRAM")) return "#ede9fe";
+function asistioPdfFill(asistio: string | null): string | null {
+  const v = String(asistio ?? "").trim().toUpperCase();
+  if (v.startsWith("S")) return "#dcfce7";
+  if (v === "NO") return "#fef3c7";
   return "#f1f5f9";
 }
+
+const HEADER_CELL = {
+  bold: true,
+  fillColor: "#f1f5f9",
+  color: "#334155",
+  fontSize: 7,
+};
 
 function buildContent(data: ReportData): any[] {
   const meta = data.meta as any;
@@ -59,32 +60,38 @@ function buildContent(data: ReportData): any[] {
 
   const tableBody: any[][] = [
     [
-      { text: "Fecha", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Día", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Hora inicio", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Hora fin", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Médico", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Sede", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Paciente", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Estado", bold: true, fillColor: "#f1f5f9", color: "#334155" },
-      { text: "Quién agenda", bold: true, fillColor: "#f1f5f9", color: "#334155" },
+      { text: "Hora de Atención", ...HEADER_CELL },
+      { text: "Nombre Completo", ...HEADER_CELL },
+      { text: "Fecha de Nacimiento", ...HEADER_CELL },
+      { text: "Edad", ...HEADER_CELL },
+      { text: "Tipo de Identificación", ...HEADER_CELL },
+      { text: "Número de Documento", ...HEADER_CELL },
+      { text: "Teléfono", ...HEADER_CELL },
+      { text: "Programa", ...HEADER_CELL },
+      { text: "Tipo de Atención", ...HEADER_CELL },
+      { text: "Profesional de Medicina", ...HEADER_CELL },
+      { text: "Responsable de Agendamiento", ...HEADER_CELL },
+      { text: "Asistió", ...HEADER_CELL },
     ],
   ];
 
   for (const row of rows) {
     tableBody.push([
-      row.fecha,
-      row.dia_nombre,
       row.hora,
-      row.hora_fin ?? "-",
-      row.profesional,
-      row.sede ?? "No registrada",
       row.paciente,
-      {
-        text: row.estado ?? "Atendido sin cita",
-        fillColor: estadoPdfFill(row.estado),
-      },
+      row.fecha_nacimiento ?? "-",
+      row.edad != null ? String(row.edad) : "-",
+      row.tipo_documento ?? "-",
+      row.documento ?? "-",
+      row.telefono ?? "-",
+      row.programa ?? "-",
+      row.tipo_atencion ?? "-",
+      row.profesional,
       row.quien_agenda ?? "No registrado",
+      {
+        text: row.asistio ?? "-",
+        fillColor: asistioPdfFill(row.asistio),
+      },
     ]);
   }
 
@@ -92,10 +99,13 @@ function buildContent(data: ReportData): any[] {
     tableBody.push([
       {
         text: "No se encontraron registros para los filtros seleccionados.",
-        colSpan: 9,
+        colSpan: 12,
         alignment: "center",
         color: "#64748b",
       },
+      "",
+      "",
+      "",
       "",
       "",
       "",
@@ -109,7 +119,7 @@ function buildContent(data: ReportData): any[] {
 
   return [
     {
-      text: "ATENCIÓN NO PROGRAMADA",
+      text: "AGENDA MÉDICA",
       fontSize: 14,
       bold: true,
       color: "#003366",
@@ -145,16 +155,17 @@ function buildContent(data: ReportData): any[] {
     {
       table: {
         headerRows: 1,
-        widths: ["auto", "auto", "auto", "auto", "*", "*", "*", "auto", "*"],
+        widths: [26, "*", 36, 16, 32, 36, 36, "*", "*", "*", "*", 22],
         body: tableBody,
       },
+      fontSize: 7,
       layout: {
         hLineWidth: () => 0.5,
         vLineWidth: () => 0.5,
         hLineColor: () => "#cbd5e1",
         vLineColor: () => "#cbd5e1",
-        paddingLeft: () => 4,
-        paddingRight: () => 4,
+        paddingLeft: () => 3,
+        paddingRight: () => 3,
         paddingTop: () => 3,
         paddingBottom: () => 3,
       },
@@ -164,10 +175,15 @@ function buildContent(data: ReportData): any[] {
 
 export const medicalAgendaReport: ReportDefinition = {
   id: "agenda-medica",
-  name: "Atención no programada",
-  code: "FO-BI-AGM",
+  name: "Agenda Médica",
+  code: "FO-BI-SA-32",
   version: "01",
-  vigencia: "Septiembre 2026",
+  vigencia: "AGOSTO 27 DE 2024",
+  headerExtra: (data: ReportData) => {
+    const meta = data.meta as any;
+    const labels = (meta?.labels ?? {}) as { sede?: string };
+    return [`Sede: ${labels.sede ?? "Todas"}`, `Fecha de generación: ${formatDate(new Date())}`, "", ""];
+  },
   buildContent,
 };
 

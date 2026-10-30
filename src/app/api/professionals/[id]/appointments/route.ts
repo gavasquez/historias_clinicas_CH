@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 import { endOfDayInZone, parseDateInZoneToUtc } from "@/lib/date-time";
 
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> } | { params: { id: string } },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAnyPermission(request, ["CITAS_VER"]);
     if (auth instanceof NextResponse) return auth;
 
     const resolvedParams = await (context as any).params;

@@ -33,6 +33,20 @@ function NewAppointmentContent() {
     setIsClient(true);
   }, []);
 
+  const { data: permissionsData, isLoading: loadingPermissions } = useQuery({
+    queryKey: ["me-permissions"],
+    queryFn: async () => {
+      const res = await fetch("/api/me/permissions");
+      if (!res.ok) return { data: [] };
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const canGestionarCitas = ((permissionsData?.data ?? []) as { codigo?: string }[]).some(
+    (p) => p.codigo === "CITAS_GESTIONAR",
+  );
+
   const selectMenuPortalTarget = typeof document !== "undefined" ? document.body : null;
   const selectStyles = {
     menuPortal: (base: any) => ({ ...base, zIndex: 60 }),
@@ -742,6 +756,18 @@ function NewAppointmentContent() {
   if (!isClient) {
     // Evitamos renderizar los Select durante SSR para prevenir hydration mismatch
     return null;
+  }
+
+  if (!loadingPermissions && !canGestionarCitas) {
+    return (
+      <AppShell>
+        <section className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+            No tienes permiso para agendar citas.
+          </div>
+        </section>
+      </AppShell>
+    );
   }
 
   return (

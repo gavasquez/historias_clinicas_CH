@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPatientDetailById } from "@/services/patients";
@@ -67,10 +68,19 @@ export default function NewPatientRecordPage() {
     queryFn: () => fetchMedicalProfessionals(1, {}),
   });
 
+  const { data: session } = useSession();
+  const roleName = (session?.user as { role?: string } | undefined)?.role;
+
   const { data: tiposHistoriaData, isLoading: loadingTiposHistoria } = useQuery({
     queryKey: ["tipos-historia-clinica"],
     queryFn: () => fetchTiposHistoriaClinica(),
   });
+
+  // Enfermera solo puede crear Registro de Atención de Salud
+  const tiposHistoriaOptions = (tiposHistoriaData ?? []).filter(
+    (t: TipoHistoriaClinica) =>
+      roleName !== "enfermera" || t.codigo === "REG_ATENCION_SALUD",
+  );
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -189,14 +199,14 @@ export default function NewPatientRecordPage() {
                       : "Seleccione el tipo de historia"
                   }
                   isClearable
-                  options={(tiposHistoriaData ?? []).map((t: TipoHistoriaClinica) => ({
+                  options={tiposHistoriaOptions.map((t: TipoHistoriaClinica) => ({
                     value: t.id_tipo_historia,
                     label: t.descripcion,
                   }))}
                   value={(() => {
                     const idTipo = form.id_tipo_historia ? Number(form.id_tipo_historia) : null;
                     if (!idTipo) return null;
-                    const opts = (tiposHistoriaData ?? []).map((t: TipoHistoriaClinica) => ({
+                    const opts = tiposHistoriaOptions.map((t: TipoHistoriaClinica) => ({
                       value: t.id_tipo_historia,
                       label: t.descripcion,
                     }));

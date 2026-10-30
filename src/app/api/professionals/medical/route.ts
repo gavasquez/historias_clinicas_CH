@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAnyPermission } from "@/lib/auth";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAnyPermission(request, ["PROFESIONALES_VER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(request.url);
     const pageParam = searchParams.get("page");
     const nombre = searchParams.get("nombre")?.trim() || "";

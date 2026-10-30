@@ -113,7 +113,7 @@ export async function POST(
     const acompananteData = acompananteRes.data;
 
     // Validar que médicos solo atiendan sus propias citas
-    if (roleName && roleName !== "administrador" && Number.isInteger(idUsuario) && idUsuario > 0) {
+    if (roleName && roleName !== "super_admin" && Number.isInteger(idUsuario) && idUsuario > 0) {
       const profesional = await prisma.profesionales_salud.findFirst({
         where: {
           id_usuario: idUsuario,
@@ -1080,7 +1080,7 @@ export async function PATCH(
       return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
     }
 
-    if (auth.user.role !== "administrador" && auth.user.role !== "super_admin") {
+    if (auth.user.role !== "super_admin") {
       const profesional = await prisma.profesionales_salud.findFirst({
         where: { id_usuario: Number(auth.user.id), activo: true },
         select: { id_profesional: true },
@@ -1581,7 +1581,7 @@ export async function GET(
       return NextResponse.json({ message: "Cita no encontrada" }, { status: 404 });
     }
 
-    if (auth.user.role !== "administrador" && auth.user.role !== "super_admin") {
+    if (auth.user.role !== "super_admin") {
       const profesional = await prisma.profesionales_salud.findFirst({
         where: { id_usuario: Number(auth.user.id), activo: true },
         select: { id_profesional: true },

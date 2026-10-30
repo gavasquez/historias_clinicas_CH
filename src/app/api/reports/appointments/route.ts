@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 import { endOfDayInZone, parseDateInZoneToUtc } from "@/lib/date-time";
 
 function parseDateRange(value: { from: string | null; to: string | null }):
@@ -35,7 +35,7 @@ function toCsv(rows: Record<string, unknown>[]) {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAnyPermission(request, ["REPORTES_VER"]);
     if (auth instanceof NextResponse) return auth;
 
     const { searchParams } = new URL(request.url);

@@ -108,8 +108,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         .filter(Boolean),
     );
 
-    if (modules.size === 0) return navItems;
-
     const navKeyToModule: Record<string, string> = {
       dashboard: "dashboard",
       patients: "pacientes",
@@ -117,8 +115,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       professionals: "profesionales",
       users: "admin",
       records: "historias",
-      reports: "admin",
+      reports: "reportes",
     };
+
+    if (modules.size === 0) {
+      return navItems.filter((item) => item.key === "dashboard");
+    }
 
     return navItems.filter((item) => {
       const moduleName = navKeyToModule[item.key] ?? item.key;
@@ -127,12 +129,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       // Regla para Profesionales:
       // - medico: solo ve su propio perfil (requiere profesional vinculado).
-      // - otros roles: visible con módulo "profesionales" o (compatibilidad) "citas".
+      // - otros roles: visible con módulo "profesionales".
       if (item.key === "professionals") {
         if (effectiveRole === "medico") {
           return !!(myProfessional as any)?.id_profesional;
         }
-        return modules.has("profesionales") || modules.has("citas");
+        return modules.has("profesionales");
       }
 
       return modules.has(moduleName);

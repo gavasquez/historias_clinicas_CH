@@ -34,9 +34,23 @@ async function main() {
     { nombre: "super_admin", descripcion: "Super administrador del sistema" },
     { nombre: "medico", descripcion: "Profesional de salud" },
     { nombre: "enfermera", descripcion: "Profesional de enfermería" },
-    { nombre: "administrador", descripcion: "Usuario administrativo (agenda, pacientes)" },
     { nombre: "directivo", descripcion: "Directivo / coordinación" },
   ];
+
+  // Eliminar roles obsoletos (sin usuarios asignados)
+  for (const nombreObsoleto of ["administrador", "administrativo"]) {
+    const obsoleto = await prisma.roles.findUnique({ where: { nombre: nombreObsoleto } });
+    if (!obsoleto) continue;
+    const usuariosConRol = await prisma.usuarios.count({ where: { id_rol: obsoleto.id_rol } });
+    if (usuariosConRol > 0) {
+      console.warn(
+        `ADVERTENCIA: el rol "${nombreObsoleto}" tiene ${usuariosConRol} usuario(s) asignado(s) y no se eliminó.`,
+      );
+      continue;
+    }
+    await prisma.roles_permisos.deleteMany({ where: { id_rol: obsoleto.id_rol } });
+    await prisma.roles.delete({ where: { id_rol: obsoleto.id_rol } });
+  }
 
   for (const role of roles) {
     await prisma.roles.upsert({
@@ -55,6 +69,10 @@ async function main() {
     { codigo: "CITAS_GESTIONAR", descripcion: "Gestionar citas", modulo: "CITAS", activo: true },
     { codigo: "HISTORIAS_VER", descripcion: "Ver historias clínicas", modulo: "HISTORIAS", activo: true },
     { codigo: "HISTORIAS_REGISTRAR", descripcion: "Registrar historias clínicas", modulo: "HISTORIAS", activo: true },
+    { codigo: "ATENCION_SIN_CITA", descripcion: "Registrar atenciones sin cita (Registro de Atención de Salud)", modulo: "HISTORIAS", activo: true },
+    { codigo: "PROFESIONALES_VER", descripcion: "Ver profesionales de salud", modulo: "PROFESIONALES", activo: true },
+    { codigo: "DISPONIBILIDAD_GESTIONAR", descripcion: "Gestionar profesionales y su disponibilidad", modulo: "PROFESIONALES", activo: true },
+    { codigo: "REPORTES_VER", descripcion: "Ver reportes", modulo: "REPORTES", activo: true },
     { codigo: "ADMIN_USUARIOS", descripcion: "Administrar usuarios", modulo: "ADMIN", activo: true },
     { codigo: "ADMIN_ROLES", descripcion: "Administrar roles", modulo: "ADMIN", activo: true },
   ];
@@ -120,31 +138,39 @@ async function main() {
     ["super_admin", "CITAS_GESTIONAR"],
     ["super_admin", "HISTORIAS_VER"],
     ["super_admin", "HISTORIAS_REGISTRAR"],
+    ["super_admin", "ATENCION_SIN_CITA"],
+    ["super_admin", "PROFESIONALES_VER"],
+    ["super_admin", "DISPONIBILIDAD_GESTIONAR"],
+    ["super_admin", "REPORTES_VER"],
     ["super_admin", "ADMIN_USUARIOS"],
     ["super_admin", "ADMIN_ROLES"],
 
-    // medico => 1,2,3,5,7,8
+    // medico => agenda propia, atiende con y sin cita
     ["medico", "PACIENTES_VER"],
     ["medico", "PACIENTES_CREAR"],
     ["medico", "PACIENTES_EDITAR"],
     ["medico", "CITAS_VER"],
+    ["medico", "PROFESIONALES_VER"],
     ["medico", "HISTORIAS_VER"],
     ["medico", "HISTORIAS_REGISTRAR"],
+    ["medico", "ATENCION_SIN_CITA"],
 
-    // enfermera => 1,2,3,5,7,8 (similar a medico pero sin gestión de citas)
+    // enfermera => agenda completa, disponibilidad, atiende solo sin cita
     ["enfermera", "PACIENTES_VER"],
     ["enfermera", "PACIENTES_CREAR"],
     ["enfermera", "PACIENTES_EDITAR"],
     ["enfermera", "CITAS_VER"],
+    ["enfermera", "CITAS_GESTIONAR"],
+    ["enfermera", "PROFESIONALES_VER"],
+    ["enfermera", "DISPONIBILIDAD_GESTIONAR"],
     ["enfermera", "HISTORIAS_VER"],
-    ["enfermera", "HISTORIAS_REGISTRAR"],
+    ["enfermera", "ATENCION_SIN_CITA"],
 
-    // administrador => 1,2,3,5,6
-    ["administrador", "PACIENTES_VER"],
-    ["administrador", "PACIENTES_CREAR"],
-    ["administrador", "PACIENTES_EDITAR"],
-    ["administrador", "CITAS_VER"],
-    ["administrador", "CITAS_GESTIONAR"],
+    // directivo => solo consulta y reportes
+    ["directivo", "PACIENTES_VER"],
+    ["directivo", "CITAS_VER"],
+    ["directivo", "HISTORIAS_VER"],
+    ["directivo", "REPORTES_VER"],
   ];
 
   for (const [rol, codigo] of grants) {
@@ -165,6 +191,26 @@ async function main() {
         id_rol,
         id_permiso,
         concedido: true,
+      },
+    });
+  }
+
+  // Revocar permisos que ya no hacen parte de la matriz de cada rol
+  const allowedByRole = new Map();
+  for (const [rol, codigo] of grants) {
+    if (!allowedByRole.has(rol)) allowedByRole.set(rol, new Set());
+    allowedByRole.get(rol).add(codigo);
+  }
+
+  for (const [rol, codigos] of allowedByRole) {
+    const id_rol = roleId[rol];
+    if (!id_rol) continue;
+    await prisma.roles_permisos.deleteMany({
+      where: {
+        id_rol,
+        id_permiso: {
+          notIn: [...codigos].map((c) => permId[c]).filter(Boolean),
+        },
       },
     });
   }
